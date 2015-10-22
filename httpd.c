@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
 	// ignore the broken PIPE error when writing 
 	//or reading to/from a closed socked connection
 	signal(SIGPIPE, SIG_IGN);
-
+	signal(SIGABRT, SIG_IGN);
 	server_sock = startup(&port);
 	LOG("httpd running on port %d\n", port);
 

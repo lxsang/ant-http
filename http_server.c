@@ -131,7 +131,7 @@ void catb(int client, FILE* ptr)
 		fread(buffer,BUFFLEN,1,ptr);
 		__b(client,buffer,BUFFLEN);
 	}
-	fclose(ptr);
+	//fclose(ptr);
 }
 void cat(int client, FILE *resource)
 {

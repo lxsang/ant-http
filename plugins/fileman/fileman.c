@@ -90,7 +90,7 @@ void execute(int client,const char* method,dictionary rq)
   	}
   	json(client);
   	__t(client,RRECORD,dlist,frec+rrec,rpath,folder_list_from(rpath)); 
-  	if(path) free(path);
+  	//if(path) free(path);
   	//if(rpath) free(rpath);
   	if(tmp) free(tmp);
   	

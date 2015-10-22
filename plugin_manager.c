@@ -415,17 +415,33 @@ void * plugin_from_file(char* name)
  */
 void unload_all_plugin()
 {
+	LOG("Unload all plugins\n");
+	void (*fn)();
+	char* error;
 	for(int i=0;i<HASHSIZE;i++)
 	{
 		struct plugin_entry *np;
     	for (np = plugin_table[i]; np != NULL; np = np->next)
     	{
+			// execute the exit function if exists
+		 	// load the function
+		    fn = (void (*)())dlsym(np->handle, "pexit");
+		 	if ((error = dlerror()) != NULL)  
+		 	{
+		     	LOG("Cant not find exit method from %s : %s \n", np->pname,error);
+		    }
+			else
+			{
+				// execute it
+				(*fn)();
+			}	
         	dlclose(np->handle);
-        	free((void *) np->handle);
+        	//free((void *) np->handle);
         	free((void *) np->pname);
         }
         plugin_table[i] = NULL;
 	}
+	exit(0);
 }
 
 /**

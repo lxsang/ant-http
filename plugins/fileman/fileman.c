@@ -186,3 +186,7 @@ void rmfolder(int c, const char* m, dictionary rq)
 	//LOG("%s\n",rpath );
 	__t(c,__RESULT__,1,"OK");
 }
+void pexit()
+{
+	LOG("Exit file manager,plugins\n");
+}

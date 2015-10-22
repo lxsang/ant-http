@@ -61,7 +61,9 @@ void load_config(const char* file)
 	}
 	init_file_system();
 }
-
+void stop_serve(int dummy) {
+    unload_all_plugin();
+}
 int main(int argc, char* argv[])
 {
 // load the config first
@@ -81,6 +83,7 @@ int main(int argc, char* argv[])
 	//or reading to/from a closed socked connection
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGABRT, SIG_IGN);
+	signal(SIGINT, stop_serve);
 	server_sock = startup(&port);
 	LOG("httpd running on port %d\n", port);
 

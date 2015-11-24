@@ -349,7 +349,7 @@ int read_buf(int sock, char*buf,int size)
 struct plugin_entry *plugin_lookup(char *s)
 {
     struct plugin_entry *np;
-    for (np = plugin_table[hash(s)]; np != NULL; np = np->next)
+    for (np = plugin_table[hash(s, HASHSIZE)]; np != NULL; np = np->next)
         if (strcmp(s, np->pname) == 0)
           return np; /* found */
     return NULL; /* not found */
@@ -371,7 +371,7 @@ struct plugin_entry *plugin_load(char *name)
           return NULL;
         if ((np->handle = plugin_from_file(name)) == NULL)
        		return NULL;
-       	hashval = hash(name);
+       	hashval = hash(name,HASHSIZE);
         np->next = plugin_table[hashval];
         plugin_table[hashval] = np;
     } else /* already there */

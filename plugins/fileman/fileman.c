@@ -15,11 +15,11 @@ char* folder_list_from(const char* aPath)
   	{
   		for(list np = path; np != NULL; np=np->next)
   		{
-  			route = __s("%s%s%s", route, DIR_SEP, np->e.value.s);
+  			route = __s("%s%s%s", route, DIR_SEP, np->value.s);
   			if(flist == NULL)
-  				flist = __s(FOLLIST, np->e.value.s,route);
+  				flist = __s(FOLLIST, np->value.s,route);
   			else
-  				flist = __s("%s,%s", flist,__s(FOLLIST,np->e.value.s,route));
+  				flist = __s("%s,%s", flist,__s(FOLLIST,np->value.s,route));
   		}
   	}
   	free(path);

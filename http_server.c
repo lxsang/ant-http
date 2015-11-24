@@ -9,7 +9,7 @@ void accept_request(int client)
 	char buf[1024];
 	int numchars;
 	char method[255];
-	char url[255];
+	char url[4096];
 	char path[512];
 	size_t i, j;
 	struct stat st;

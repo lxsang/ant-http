@@ -46,6 +46,18 @@ void json(int client)
 {
 	header(client,"application/json");
 }
+void textstream(int client)
+{
+	header(client, "text/event-stream");
+}
+void octstream(int client, char* name)
+{
+	header_base(client);
+	__t(client,"Content-Type: application/octet-stream");
+	__t(client,"Content-Disposition: attachment; filename=\"%s\"", name);
+	response(client,"");
+	//Content-Disposition: attachment; filename="fname.ext"
+}
 void jpeg(int client)
 {
 	header(client,"image/jpeg");
@@ -57,26 +69,28 @@ void header(int client, const char* type)
 	response(client,"");
 }
 
-void response(int client, const char* data)
+int response(int client, const char* data)
 {
 	char buf[BUFFLEN+3];
 	strcpy(buf, data);
+	int nbytes;
 	int size = strlen(data);
 	buf[size] = '\r';
 	buf[size+1] = '\n';
 	buf[size+2] = '\0';
-	send(client, buf, strlen(buf), 0);
+	nbytes = send(client, buf, strlen(buf), 0);
+	return (nbytes ==-1?0:1);
 }
-void __ti(int client,int data)
+int __ti(int client,int data)
 {
 	char str[15];
 	sprintf(str, "%d", data);
-	response(client,str);
+	return response(client,str);
 }
 
-void __t(int client, const char* fstring,...)
+int __t(int client, const char* fstring,...)
 {
-
+	int nbytes;
 	int dlen;
 	int sent = 0;
 	int buflen = 0;
@@ -93,7 +107,7 @@ void __t(int client, const char* fstring,...)
         va_end(arguments);
         
         if(dlen < BUFFLEN) 
-			response(client,data);
+			return response(client,data);
 		else
 		{
 			while(sent < dlen - 1)
@@ -108,23 +122,29 @@ void __t(int client, const char* fstring,...)
 				//chunk[buflen-1] = '\0';
 				//response(client,chunk);
 				sent += buflen;
-				send(client, chunk, buflen, 0);
+				nbytes = send(client, chunk, buflen, 0);
 				free(chunk);	
+				if(nbytes == -1) return 0;
 			}
 			chunk = "\r\n";
 			send(client, chunk, strlen(chunk), 0);
 		}
         free(data);
     }
+	return 1;
 	//
 }
-void __b(int client, const unsigned char* data, int size)
+int __b(int client, const unsigned char* data, int size)
 {
 	char buf[BUFFLEN];
 	int sent = 0;
 	int buflen = 0;
+	int nbytes;
 	if(size <= BUFFLEN)
-		send(client,data,size,0);
+	{
+		nbytes = send(client,data,size,0);
+		return (nbytes==-1?0:1);
+	}
 	else
 	{
 		while(sent < size)
@@ -134,12 +154,14 @@ void __b(int client, const unsigned char* data, int size)
 			else
 				buflen = size - sent;
 			memcpy(buf,data+sent,buflen);
-			send(client,buf,buflen,0);
+			nbytes = send(client,buf,buflen,0);
 			sent += buflen;
+			if(nbytes == -1) return 0;
 		}	
 	}
+	return 1;
 }
-void __fb(int client, const char* file)
+int __fb(int client, const char* file)
 {
 	printf("Open file %s\n",file );
 	unsigned char buffer[BUFFLEN];
@@ -148,32 +170,37 @@ void __fb(int client, const char* file)
 	if(!ptr)
 	{
 		LOG("Cannot read : %s\n", file);
-		return;
+		return 0;
 	}
+	size_t size;
 	while(!feof(ptr))
 	{
-		fread(buffer,BUFFLEN,1,ptr);
-		__b(client,buffer,BUFFLEN);
+		size = fread(buffer,1,BUFFLEN,ptr);
+		if(!__b(client,buffer,size)) return 0;
 	}
 	fclose(ptr);
+	return 1;
 }
-void __f(int client, const char* file)
+int __f(int client, const char* file)
 {
 	unsigned char buf[BUFFLEN];
 	FILE *ptr;
+	int nbytes;
 	ptr = fopen(file,"r");
 	if(!ptr)
 	{
 		LOG("Cannot read : %s\n", file);
-		return;
+		return 0;
 	}
 	fgets(buf, sizeof(buf), ptr);
 	while(!feof(ptr))
 	{
-		send(client, buf, strlen(buf), 0);
+		nbytes = send(client, buf, strlen(buf), 0);
+		if(nbytes == -1) return 0;
 		fgets(buf, sizeof(buf), ptr);
 	}
 	fclose(ptr);
+	return 1;
 }
 
 char* route(const char* repath)
@@ -208,7 +235,7 @@ void set_cookie(int client,dictionary dic)
 	__t(client,"Content-Type: text/html; charset=utf-8");
 	association assoc;
 	for_each_assoc(assoc,dic){
-		__t(client,"Set-Cookie: %s=%s",assoc->key, assoc->value.s);
+		__t(client,"Set-Cookie: %s=%s",assoc->key, (char*)assoc->value);
 	}
 	response(client,"");
 }

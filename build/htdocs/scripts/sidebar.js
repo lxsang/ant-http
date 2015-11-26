@@ -14,7 +14,8 @@ var sidebar_config = {
 	      			text: 'Plugins', 
 	      			icon: 'fa-cogs' 
 	      		},
-	            { id: 'level-fman', text: 'File manager', icon: 'fa-folder-open' }
+	            { id: 'level-fman', text: 'File manager', icon: 'fa-folder-open' },
+				{ id: 'level-wterm', text: 'Terminal', icon: 'fa-wrench' }
 	        ]
 	    },
 	    { 
@@ -46,6 +47,9 @@ var sidebar_config = {
 				break;
 			case  'level-picam':
 				w2ui.layout.content('main', w2ui.picam_layout);
+				break;
+			case 'level-wterm':
+				w2ui.layout.content('main', w2ui.wterm_layout);
 				break;
 			default: //do nothing
 				w2ui.layout.content('main',"Empty page");

@@ -5,7 +5,7 @@ EXT=dylib
 SERVER=plugin_manager.o ini.o http_server.o plugins/dictionary.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
 #-lsocket
-PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT)  
+PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) 
 
 PLUGINSDEP = plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o
 PLUGINLIBS = -lsqlite3

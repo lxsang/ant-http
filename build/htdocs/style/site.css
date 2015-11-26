@@ -1,0 +1,21 @@
+#wterm {
+	width:100%;
+	height: 100%;
+	background-color:black;
+	position:absolute;
+	overflow:auto;
+}
+.wterm_output_div{
+	padding-left:15px;
+}
+.wterm_input_div
+{
+	color:#00cc00;
+}
+.wterm_input_p{
+	color:#00cc00;
+}
+.wterm_cursor{
+	color:#00cc00;
+	background-color:#00cc00;
+}

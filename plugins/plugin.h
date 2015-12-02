@@ -9,8 +9,8 @@
 #define IS_POST(method) (strcmp(method,"POST")== 0)
 #define IS_GET(method) (strcmp(method,"GET")== 0)
 #define R_STR(d,k) ((char*)dvalue(d,k))
-#define R_INT(d,k) ((int)dvalue(d,k))
-#define R_FLOAT(d,k) ((double)dvalue(d,k))
+#define R_INT(d,k) (atoi(dvalue(d,k)))
+#define R_FLOAT(d,k) ((double)atof(dvalue(d,k)))
 #define R_PTR(d,k) (dvalue(d,k))
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 

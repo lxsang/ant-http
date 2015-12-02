@@ -1,9 +1,16 @@
 CC=gcc
 CFLAGS=-W -Wall -g -std=c99 -D DEBUG
-BUILDIRD=build
 EXT=dylib
 SERVER=plugin_manager.o ini.o http_server.o plugins/dictionary.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
+
+ifeq ($(UNAME_S),Linux)
+    BUILDIRD=/root/antd
+endif
+ifeq ($(UNAME_S),Darwin)
+	BUILDIRD=../build
+endif
+
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) 
 
@@ -33,7 +40,7 @@ clean: sclean pclean
 sclean:
 	rm -f *.o build/httpd
 pclean:
-	rm -f build/plugins/* plugins/*.o
+	rm -f $(BUILDIRD)/plugins/* plugins/*.o
 	-for file in plugins/* ;do \
 		if [ -d "$$file" ]; then \
 			rm "$$file"/*.o; \

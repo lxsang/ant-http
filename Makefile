@@ -3,7 +3,7 @@ CFLAGS=-W -Wall -g -std=c99 -D DEBUG
 EXT=dylib
 SERVER=plugin_manager.o ini.o http_server.o plugins/dictionary.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
-
+UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/root/antd
 endif

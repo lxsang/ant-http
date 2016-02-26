@@ -1,7 +1,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#ifdef USE_DB
 #include "dbhelper.h"
+#endif
 #include "dictionary.h"
 #include "list.h"
 
@@ -24,9 +26,9 @@ typedef struct  {
  
 
 typedef void(*call)();
-
+#ifdef USE_DB
 typedef sqlite3* sqldb;
-
+#endif
 extern plugin_header __plugin__;
 extern call __init__;
 
@@ -48,8 +50,9 @@ int __fb(int, const char*);
 int upload(const char*, const char*);
 char* route(const char*);
 char* htdocs(const char*);
+#ifdef USE_DB
 sqldb getdb();
-void dbclose(sqldb);
+#endif
 void set_cookie(int,dictionary);
 
 /*Default function for plugin*/

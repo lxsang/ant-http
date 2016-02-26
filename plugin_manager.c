@@ -12,7 +12,7 @@ config_t server_config;
  */
 char* post_url_decode(int client,int len)
 {
-	char *query = (char*) malloc(len*sizeof(char));
+	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
       recv(client, (query+i), 1, 0);
     }
@@ -465,7 +465,7 @@ int execute_plugin(int client, const char *path, const char *method, const char 
  	void (*fn)(int, const char*,dictionary);
  	struct plugin_entry *plugin ;
 	int plen = strlen(path);
-	char * rpath = (char*) malloc(plen*sizeof(char));
+	char * rpath = (char*) malloc((plen+1)*sizeof(char));
 	char *error;
 	memcpy(rpath,path+1,plen);
 	rpath[plen] = '\0';

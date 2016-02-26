@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-W -Wall -g -std=c99 -D DEBUG
+CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB
 EXT=dylib
 SERVER=plugin_manager.o ini.o http_server.o plugins/dictionary.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
@@ -8,7 +8,7 @@ ifeq ($(UNAME_S),Linux)
     BUILDIRD=/root/antd
 endif
 ifeq ($(UNAME_S),Darwin)
-	BUILDIRD=../build
+	BUILDIRD=./build
 endif
 
 #-lsocket
@@ -17,7 +17,7 @@ PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT)
 PLUGINSDEP = plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o
 PLUGINLIBS = -lsqlite3
 
-main: httpd plugins
+main: httpd plugins 
 
 
 httpd:$(SERVER)
@@ -29,7 +29,7 @@ plugins: $(PLUGINS)
 	
 %.$(EXT): $(PLUGINSDEP) 
 	for file in $(wildcard plugins/$(basename $@)/*.c) ; do\
-		$(CC) $(CFLAGS) -c $$file -o $$file.o; \
+		$(CC) $(CFLAGS)  -c $$file -o $$file.o; \
 	done
 	$(CC) $(CFLAGS) $(PLUGINLIBS) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
 		$(PLUGINSDEP) plugins/$(basename $@)/*.c.o

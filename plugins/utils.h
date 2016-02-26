@@ -40,6 +40,7 @@ THE SOFTWARE.
 #define IEQU(a,b) (strcasecmp(a,b) == 0)
 #define IS_INT(a) (match_int(a))
 #define IS_FLOAT(a) (match_float(a))
+#define FILE_OK(f) ( access( f, F_OK ) != -1 )
 #define DIR_SEP "/"
 #define true 1
 #define false 0

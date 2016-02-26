@@ -11,6 +11,7 @@ void __init_plugin__(const char* pl,const char*ph,const char* htdocs, const char
 	__plugin__.pdir = strdup(pdir);
 	if(__init__ != NULL) __init__();
 }; 
+#ifdef USE_DB
 sqldb getdb()
 {
 	int plen = strlen(__plugin__.name)+strlen(__plugin__.dbpath)+4;
@@ -22,6 +23,7 @@ sqldb getdb()
 	free(path);
 	return ret;
 }
+#endif
 void header_base(int client)
 {
 

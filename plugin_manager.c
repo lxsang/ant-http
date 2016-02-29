@@ -243,7 +243,7 @@ dictionary decode_multi_part_request(int client,const char* ctype)
 						field = __s("%s.file",part_name);
 						dput(dic,field,part_file);
 						field = __s("%s.tmp",part_name);
-						dput(dic,field,file_path);
+						dput(dic,field,strdup(file_path));
 						field = __s("%s.size",part_name);
 						dput(dic,field,__s("%d",totalsize));
 						field = __s("%s.ext",part_name);

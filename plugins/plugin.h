@@ -6,8 +6,9 @@
 #endif
 #include "dictionary.h"
 #include "list.h"
+#include "ini.h"
 
-
+#define SERVER_NAME "antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)
 #define IS_GET(method) (strcmp(method,"GET")== 0)
 #define R_STR(d,k) ((char*)dvalue(d,k))

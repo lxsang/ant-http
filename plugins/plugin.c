@@ -28,7 +28,7 @@ void header_base(int client)
 {
 
 	response(client, "HTTP/1.0 200 OK");
-	response(client, "RPI CAR SERVER ");
+	response(client, __s("Server: %s ", SERVER_NAME));
 
 }
 void redirect(int client,const char*path)

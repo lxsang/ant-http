@@ -12,9 +12,9 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 #-lsocket
-PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) 
+PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT)
 
-PLUGINSDEP = plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o
+PLUGINSDEP = plugins/ini.o plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o
 PLUGINLIBS = -lsqlite3
 
 main: httpd plugins 
@@ -40,7 +40,7 @@ clean: sclean pclean
 sclean:
 	rm -f *.o build/httpd
 pclean:
-	rm -f $(BUILDIRD)/plugins/* plugins/*.o
+	rm -rf $(BUILDIRD)/plugins/* plugins/*.o
 	-for file in plugins/* ;do \
 		if [ -d "$$file" ]; then \
 			rm "$$file"/*.o; \

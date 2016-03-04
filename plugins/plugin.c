@@ -1,16 +1,18 @@
 #include "plugin.h"
 
 plugin_header __plugin__;
-call __init__;
 // private function
+call __init__;
 
-void __init_plugin__(const char* pl,const char*ph,const char* htdocs, const char* pdir){
+void __init_plugin__(const char* pl,const char*ph,const char* htdocs, const char* pdir,int port){
 	__plugin__.name = strdup(pl);
 	__plugin__.dbpath= strdup(ph);
 	__plugin__.htdocs = strdup(htdocs);
 	__plugin__.pdir = strdup(pdir);
+	__plugin__.sport = port;
 	if(__init__ != NULL) __init__();
 }; 
+
 #ifdef USE_DB
 sqldb getdb()
 {
@@ -240,4 +242,12 @@ void set_cookie(int client,dictionary dic)
 		__t(client,"Set-Cookie: %s=%s",assoc->key, (char*)assoc->value);
 	}
 	response(client,"");
+}
+char* config_dir()
+{
+	struct stat st;
+	char* path = __s("%s%s%s", __plugin__.pdir,DIR_SEP, __plugin__.name);
+	if (stat(path, &st) == -1)
+		mkdir(path, 0755);
+	return path;
 }

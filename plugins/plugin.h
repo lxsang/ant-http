@@ -22,6 +22,7 @@ typedef struct  {
     char *dbpath;
     char * htdocs;
     char*pdir;
+	int *sport;
 } plugin_header;
 
  
@@ -49,6 +50,7 @@ int __b(int, const unsigned char*, int);
 int __f(int, const char*);
 int __fb(int, const char*);
 int upload(const char*, const char*);
+char* config_dir();
 char* route(const char*);
 char* htdocs(const char*);
 #ifdef USE_DB

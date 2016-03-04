@@ -15,7 +15,10 @@ void init()
 		dbquery(db,sql,NULL);
 	printf("Finish init\n");
 }
-
+void pexit()
+{
+	LOG("%s\n","Plugin DUMMY is exited");
+}
 void execute(int client,const char* method,dictionary rq)
 {
 
@@ -50,7 +53,6 @@ void execute(int client,const char* method,dictionary rq)
 	__t(client, "],\"total\":%d}",records->idx);
 	free(records);
 	//__t(client, query);
-	
 }
 
 // delete record

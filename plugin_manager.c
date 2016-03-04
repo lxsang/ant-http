@@ -391,7 +391,7 @@ void * plugin_from_file(char* name)
 	void *lib_handle;
   char* error;
   char* path = __s("%s%s%s",server_config.plugins_dir,name,server_config.plugins_ext);
-  void (*fn)(const char*,const char*,const char*,const char*);
+  void (*fn)(const char*,const char*,const char*,const char*,int);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 
    {
@@ -399,45 +399,70 @@ void * plugin_from_file(char* name)
       return NULL;
    }
    // set database path
-   fn = (void (*)(const char *, const char *, const char *, const char *))dlsym(lib_handle, "__init_plugin__");
+   fn = (void (*)(const char *, const char *, const char *, const char *,int))dlsym(lib_handle, "__init_plugin__");
   if ((error = dlerror()) != NULL)  
   		LOG("Problem when setting data path for %s : %s \n", name,error);
   else
-    (*fn)(name,server_config.db_path, server_config.htdocs,server_config.plugins_dir);
+    (*fn)(name,server_config.db_path, server_config.htdocs,server_config.plugins_dir,server_config.port);
 	free(path);
    return lib_handle;
 }
 
-
-
+void unload_plugin(struct plugin_entry* np)
+{
+	char* error;
+	void (*fn)() = NULL;
+	// find and execute the exit function
+    fn = (void (*)())dlsym(np->handle, "pexit");
+ 	if ((error = dlerror()) != NULL)  
+ 	{
+     	LOG("Cant not find exit method from %s : %s \n", np->pname,error);
+    }
+	else
+	{
+		// execute it
+		(*fn)();
+	}	
+	dlclose(np->handle);
+	//free((void *) np->handle);
+	free((void *) np->pname);
+}
+/*
+	Unload a plugin by its name
+*/
+void unload_plugin_by_name(const char* name)
+{
+	LOG("%s\n","Unloading thing");
+	struct plugin_entry *np;
+	int hasval = hash(name, HASHSIZE);
+	np = plugin_table[hasval];
+	if(strcmp(np->pname,name) == 0)
+	{
+		unload_plugin(np);
+		plugin_table[hasval] = np->next;
+	}
+	else
+	{
+	    for (np; np != NULL; np = np->next)
+	        if (np->next != NULL  && strcmp(name, np->next->pname) == 0)
+				break;
+		if(np == NULL) return; // the plugin is is not loaded
+		unload_plugin(np->next);
+		np->next = np->next->next;
+	}
+}
 /**
  * Unload all the plugin loaded on the plugin table
  */
 void unload_all_plugin()
 {
 	LOG("Unload all plugins\n");
-	void (*fn)();
-	char* error;
 	for(int i=0;i<HASHSIZE;i++)
 	{
 		struct plugin_entry *np;
     	for (np = plugin_table[i]; np != NULL; np = np->next)
     	{
-			// execute the exit function if exists
-		 	// load the function
-		    fn = (void (*)())dlsym(np->handle, "pexit");
-		 	if ((error = dlerror()) != NULL)  
-		 	{
-		     	LOG("Cant not find exit method from %s : %s \n", np->pname,error);
-		    }
-			else
-			{
-				// execute it
-				(*fn)();
-			}	
-        	dlclose(np->handle);
-        	//free((void *) np->handle);
-        	free((void *) np->pname);
+			unload_plugin(np);
         }
         plugin_table[i] = NULL;
 	}

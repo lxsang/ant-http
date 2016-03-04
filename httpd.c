@@ -9,7 +9,7 @@ static int config_handler(void* conf, const char* section, const char* name,
                    const char* value)
 {
     config_t* pconfig = (config_t*)conf;
-
+	char * ppath = NULL;
     if (MATCH("SERVER", "port")) {
         pconfig->port = atoi(value);
     } else if (MATCH("SERVER", "plugins")) {
@@ -22,7 +22,11 @@ static int config_handler(void* conf, const char* section, const char* name,
         pconfig->htdocs = strdup(value);
     } else if(MATCH("SERVER", "tmpdir")) {
         pconfig->tmpdir = strdup(value);
-    }else {
+    }else if(strcmp(section,"AUTOSTART")==0){
+		// The server section must be added before the autostart section
+		// auto start plugin
+		plugin_load(value);
+    } else {
         return 0;  /* unknown section/name, error */
     }
     return 1;

@@ -1,16 +1,17 @@
 CC=gcc
-CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB
 EXT=dylib
 SERVER=plugin_manager.o plugins/ini.o http_server.o plugins/dictionary.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/root/antd
+	PF_FLAG=-D_GNU_SOURCE
 endif
 ifeq ($(UNAME_S),Darwin)
 	BUILDIRD=./build
+	PF_FLAG=
 endif
-
+CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT)
 

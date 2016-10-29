@@ -1,0 +1,672 @@
+application-window-top .WindowFrost {
+  position : absolute;
+  top : 0;
+  left : 0;
+  width : 100%;
+  height : 100%;
+  -webkit-filter : blur(4px);
+  opacity : .5;
+}
+
+/**
+ * Default Wallpaper stuff
+ */
+body[data-background-style="color"] {
+  background-image : none;
+}
+body[data-background-style="default"] {
+  background-repeat : repeat;
+}
+body[data-background-style="normal"] {
+  background-repeat : no-repeat;
+}
+body[data-background-style="center"] {
+  background-repeat : no-repeat;
+  background-position : center center;
+}
+body[data-background-style="fill"] {
+  background-repeat : no-repeat;
+  background-size : cover;
+  background-position : center center;
+  /*
+  background-attachment : fixed;
+  */
+}
+body[data-background-style="strech"] {
+  background-repeat : no-repeat;
+  background-size : 100% auto;
+}
+
+/**
+ * ===========================================================================
+ *                             NOTIFICATIONS
+ * ===========================================================================
+ */
+
+corewm-notifications {
+  position : absolute;
+  top : 0;
+  right : 0;
+  z-index : 10000000;
+  width : 400px;
+}
+
+corewm-notification {
+  display : block;
+  position : relative;
+  min-height : 10px;
+  overflow : hidden;
+  white-space : nowrap;
+}
+corewm-notification.HasIcon {
+  min-height : 32px;
+}
+corewm-notification.HasIcon img {
+  position : absolute;
+}
+corewm-notification.HasIcon .Title,
+corewm-notification.HasIcon .Message {
+  margin-left : 32px;
+  padding-left : 5px;
+  white-space: -moz-pre-wrap;
+  white-space:   -o-pre-wrap;
+  white-space:     -pre-wrap;
+  white-space:      pre-wrap;
+  word-wrap: break-word;
+}
+corewm-notification:before {
+  content : '';
+  position : absolute;
+  top : 0;
+  left : 0;
+  right : 0;
+  bottom : 0;
+  z-index : -1;
+}
+
+/**
+ * ===========================================================================
+ *                            WINDOW SWITCHER
+ * ===========================================================================
+ */
+
+corewm-window-switcher {
+  display : block;
+  position : absolute;
+  top : 50%;
+  left : 50%;
+  width : 256px;
+  z-index : 999999;
+  overflow : hidden;
+  margin-left : -128px;
+}
+corewm-window-switcher > div {
+  width : 256px;
+  height : 32px;
+  line-height : 32px;
+  overflow : hidden;
+}
+corewm-window-switcher > div > img {
+  vertical-align : middle;
+  margin-right : 5px;
+  margin-left : 5px;
+  width : 16px;
+}
+
+/**
+ * ===========================================================================
+ *                                ICON VIEW
+ * ===========================================================================
+ */
+
+#CoreWMDesktopIconView {
+  background : transparent !important;
+  position : absolute;
+  top : 10px;
+  left : 10px;
+  right : 10px;
+  bottom : 10px;
+  z-index : 1;
+  border : 0 none !important;
+  box-shadow : none !important;
+  pointer-events : none;
+  box-sizing : border-box;
+}
+
+#CoreWMDesktopIconView gui-icon-view-entry {
+  pointer-events : all;
+}
+
+/**
+ * ===========================================================================
+ *                            APPLICATION MENU
+ * ===========================================================================
+ */
+
+#CoreWMApplicationMenu {
+  z-index : 9999999999;
+  position : absolute;
+  left : 5%;
+  right : 5%;
+  top : 5% !important;
+  bottom : 5%;
+  width : 90%;
+  height : 90%;
+  overflow-x : hidden;
+  overflow-y : auto;
+  padding : 0;
+  margin : 0;
+  background : transparent;
+  border : 0 none;
+  box-shadow : none;
+  text-align : center;
+}
+
+#CoreWMApplicationMenu:before {
+  z-index : -1;
+  position : fixed;
+  top : 0;
+  left : 0;
+  right : 0;
+  bottom : 0;
+  overflow : hidden;
+  background : rgba(0, 0, 0, .8);
+  content : '';
+}
+
+  #CoreWMApplicationMenu gui-menu-entry {
+    width : 84px;
+    height : 84px;
+    padding : 4px;
+    display : inline-block;
+    overflow : hidden;
+    line-height : 16px;
+    position : relative;
+    box-sizing : border-box;
+    text-align : center;
+  }
+
+    #CoreWMApplicationMenu gui-menu-entry img {
+      margin-top : 5px;
+      width : 32px;
+      height : 32px;
+    }
+
+    #CoreWMApplicationMenu gui-menu-entry div {
+      white-space : normal;
+      max-height : 30px;
+      box-sizing : border-box;
+      margin-top : 5px;
+      color : #fff;
+    }
+
+/**
+ * ===========================================================================
+ *                                PANELS
+ * ===========================================================================
+ */
+
+corewm-panel {
+  display : block;
+  position : absolute;
+  overflow : hidden;
+  z-index : 2;
+  margin : 0;
+  box-sizing : border-box;
+
+  -webkit-user-select: none;
+   -khtml-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+
+  min-width : 16px;
+  min-height : 16px;
+}
+
+corewm-panel[data-orientation="horizontal"] {
+  top : 0;
+  left : 0;
+  right : 0;
+}
+  corewm-panel[data-orientation="horizontal"] corewm-panel-item {
+    height : 100%;
+  }
+  corewm-panel[data-orientation="horizontal"] corewm-panel-container {
+    width : 100%;
+    min-height : 16px;
+    height : 16px;
+  }
+  corewm-panel[data-orientation="horizontal"] .corewm-panel-buttons {
+    height : 100%;
+  }
+    corewm-panel[data-orientation="horizontal"] .corewm-panel-buttons > li {
+      height : 100%;
+    }
+
+    corewm-panel[data-orientation="horizontal"] .corewm-panel-buttons > li > img {
+      height : 100%;
+      width : auto;
+    }
+
+corewm-panel[data-orientation="vertical"] {
+  left : 0;
+  bottom : 0;
+  top : 0;
+}
+  corewm-panel[data-orientation="vertical"] corewm-panel-item {
+    width : 100%;
+  }
+  corewm-panel[data-orientation="vertical"] corewm-panel-container {
+    height : 100%;
+    min-width : 16px;
+    width : 16px;
+    flex-direction : column;
+  }
+  corewm-panel[data-orientation="vertical"] .corewm-panel-buttons {
+    flex-direction : column;
+    width : 100%;
+  }
+    corewm-panel[data-orientation="vertical"] .corewm-panel-buttons > li {
+      max-width : 100%;
+      width : 100%;
+    }
+      corewm-panel[data-orientation="vertical"] .corewm-panel-buttons > li > span {
+        transform : rotate(90deg);
+      }
+      corewm-panel[data-orientation="vertical"] .corewm-panel-buttons > li > img {
+        width : 100%;
+        height : auto;
+      }
+
+corewm-panel:before {
+  content : '';
+  display : block;
+  position : absolute;
+  top : 0;
+  left : 0;
+  right : 0;
+  bottom : 0;
+  z-index : 1;
+}
+
+corewm-panel[data-ontop="true"] {
+  z-index : 9999998;
+}
+corewm-panel[data-position="bottom"] {
+  top : auto;
+  bottom : 0;
+}
+corewm-panel[data-autohide="true"] {
+  height : 0;
+}
+corewm-panel[data-autohide="true"] > * {
+  visibility : hidden;
+}
+
+corewm-panel-container {
+  position : relative;
+  z-index : 10;
+
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+
+  -ms-flex-align: center;
+
+  -webkit-align-items: center;
+     -moz-align-items: center;
+          align-items: center;
+
+  -webkit-box-align: center;
+     -moz-box-align: center;
+      -ms-box-align: center;
+       -o-box-align: center;
+          box-align: center;
+
+  -webkit-flex-wrap: nowrap;
+     -moz-flex-wrap: nowrap;
+      -ms-flex-wrap: nowrap;
+       -o-flex-wrap: nowrap;
+          flex-wrap: nowrap;
+}
+
+corewm-panel-item {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  box-sizing : border-box;
+
+  -webkit-flex: 0 0 auto;
+     -moz-flex: 0 0 auto;
+      -ms-flex: 0 0 auto;
+       -o-flex: 0 0 auto;
+          flex: 0 0 auto;
+}
+
+corewm-panel-container > .corewm-panel-expand {
+  -webkit-flex: 1 1 auto;
+     -moz-flex: 1 1 auto;
+      -ms-flex: 1 1 auto;
+       -o-flex: 1 1 auto;
+          flex: 1 1 auto;
+}
+corewm-panel-container > .corewm-panel-right {
+  -webkit-justify-content : flex-end;
+     -moz-justify-content : flex-end;
+      -ms-justify-content : flex-end;
+       -o-justify-content : flex-end;
+          justify-content : flex-end;
+}
+
+  corewm-panel-item .corewm-panel-buttons {
+    list-style : none;
+    margin : 0;
+    padding : 0;
+    position : relative;
+    z-index : 10;
+    box-sizing : border-box;
+
+    display: -webkit-box;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: -webkit-flex;
+    display: flex;
+
+    -ms-flex-align: center;
+
+    -webkit-align-items: center;
+       -moz-align-items: center;
+            align-items: center;
+  }
+    corewm-panel-item .corewm-panel-buttons > li {
+      margin : 0;
+      padding : 0;
+      box-sizing : border-box;
+      position : relative;
+      min-width : 16px;
+      min-height : 16px;
+
+      display: -webkit-box;
+      display: -moz-box;
+      display: -ms-flexbox;
+      display: -webkit-flex;
+      display: flex;
+
+      -webkit-flex: 1 1 auto;
+         -moz-flex: 1 1 auto;
+          -ms-flex: 1 1 auto;
+           -o-flex: 1 1 auto;
+              flex: 1 1 auto;
+
+
+      justify-content: center;
+
+      -ms-flex-align: center;
+
+      -webkit-align-items: center;
+         -moz-align-items: center;
+              align-items: center;
+
+      -webkit-box-align: center;
+         -moz-box-align: center;
+    }
+    corewm-panel-item .corewm-panel-buttons:first-child {
+      margin-right : 0;
+      margin-top : 0;
+    }
+    corewm-panel-item .corewm-panel-buttons:last-child {
+      margin-right : 0;
+      margin-bottom : 0;
+    }
+      corewm-panel-item .corewm-panel-buttons > li > img {
+        display : inline-block;
+      }
+
+      corewm-panel-item .corewm-panel-buttons > li > img,
+      corewm-panel-item .corewm-panel-buttons > li > span {
+        pointer-events: none;
+      }
+
+corewm-panel-item .Ghost {
+  background-color : red !important;
+  min-width : 16px;
+}
+
+.corewm-panel-dummy {
+  min-width : 16px;
+  min-height : 16px;
+}
+.corewm-panel-ellipsis span {
+  display : inline-block;
+  overflow : hidden;
+  white-space : nowrap;
+  text-overflow: ellipsis;
+  -o-text-overflow: ellipsis;
+}
+
+/**
+ * ===========================================================================
+ *                                 SEARCH
+ * ===========================================================================
+ */
+
+corewm-search {
+  position : absolute;
+  display : none;
+  z-index : 99999;
+  max-width : 400px;
+}
+corewm-search:before {
+  position : absolute;
+  top : 0;
+  left : 0;
+  bottom : 0;
+  right : 0;
+  z-index : -1;
+}
+corewm-search[data-visible=true] {
+  display : block;
+}
+  corewm-search > div {
+    margin-top : 5px;
+  }
+  corewm-search gui-text {
+    width : 100%;
+  }
+
+  corewm-search > ul {
+    list-style-type : none;
+    margin : 0;
+    padding : 0;
+  }
+    corewm-search > ul > li {
+      position : relative;
+      margin : 0;
+      padding : 0;
+    }
+      corewm-search > ul > li > * {
+        pointer-events : none;
+      }
+      corewm-search > ul > li > img {
+        position : absolute;
+        top : 5px;
+        left : 5px;
+      }
+
+/**
+ * ===========================================================================
+ *                               PANEL ITEMS
+ * ===========================================================================
+ */
+
+corewm-panel .PanelItemClock {
+  flex : 0 0 55px;
+}
+corewm-panel .PanelItemClock li {
+  cursor : default;
+}
+corewm-panel .PanelItemWindowList li > span {
+  max-width : 200px;
+}
+
+corewm-panel[data-orientation="horizontal"] .PanelItemWindowList li {
+  -webkit-flex: 0 0 auto;
+     -moz-flex: 0 0 auto;
+      -ms-flex: 0 0 auto;
+       -o-flex: 0 0 auto;
+          flex: 0 0 auto;
+}
+corewm-panel[data-orientation="vertical"] .PanelItemWindowList li {
+  -ms-flex-align: flex-start;
+
+  -webkit-align-items: flex-start;
+     -moz-align-items: flex-start;
+          align-items: flex-start;
+}
+
+corewm-panel[data-orientation="vertical"] .PanelItemWindowList li > img {
+  transform : rotate(90deg);
+}
+corewm-panel[data-orientation="vertical"] .PanelItemWindowList li > span {
+  position: absolute;
+  left: .5em;
+  top: 20px;
+  transform-origin: left;
+}
+
+corewm-panel .PanelItemNotificationArea .BusyNotification > div,
+corewm-panel .PanelItemNotificationArea .StartupNotification > div {
+  cursor : help;
+  width : 20px;
+}
+
+corewm-panel .PanelItemNotificationArea .BusyNotification > div > div,
+corewm-panel .PanelItemNotificationArea .StartupNotification > div > div {
+  border: 2px solid #fff;
+  border-radius: 100%;
+  margin-left : -10px;
+  margin-top : -10px;
+  position : absolute;
+  top : 50%;
+  left : 50%;
+  width : 20px;
+  height : 20px;
+  box-sizing : border-box;
+}
+corewm-panel .PanelItemNotificationArea .StartupNotification > div > div:before {
+  display: block;
+  position: absolute;
+  left: 7px;
+  top: 2px;
+  width: 2px;
+  height: 6px;
+  background-color: #fff;
+  content: "";
+
+  -webkit-animation: NotificationSpinAnim 3s linear infinite;
+     -moz-animation: NotificationSpinAnim 3s linear infinite;
+      -ms-animation: NotificationSpinAnim 3s linear infinite;
+          animation: NotificationSpinAnim 3s linear infinite;
+
+  -webkit-transform-origin: 1px 6px;
+     -moz-transform-origin: 1px 6px;
+      -ms-transform-origin: 1px 6px;
+       -o-transform-origin: 1px 6px;
+          transform-origin: 1px 6px;
+}
+corewm-panel .PanelItemNotificationArea .StartupNotification > div > div:after {
+    display: block;
+    position: absolute;
+    left: 7px; /*( 16px / 2 ) - 1px;*/
+    top: 3px;
+    width: 2px;
+    height: 5px; /*( 16px / 2 ) - 3px;*/
+    background-color: #fff;
+    content: "";
+
+    -webkit-animation: NotificationSpinAnim 18s linear infinite; /* NotificationSpinAnim 6 * 3s linear infinite; */
+       -moz-animation: NotificationSpinAnim 18s linear infinite; /* NotificationSpinAnim 6 * 3s linear infinite; */
+        -ms-animation: NotificationSpinAnim 18s linear infinite; /* NotificationSpinAnim 6 * 3s linear infinite; */
+         -o-animation: NotificationSpinAnim 18s linear infinite; /* NotificationSpinAnim 6 * 3s linear infinite; */
+            animation: NotificationSpinAnim 18s linear infinite; /* NotificationSpinAnim 6 * 3s linear infinite; */
+
+    -webkit-transform-origin: 1px 5px; /* 1px ( 16px / 2 ) - 3px;*/
+       -moz-transform-origin: 1px 5px; /* 1px ( 16px / 2 ) - 3px;*/
+        -ms-transform-origin: 1px 5px; /* 1px ( 16px / 2 ) - 3px;*/
+         -o-transform-origin: 1px 5px; /* 1px ( 16px / 2 ) - 3px;*/
+            transform-origin: 1px 5px; /* 1px ( 16px / 2 ) - 3px;*/
+}
+
+corewm-panel .PanelItemNotificationArea .BusyNotification > div > div:after,
+corewm-panel .PanelItemNotificationArea .BusyNotification > div > div:before {
+  display: block;
+  position: absolute;
+  left: 7px;
+  top: 2px;
+  width: 2px;
+  height: 12px;
+  background-color: #fff;
+  content: "";
+
+  -webkit-transform-origin: 1px 6px; /* 1px ( 24px / 2 ) - 2px;*/
+     -moz-transform-origin: 1px 6px; /* 1px ( 24px / 2 ) - 2px;*/
+      -ms-transform-origin: 1px 6px; /* 1px ( 24px / 2 ) - 2px;*/
+       -o-transform-origin: 1px 6px; /* 1px ( 24px / 2 ) - 2px;*/
+          transform-origin: 1px 6px; /* 1px ( 24px / 2 ) - 2px;*/
+
+  -webkit-animation: NotificationSpinAnim 3s linear infinite;
+     -moz-animation: NotificationSpinAnim 3s linear infinite;
+      -ms-animation: NotificationSpinAnim 3s linear infinite;
+       -o-animation: NotificationSpinAnim 3s linear infinite;
+          animation: NotificationSpinAnim 3s linear infinite;
+}
+corewm-panel .PanelItemNotificationArea .BusyNotification > div > div:after {
+  -webkit-animation: NotificationSpinAnim 3s linear -0.75s infinite;
+     -moz-animation: NotificationSpinAnim 3s linear -0.75s infinite;
+      -ms-animation: NotificationSpinAnim 3s linear -0.75s infinite;
+       -o-animation: NotificationSpinAnim 3s linear -0.75s infinite;
+          animation: NotificationSpinAnim 3s linear -0.75s infinite;
+}
+
+@-webkit-keyframes NotificationSpinAnim {
+  to {
+    -webkit-transform: rotate( 360deg );
+  }
+}
+@-moz-keyframes notificationspinanim {
+  to {
+    -moz-transform: rotate( 360deg );
+  }
+}
+@-o-keyframes notificationspinanim {
+  to {
+    -o-transform: rotate( 360deg );
+  }
+}
+@keyframes NotificationSpinAnim {
+  to {
+    transform: rotate( 360deg );
+  }
+}
+
+/**
+ * ===========================================================================
+ *                               RESPONSIVE
+ * ===========================================================================
+ */
+
+@media all and (max-width: 800px) {
+
+  .PanelItemWindowList > ul > li > span {
+    display: none;
+  }
+
+}

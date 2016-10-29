@@ -1,0 +1,80 @@
+{
+    "className": "CoreWM",
+    "name": "OS.js Window Manager",
+    "names": {
+        "bg_BG": "Мениджър на прозорци на OS.js",
+        "de_DE": "OS.js Fenster-Manager",
+        "es_ES": "OS.js Window Manager",
+        "fr_FR": "Gestionnaire de fenêtre OS.js",
+        "it_IT": "OS.js Gestore Finestre",
+        "ko_KR": "OS.js 윈도우 관리자",
+        "nl_NL": "OS.js venster beheer",
+        "no_NO": "OS.js Vinduhåndterer",
+        "pl_PL": "Menedżer Okien OS.js",
+        "ru_RU": "OS.js Оконный менеджер",
+        "sk_SK": "Správca Okien OS.js",
+        "tr_TR": "OS.js Pencere Yöneticisi",
+        "vi_VN": "Quản lí cửa sổ OS.js"
+    },
+    "singular": true,
+    "type": "windowmanager",
+    "icon": "apps/gnome-window-manager.png",
+    "splash": false,
+    "preload": [
+        {
+            "src": "scheme.html",
+            "type": "scheme"
+        },
+        {
+            "type": "javascript",
+            "src": "combined.js"
+        },
+        {
+            "type": "stylesheet",
+            "src": "combined.css"
+        }
+    ],
+    "panelItems": {
+        "AppMenu": {
+            "Name": "AppMenu",
+            "Description": "Application Menu",
+            "Icon": "actions/stock_about.png",
+            "HasOptions": false
+        },
+        "Buttons": {
+            "Name": "Buttons",
+            "Description": "Button Bar",
+            "Icon": "actions/stock_about.png"
+        },
+        "Clock": {
+            "Name": "Clock",
+            "Description": "View the time",
+            "Icon": "status/appointment-soon.png",
+            "HasOptions": true
+        },
+        "NotificationArea": {
+            "Name": "NotificationArea",
+            "Description": "View notifications",
+            "Icon": "apps/gnome-panel-notification-area.png"
+        },
+        "Search": {
+            "Name": "Search",
+            "Description": "Perform searches",
+            "Icon": "actions/find.png",
+            "HasOptions": true
+        },
+        "Weather": {
+            "Name": "Weather",
+            "Description": "Weather notification",
+            "Icon": "status/weather-few-clouds.png"
+        },
+        "WindowList": {
+            "Name": "Window List",
+            "Description": "Toggle between open windows",
+            "Icon": "apps/xfwm4.png"
+        }
+    },
+    "path": "default/CoreWM",
+    "build": {},
+    "repo": "default"
+}

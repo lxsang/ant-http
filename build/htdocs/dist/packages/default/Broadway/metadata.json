@@ -1,0 +1,33 @@
+{
+    "className": "ExtensionBroadway",
+    "type": "extension",
+    "enabled": false,
+    "config": {},
+    "build": {
+        "copy": [
+            "scheme.html",
+            "metadata.json",
+            "broadway.js",
+            "extension.js",
+            "extension.css",
+            "api.php"
+        ]
+    },
+    "sources": [
+        {
+            "type": "javascript",
+            "src": "packages/default/Broadway/broadway.js"
+        },
+        {
+            "type": "stylesheet",
+            "src": "packages/default/Broadway/extension.css"
+        },
+        {
+            "type": "javascript",
+            "src": "packages/default/Broadway/extension.js"
+        }
+    ],
+    "path": "default/Broadway",
+    "repo": "default",
+    "preload": []
+}

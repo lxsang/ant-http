@@ -138,7 +138,7 @@ void pexit()
 {
 	LOG("%s","EXIT daemon");
 }
-void execute(int c, const char* m, dictionary d)
+void handler(int c, const char* m, const char* rqp, dictionary d)
 {
 	text(c);
 	__t(c,"This is a system plugin. It cant be acessed from the web");

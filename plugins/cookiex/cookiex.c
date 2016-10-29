@@ -30,3 +30,14 @@ void get(int client,const char* method,dictionary rq)
 
 	
 }
+void handler(int client, const char* method, const char* rqpth, dictionary rq)
+{
+	if(EQU(rqpth,"default"))
+	{
+		execute(client,method,rq);
+	}
+	else
+	{
+		unknow(client);
+	}
+}

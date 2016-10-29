@@ -128,3 +128,26 @@ void jsonex(int client,const char* method,dictionary rq)
 	jpeg(client);
 	__f(client,htdocs("images/ex.jpg"));
 }
+void handler(int client, const char* method, const char* rqpth, dictionary rq)
+{
+	if(EQU(rqpth,"default"))
+	{
+		execute(client,method,rq);
+	}
+	else if(EQU(rqpth,"delete"))
+	{
+		delete(client,method,rq);
+	}
+	else if(EQU(rqpth,"update"))
+	{
+		execute(client,method,rq);
+	}
+	else if(EQU(rqpth,"jsonex"))
+	{
+		execute(client,method,rq);
+	}
+	else
+	{
+		unknow(client);
+	}
+}

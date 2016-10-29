@@ -251,3 +251,8 @@ char* config_dir()
 		mkdir(path, 0755);
 	return path;
 }
+void unknow(int client)
+{
+	html(client);
+	__t(client,"404 API not found");
+}

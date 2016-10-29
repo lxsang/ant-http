@@ -37,7 +37,7 @@ int read_buf(int fd, char*buf,int size)
 	buf[i] = '\0';
 	return i;
 }
-void execute(int client, const char* m, dictionary rq)
+void handler(int client, const char* m, const char* rqp, dictionary rq)
 {
 	textstream(client);
 	int filedes[2];

@@ -59,4 +59,5 @@ sqldb getdb();
 void set_cookie(int,dictionary);
 
 /*Default function for plugin*/
-void execute(int, const char*,dictionary);
+void handler(int, const char*,const char*,dictionary);
+void unknow(int);

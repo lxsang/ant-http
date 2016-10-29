@@ -5,7 +5,7 @@
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-
+#define PLUGIN_HANDLER	 "handler"
 
 struct plugin_entry { 
     struct plugin_entry *next; 

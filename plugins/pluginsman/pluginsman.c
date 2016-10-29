@@ -74,3 +74,18 @@ void install(int c, const char* m, dictionary rq)
 	
 	__t(c,result,0,"This is not a plugin file");
 }
+void handler(int client, const char* method, const char* rqpth, dictionary rq)
+{
+	if(EQU(rqpth,"default"))
+	{
+		execute(client,method,rq);
+	}
+	else if(EQU(rqpth,"install"))
+	{
+		install(client,method,rq);
+	}
+	else
+	{
+		unknow(client);
+	}
+}

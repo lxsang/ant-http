@@ -487,7 +487,7 @@ int execute_plugin(int client, const char *path, const char *method, const char 
 {
 	char pname[255];
  	char pfunc[255];
- 	void (*fn)(int, const char*,dictionary);
+ 	void (*fn)(int, const char*,const char*, dictionary);
  	struct plugin_entry *plugin ;
 	int plen = strlen(path);
 	char * rpath = (char*) malloc((plen+1)*sizeof(char));
@@ -499,7 +499,7 @@ int execute_plugin(int client, const char *path, const char *method, const char 
  	if(delim == NULL)
  	{
  		strcpy(pname,rpath);
- 		strcpy(pfunc,"execute");
+ 		strcpy(pfunc,"default");
 	} 
 	else
 	{
@@ -515,7 +515,7 @@ int execute_plugin(int client, const char *path, const char *method, const char 
 	LOG("Path : '%s'\n", rpath);
 	LOG("Method:%s\n", method);
 	LOG("Plugin name '%s'\n",pname);
-	LOG("Plugin func. '%s'\n", pfunc);
+	LOG("Query path. '%s'\n", pfunc);
 	LOG("query :%s\n", query_string);
 
 	//load the plugin
@@ -523,14 +523,14 @@ int execute_plugin(int client, const char *path, const char *method, const char 
 		if((plugin= plugin_load(pname)) == NULL)
 			return -1;
 	// load the function
-   fn = (void (*)(int, const char *, dictionary))dlsym(plugin->handle, pfunc);
+   fn = (void (*)(int, const char *, const char*, dictionary))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)  
 	{
-    	LOG("Problem when finding %s method from %s : %s \n", pfunc, pname,error);
+    	LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname,error);
     	return -1;
    }
    dictionary dic = decode_request(client,method,query_string);
-   	(*fn)(client,method,dic);
+   	(*fn)(client,method,pfunc,dic);
    free(dic);
    free(rpath);
    return 1;

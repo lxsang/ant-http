@@ -190,3 +190,26 @@ void pexit()
 {
 	LOG("Exit file manager,plugins\n");
 }
+void handler(int client, const char* method, const char* rqpth, dictionary rq)
+{
+	if(EQU(rqpth,"default"))
+	{
+		execute(client,method,rq);
+	}
+	else if(EQU(rqpth,"add"))
+	{
+		add(client,method,rq);
+	}
+	else if(EQU(rqpth,"rmfolder"))
+	{
+		rmfolder(client,method,rq);
+	}
+	else if(EQU(rqpth,"mkfolder"))
+	{
+		mkfolder(client,method,rq);
+	}
+	else
+	{
+		unknow(client);
+	}
+}

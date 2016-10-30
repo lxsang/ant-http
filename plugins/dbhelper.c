@@ -176,11 +176,13 @@ dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
 }
 int hastable(sqlite3* db,const char* table)
 {
-	char * prefix = "select * from sqlite_master where type='table' and name='%s'";
-	char* sql = __s(prefix,table);
-	int ret = dbquery(db,sql,NULL);
-	free(sql);
-	return ~ret;
+	char * prefix = __s("type='table' and name='%s'",table);
+	dbrecord rc = dbselect(db,"sqlite_master",prefix);
+	free(prefix);
+	if(!rc) return 0;
+	if(!rc->fields) return 0;
+	free(rc);
+	return 1;
 }
 int dbupdate(sqlite3* db,const char* table,const dbfield field,const char* fstring,...)
 {

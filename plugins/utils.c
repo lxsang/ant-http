@@ -326,3 +326,8 @@ unsigned hash(const char* key, int hash_size)
       hashval = *key + 31 * hashval;
     return hashval % hash_size;	
 }
+int is_file(const char* f)
+{
+	struct stat st;
+	return !(stat(f, &st) == -1);
+}

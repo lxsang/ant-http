@@ -37,12 +37,13 @@ char* post_url_decode(int client,int len)
 dictionary decode_request(int client,const char* method,const char* query)
 {
 	dictionary request = NULL;
+	dictionary cookie = NULL;
 	char* line;
 	if(strcmp(method,"GET") == 0)
 	{
 		while((line = read_line(client)) && strcmp("\r\n",line))
 		{
-			decode_cookie(line);
+			if(!cookie) cookie = decode_cookie(line);
 		}
 		request = decode_url_request(query);
 	}
@@ -70,7 +71,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 			}
 			else
 			{
-				decode_cookie(line);
+				if(!cookie) cookie = decode_cookie(line);
 			}
 
 			line = read_line(client);
@@ -88,7 +89,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 		} else if(strstr(ctype,FORM_MULTI_PART)> 0)
 		{
 			//printf("Multi part form : %s\n", ctype);
-			return decode_multi_part_request(client,ctype);
+			request = decode_multi_part_request(client,ctype);
 		} 
 		else
 		{
@@ -96,6 +97,11 @@ dictionary decode_request(int client,const char* method,const char* query)
 			return NULL;
 		}
 	}
+	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
+	if(cookie && !request)
+			request = dict();
+		
+	dput(request,"cookie",cookie);
 	return request;
 }
 void __px(const char* data,int size)
@@ -119,21 +125,20 @@ dictionary decode_cookie(const char* line)
 	trim(token,' ');
 	if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 	{
-		printf("%s\n", line);
-		token = strsep(&cpstr,":");
-		if(token)
+		while((token = strsep(&cpstr,";")))
 		{
-			while((token1 = strsep(&token,";")))
-				LOG("Found cookie : %s\n",token1);
-		}
-		else
-		{
-			//free(cpstr);
-			return NULL;
+			token1 = strsep(&token,"=");
+			if(token1)
+			{
+				if(dic == NULL)
+					dic = dict();
+				LOG("Found cookie : %s = %s\n",token1,token);
+				dput(dic,token1,token);
+			}
 		}
 	}
-	//free(cpstr);
 	return dic;
+	//free(cpstr);
 }
 /**
  * Decode the multi-part form data from the POST request

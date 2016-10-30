@@ -27,7 +27,23 @@ void execute(int client,const char* method,dictionary rq)
 
 void get(int client,const char* method,dictionary rq)
 {
-
+	html(client);
+	if(rq)
+	{
+		dictionary ck = (dictionary)dvalue(rq,"cookie");
+		if(ck)
+		{
+			association as;
+			for_each_assoc(as, ck)
+			{
+				__t(client,"%s -> %s <br/>",as->key, as->value);
+			}
+		}
+		else
+			__t(client,"noo cookie");
+	}
+	else
+		__t(client,"no request");
 	
 }
 void handler(int client, const char* method, const char* rqpth, dictionary rq)
@@ -35,6 +51,10 @@ void handler(int client, const char* method, const char* rqpth, dictionary rq)
 	if(EQU(rqpth,"default"))
 	{
 		execute(client,method,rq);
+	}
+	else if(EQU(rqpth,"get"))
+	{
+		get(client,method,rq);
 	}
 	else
 	{

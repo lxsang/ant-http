@@ -14,9 +14,9 @@ void __init_plugin__(const char* pl,const char*ph,const char* htdocs, const char
 }; 
 
 #ifdef USE_DB
-sqldb getdb()
+sqldb __getdb(char *name)
 {
-	int plen = strlen(__plugin__.name)+strlen(__plugin__.dbpath)+4;
+	int plen = strlen(name)+strlen(__plugin__.dbpath)+4;
 	char* path = (char*) malloc(plen*sizeof(char));
 	strcpy(path,__plugin__.dbpath);
 	strcat(path,__plugin__.name);
@@ -24,6 +24,10 @@ sqldb getdb()
 	sqldb ret = (sqldb)database(path);
 	free(path);
 	return ret;
+}
+sqldb getdb()
+{
+	return getdb(__plugin__.name);
 }
 #endif
 void header_base(int client)
@@ -240,6 +244,16 @@ void set_cookie(int client,dictionary dic)
 	association assoc;
 	for_each_assoc(assoc,dic){
 		__t(client,"Set-Cookie: %s=%s",assoc->key, (char*)assoc->value);
+	}
+	response(client,"");
+}
+void clear_cookie(int client, dictionary dic)
+{
+	header_base(client);
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	association assoc;
+	for_each_assoc(assoc,dic){
+		__t(client,"Set-Cookie: %s=%s;expires=",assoc->key, (char*)assoc->value, server_time());
 	}
 	response(client,"");
 }

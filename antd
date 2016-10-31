@@ -1,0 +1,1 @@
+LD_LIBRARY_PATH=$(dirname "$0")/plugins $(dirname "$0")/httpd $(dirname "$0")/config.ini

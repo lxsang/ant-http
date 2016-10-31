@@ -23,6 +23,7 @@ main: httpd plugins
 
 httpd:$(SERVER)
 	$(CC) $(CFLAGS) $(SERVERLIB) $(SERVER)  -o $(BUILDIRD)/httpd httpd.c
+	cp antd $(BUILDIRD)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

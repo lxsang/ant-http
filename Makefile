@@ -4,7 +4,7 @@ SERVER=plugin_manager.o plugins/ini.o http_server.o plugins/dictionary.o plugins
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-    BUILDIRD=/root/antd
+    BUILDIRD=/root/www
 	PF_FLAG=-D_GNU_SOURCE
 endif
 ifeq ($(UNAME_S),Darwin)

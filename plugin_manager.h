@@ -5,6 +5,7 @@
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
+#define APP_JSON		 "application/json"
 #define PLUGIN_HANDLER	 "handler"
 
 struct plugin_entry { 
@@ -26,6 +27,7 @@ dictionary decode_url_request(const char* query);
 dictionary decode_request(int client,const char* method,const char* query);
 dictionary decode_multi_part_request(int,const char*);
 dictionary decode_cookie(const char*);
+char* json_data_decode(int,int);
 char* read_line(int sock);
 int read_buf(int sock,char* buf,int i);
 int execute_plugin(int client, const char *path,

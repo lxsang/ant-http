@@ -91,9 +91,16 @@ dictionary decode_request(int client,const char* method,const char* query)
 			//printf("Multi part form : %s\n", ctype);
 			request = decode_multi_part_request(client,ctype);
 		} 
+		else if(strstr(ctype,APP_JSON) > 0)
+		{
+			char* query = json_data_decode(client,clen);
+			request = dict();
+			dput(request,"json", strdup(query));
+			free(query);
+		}
 		else
 		{
-			LOG("Un supported yet%s\n",ctype);
+			LOG("Un supported yet %s\n",ctype);
 			return NULL;
 		}
 	}
@@ -306,6 +313,21 @@ dictionary decode_url_request(const char* query)
 	free(str_copy);
 	return dic;
 }
+/**
+* Decode JSON query string to string
+*/
+char* json_data_decode(int client,int len)
+{
+	char *query = (char*) malloc((len+1)*sizeof(char));
+    for (int i = 0; i < len; i++) {
+      recv(client, (query+i), 1, 0);
+    }
+    query[len]='\0';
+    //query = url_decode(query);
+    LOG("JSON Query %s\n", query);
+    return query;
+}
+
 /**
  * read the request as a string line format
  * @param  sock socket

@@ -80,5 +80,6 @@ char *url_encode(const char *str);
 char from_hex(char ch);
 char to_hex(char code);
 unsigned hash(const char*, int);
+unsigned simple_hash(const char*);
 int is_file(const char* f);
 #endif

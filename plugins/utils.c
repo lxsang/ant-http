@@ -321,10 +321,15 @@ char to_hex(char code) {
 }
 unsigned hash(const char* key, int hash_size)
 {
+	unsigned hashval = simple_hash(key);
+    return hashval % hash_size;	
+}
+unsigned simple_hash(const char* key)
+{
 	unsigned hashval;
     for (hashval = 0; *key != '\0'; key++)
       hashval = *key + 31 * hashval;
-    return hashval % hash_size;	
+	return hashval;
 }
 int is_file(const char* f)
 {

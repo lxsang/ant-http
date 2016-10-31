@@ -8,7 +8,7 @@ ifeq ($(UNAME_S),Linux)
 	PF_FLAG=-D_GNU_SOURCE
 endif
 ifeq ($(UNAME_S),Darwin)
-	BUILDIRD=./build
+	BUILDIRD=../ant-build
 	PF_FLAG=
 endif
 CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)

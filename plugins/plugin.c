@@ -243,7 +243,7 @@ void set_cookie(int client,const char* type, dictionary dic)
 	__t(client,"Content-Type: %s",type);
 	association assoc;
 	for_each_assoc(assoc,dic){
-		__t(client,"Set-Cookie: %s=%s",assoc->key, (char*)assoc->value);
+		__t(client,"Set-Cookie: %s=%s; Path=/%s",assoc->key, (char*)assoc->value, __plugin__.name);
 	}
 	response(client,"");
 }

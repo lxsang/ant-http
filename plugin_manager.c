@@ -140,6 +140,7 @@ dictionary decode_cookie(const char* line)
 			if(dic == NULL)
 				dic = dict();
 			LOG("Found cookie : %s = %s\n",token1,token);
+			trim(token1,' ');
 			dput(dic,token1,token);
 		}
 	}

@@ -39,22 +39,26 @@ dictionary decode_request(int client,const char* method,const char* query)
 	dictionary request = NULL;
 	dictionary cookie = NULL;
 	char* line;
+	char * token;
 	if(strcmp(method,"GET") == 0)
 	{
 		while((line = read_line(client)) && strcmp("\r\n",line))
 		{
-			if(!cookie) cookie = decode_cookie(line);
+			token = strsep(&line,":");
+			trim(token,' ');
+			if(token != NULL &&strcasecmp(token,"Cookie") == 0)
+				if(!cookie) cookie = decode_cookie(line);
 		}
 		request = decode_url_request(query);
 	}
 	else
 	{
-		char * token;
 		char* ctype = NULL;
 		int clen = -1;
 		line = read_line(client);
-		while ((strlen(line) > 0) && strcmp("\r\n",line))
+		while (line && strcmp("\r\n",line))
 		{
+			//printf("%s\n",line);
 			token = strsep(&line,":");
 			trim(token,' ');
 			if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
@@ -69,7 +73,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 				trim(token,' ');
 				clen = atoi(token);
 			}
-			else
+			else if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 			{
 				if(!cookie) cookie = decode_cookie(line);
 			}
@@ -128,22 +132,18 @@ dictionary decode_cookie(const char* line)
 	char *token,*token1;
 	char *cpstr = strdup(line);
 	dictionary dic = NULL;
-	token = strsep(&cpstr,":");
-	trim(token,' ');
-	if(token != NULL &&strcasecmp(token,"Cookie") == 0)
+	while((token = strsep(&cpstr,";")))
 	{
-		while((token = strsep(&cpstr,";")))
+		token1 = strsep(&token,"=");
+		if(token1)
 		{
-			token1 = strsep(&token,"=");
-			if(token1)
-			{
-				if(dic == NULL)
-					dic = dict();
-				LOG("Found cookie : %s = %s\n",token1,token);
-				dput(dic,token1,token);
-			}
+			if(dic == NULL)
+				dic = dict();
+			LOG("Found cookie : %s = %s\n",token1,token);
+			dput(dic,token1,token);
 		}
 	}
+		//}
 	return dic;
 	//free(cpstr);
 }

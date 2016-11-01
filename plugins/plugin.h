@@ -57,7 +57,7 @@ char* htdocs(const char*);
 sqldb getdb();
 sqldb __getdb(char *name);
 #endif
-void set_cookie(int,dictionary);
+void set_cookie(int, const char*,dictionary);
 void clear_cookie(int, dictionary);
 /*Default function for plugin*/
 void handler(int, const char*,const char*,dictionary);

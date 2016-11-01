@@ -18,7 +18,7 @@ void execute(int client,const char* method,dictionary rq)
 	dictionary d = dict();
 	dput(d,"test",c);
 	dput(d,"test1","This is another cookie");
-	set_cookie(client,d);
+	set_cookie(client,"text/html; charset=utf-8",d);
 
 	LOG("%s",c);
 	__t(client,"<h1>Set the cookie</h1>");

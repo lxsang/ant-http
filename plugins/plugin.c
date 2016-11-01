@@ -237,17 +237,17 @@ int upload(const char* tmp, const char* path)
 {
 	return !rename(tmp, path);
 }
-void set_cookie(int client,dictionary dic)
+void set_cookie(int client,const char* type, dictionary dic)
 {
 	header_base(client);
-	__t(client,"Content-Type: text/html; charset=utf-8");
+	__t(client,"Content-Type: %s",type);
 	association assoc;
 	for_each_assoc(assoc,dic){
 		__t(client,"Set-Cookie: %s=%s",assoc->key, (char*)assoc->value);
 	}
 	response(client,"");
 }
-void clear_cookie(int client, dictionary dic)
+void clear_cookie(int client,  dictionary dic)
 {
 	header_base(client);
 	__t(client,"Content-Type: text/html; charset=utf-8");

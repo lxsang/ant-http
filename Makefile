@@ -1,21 +1,21 @@
 CC=gcc
 EXT=dylib
-SERVER=plugin_manager.o plugins/ini.o http_server.o plugins/dictionary.o plugins/utils.o
+SERVER=plugin_manager.o plugins/ini.o http_server.o plugins/dictionary.o plugins/sha1.o plugins/utils.o
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/root/www
-	PF_FLAG=-D_GNU_SOURCE
+	PF_FLAG=-D_GNU_SOURCE -DLINUX
 endif
 ifeq ($(UNAME_S),Darwin)
 	BUILDIRD=../ant-build
-	PF_FLAG=
+	PF_FLAG= -DMACOS
 endif
 CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT)
 
-PLUGINSDEP = plugins/ini.o plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o
+PLUGINSDEP = plugins/ini.o plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o plugins/sha1.o
 PLUGINLIBS = -lsqlite3
 
 main: httpd plugins 

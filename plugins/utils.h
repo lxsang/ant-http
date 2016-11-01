@@ -36,6 +36,7 @@ THE SOFTWARE.
 #include <regex.h>
 #include <time.h>
 #include <stdint.h>
+#include "sha1.h"
 
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 #define EQU(a,b) (strcmp(a,b) == 0)
@@ -85,4 +86,5 @@ unsigned hash(const char*, int);
 unsigned simple_hash(const char*);
 int is_file(const char* f);
 void md5(uint8_t *, size_t , char*);
+void sha1(const char*, char*);
 #endif

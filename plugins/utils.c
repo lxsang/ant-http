@@ -445,18 +445,27 @@ void md5(uint8_t *initial_msg, size_t initial_len, char* buff) {
     }
 	uint8_t *p;
 	p=(uint8_t *)&h0;
-	sprintf(tmp,"%2.2x%2.2x%2.2x%2.2x", p[0], p[1], p[2], p[3], h0);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h0);
 	strcpy(buff, tmp);
 	p=(uint8_t *)&h1;
-	sprintf(tmp,"%2.2x%2.2x%2.2x%2.2x", p[0], p[1], p[2], p[3], h1);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h1);
 	strcat(buff,tmp);
 	p=(uint8_t *)&h2;
-	sprintf(tmp,"%2.2x%2.2x%2.2x%2.2x", p[0], p[1], p[2], p[3], h2);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h2);
     strcat(buff,tmp);
 	p=(uint8_t *)&h3;
-	sprintf(tmp,"%2.2x%2.2x%2.2x%2.2x", p[0], p[1], p[2], p[3], h3);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h3);
 	strcat(buff,tmp);
     // cleanup
     free(msg);
  
+}
+void sha1(const char* text, char* out)
+{	
+	uint8_t d [20];
+	 SHA1_CTX context;
+     SHA1_Init(&context);
+     SHA1_Update(&context, text, strlen(text));
+     SHA1_Final(&context, d);
+	 digest_to_hex(d,out);
 }

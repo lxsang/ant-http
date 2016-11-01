@@ -31,7 +31,7 @@ plugins: $(PLUGINS)
 	
 %.$(EXT): $(PLUGINSDEP) 
 	for file in $(wildcard plugins/$(basename $@)/*.c) ; do\
-		$(CC) $(CFLAGS)  -c $$file -o $$file.o; \
+		$(CC) -fPIC $(CFLAGS)  -c  $$file -o $$file.o; \
 	done
 	$(CC) $(CFLAGS) $(PLUGINLIBS) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
 		$(PLUGINSDEP) plugins/$(basename $@)/*.c.o

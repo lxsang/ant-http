@@ -184,16 +184,3 @@ void ws_close(int client, unsigned int status)
 	_send_header(client, header);
 	send(client,bytes,2,0);
 }
-int ws_status(int client)
-{
-	fd_set sk;
-	FD_ZERO(&sk);
-	FD_SET(0, &sk);
-	FD_SET(client, &sk);
-	int result = select(client + 1, sk, NULL, NULL, NULL);
-	if(result == 1)
-	{
-		return FD_ISSET(client, &sk);
-	}
-	return result;
-}

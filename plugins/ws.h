@@ -24,5 +24,4 @@ void ws_b(int , uint8_t* data, int);
 void ws_close(int, unsigned int);
 void pong(int client, int len);
 int ws_read_data(int , ws_msg_header_t*, int, uint8_t*);
-int ws_status(int);
 #endif

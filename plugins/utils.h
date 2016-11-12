@@ -37,6 +37,7 @@ THE SOFTWARE.
 #include <time.h>
 #include <stdint.h>
 #include "sha1.h"
+#include "base64.h"
 
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 #define EQU(a,b) (strcmp(a,b) == 0)

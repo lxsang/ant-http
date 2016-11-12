@@ -1,88 +1,191 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/wait.h>
+#include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <termios.h>
+#include <sys/select.h>
+#include <sys/ioctl.h>
+#include <string.h>
 #include "../plugin.h"
 
-void init();
-call __init__ = init;
-
-void init()
-{
-	
-}
 void pexit()
 {
 	
 }
-
-int read_buf(int fd, char*buf,int size)
+void handler(int cl, const char* m, const char* rqp, dictionary rq)
 {
-	int i = 0;
-	char c = '\0';
-	int n;
-	while ((i < size - 1) && (c != '\n'))
+	ws_msg_header_t* h = NULL;
+	if(ws_enable(rq))
 	{
-		n = read(fd, &c, 1);
-		if (n > 0)
+		
+		int fdm, fds;
+		int rc;
+		char buff[1024];
+		
+		// Check arguments
+		fdm = posix_openpt(O_RDWR);
+		if (fdm < 0)
 		{
-			buf[i] = c;
-			i++;
+			LOG("Error %d on posix_openpt()\n", errno);
+			ws_close(cl, 1011);
+			return ;
 		}
-		else if(n == -1) return n;
+
+		rc = grantpt(fdm);
+		if (rc != 0)
+		{
+			LOG("Error %d on grantpt()\n", errno);
+			ws_close(cl, 1011);
+			return ;
+		}
+
+		rc = unlockpt(fdm);
+		if (rc != 0)
+		{
+			LOG( "Error %d on unlockpt()\n", errno);
+			ws_close(cl, 1011);
+			return ;
+		}
+
+		// Open the slave side ot the PTY
+		fds = open(ptsname(fdm), O_RDWR);
+
+		// Create the child process
+		if (fork())
+		{
+			fd_set fd_in;
+
+			// FATHER
+
+			// Close the slave side of the PTY
+			close(fds);
+			int max_fdm;
+			while (1)
+			{	
+				FD_ZERO(&fd_in);
+				//FD_SET(0, &fd_in);
+				FD_SET(fdm, &fd_in);
+				FD_SET(cl,&fd_in);
+				max_fdm = fdm>cl?fdm:cl;
+				rc = select(max_fdm + 1, &fd_in, NULL, NULL, NULL);
+				switch(rc)
+				{
+					case -1 : 
+						LOG("Error %d on select()\n", errno);
+						ws_close(cl, 1011);
+						return;
+
+					default :
+					{
+	   					// If data is on websocket side
+						if (FD_ISSET(cl, &fd_in))
+						{
+			      			h = ws_read_header(cl);
+			      			if(h)
+			      			{
+			      				if(h->opcode == WS_CLOSE)
+			      				{
+			      					LOG("%s\n","Websocket: connection closed");
+			   						write(fdm, "exit\n", 5);
+			      					return;
+			      				}
+			      				else if(h->opcode == WS_TEXT)
+			      				{
+			      					int l;
+			      					while((l = ws_read_data(cl,h,sizeof(buff),buff)) > 0)
+			      					{
+			      						//buff[l] = '\0';
+			   							write(fdm, buff, l);
+										//ws_t(cl,buff);
+			      					}
+									/*if(l == -1)
+									{
+										printf("EXIT FROM CLIENT \n");
+				   						write(fdm, "exit\n", 5);
+				      					return;
+									}*/
+			      				}
+
+			      				free(h);
+			      			} 
+							else
+							{
+								write(fdm, "exit\n", 5);
+								ws_close(cl,1000);
+							} 
+						}
+						// If data on master side of PTY
+						if (FD_ISSET(fdm, &fd_in))
+						{
+							//rc = read(fdm, buff, sizeof(buff));
+							if ( (rc = read(fdm, buff,sizeof(buff)-1)) > 0)
+							{
+								// Send data to websocket
+								buff[rc] = '\0';
+								ws_t(cl,buff);
+							} else
+							{
+								if (rc < 0)
+								{
+									LOG("Error %d on read standard input. Exit now\n", errno);
+									write(fdm, "exit\n", 5);
+									ws_close(cl,1011);
+									return;
+								}
+							}
+						}
+						//printf("DONE\n");
+					}
+				} // End switch
+			} // End while
+		}
 		else
-			c = '\n';
-	}
-	buf[i] = '\0';
-	return i;
-}
-void handler(int client, const char* m, const char* rqp, dictionary rq)
-{
-	textstream(client);
-	int filedes[2];
-	char* code = R_STR(rq, "cmd");
-	if(!code) return;
-	if(pipe(filedes) == -1)
-	{
-		perror("pipe");
-		return;
-	}
-	pid_t pid = fork();
-	if(pid == -1)
-	{
-		perror("folk");
-		return;
-	} else if(pid == 0)
-	{
-	    while ((dup2(filedes[1], STDOUT_FILENO) == -1) && (errno == EINTR)) {}
-	     close(filedes[1]);
-	     close(filedes[0]);
-	    // executecomand
-		 system(code);
-	     //perror("execl");
-	     _exit(1);
-	}
-	close(filedes[1]);
-	char buffer[1024];
-	while (1) {
-		ssize_t count = read_buf(filedes[0],buffer, sizeof(buffer));
-		if (count == -1) {
-			if (errno == EINTR) {
-				continue;
-			} else {
-				perror("read");
-				return;
-			}
-		} else if (count == 0) {
-			break;
-		} else {
-			__t(client,"data:%s\n",buffer);
-			//handle_child_process_output(buffer, count);
+		{
+			struct termios slave_orig_term_settings; // Saved terminal settings
+			struct termios new_term_settings; // Current terminal settings
+
+			// CHILD
+		
+			// Close the master side of the PTY
+			close(fdm);
+
+			// Save the defaults parameters of the slave side of the PTY
+			//rc = tcgetattr(fds, &slave_orig_term_settings);
+
+			// Set RAW mode on slave side of PTY
+			//new_term_settings = slave_orig_term_settings;
+			//cfmakeraw (&new_term_settings);
+			//tcsetattr (fds, TCSANOW, &new_term_settings);
+
+			// The slave side of the PTY becomes the standard input and outputs of the child process
+			// we use cook mode here
+			close(0); // Close standard input (current terminal)
+			close(1); // Close standard output (current terminal)
+			close(2); // Close standard error (current terminal)
+
+			dup(fds); // PTY becomes standard input (0)
+			dup(fds); // PTY becomes standard output (1)
+			dup(fds); // PTY becomes standard error (2)
+
+			// Now the original file descriptor is useless
+			close(fds);
+
+			// Make the current process a new session leader
+			setsid();
+
+			// As the child is a session leader, set the controlling terminal to be the slave side of the PTY
+			// (Mandatory for programs like the shell to make them manage correctly their outputs)
+			ioctl(0, TIOCSCTTY, 1);
+		
+			//system("/bin/bash");
+			system("sudo login");
+			// if Error...
+			ws_close(cl,1000);
+			//LOG("%s\n","Terminal exit");
+			_exit(1);
 		}
 	}
-	close(filedes[0]);
-	wait(0);
-	free(code);
-	printf("Child process exit\n");
+
+	LOG("%s\n","All processes exit");
 }

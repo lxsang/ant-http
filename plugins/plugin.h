@@ -7,6 +7,7 @@
 #include "dictionary.h"
 #include "list.h"
 #include "ini.h"
+#include "ws.h"
 
 #define SERVER_NAME "antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)
@@ -62,3 +63,4 @@ void clear_cookie(int, dictionary);
 /*Default function for plugin*/
 void handler(int, const char*,const char*,dictionary);
 void unknow(int);
+int ws_enable(dictionary);

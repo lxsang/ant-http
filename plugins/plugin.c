@@ -270,3 +270,7 @@ void unknow(int client)
 	html(client);
 	__t(client,"404 API not found");
 }
+int ws_enable(dictionary dic)
+{
+	return (dic != NULL && R_INT(dic,"__web_socket__") == 1);
+}

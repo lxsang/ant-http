@@ -1,6 +1,13 @@
 CC=gcc
 EXT=dylib
-SERVER=plugin_manager.o plugins/ini.o http_server.o plugins/dictionary.o plugins/sha1.o plugins/utils.o
+SERVER=plugin_manager.o \
+		plugins/ini.o \
+		http_server.o \
+		plugins/dictionary.o \
+		plugins/base64.o \
+		plugins/sha1.o \
+		plugins/ws.o \
+		plugins/utils.o
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -15,7 +22,15 @@ CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT)
 
-PLUGINSDEP = plugins/ini.o plugins/plugin.o plugins/dbhelper.o plugins/dictionary.o plugins/utils.o plugins/list.o plugins/sha1.o
+PLUGINSDEP = plugins/ini.o \
+				plugins/plugin.o \
+				plugins/dbhelper.o \
+				plugins/dictionary.o \
+				plugins/base64.o \
+				plugins/utils.o \
+				plugins/ws.o \
+				plugins/sha1.o \
+				plugins/list.o 
 PLUGINLIBS = -lsqlite3
 
 main: httpd plugins 
@@ -40,7 +55,7 @@ plugins: $(PLUGINS)
 clean: sclean pclean
 
 sclean:
-	rm -f *.o build/httpd
+	rm -f *.o $(BUILDIRD)/httpd
 pclean:
 	rm -rf $(BUILDIRD)/plugins/* plugins/*.o
 	-for file in plugins/* ;do \

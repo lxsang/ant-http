@@ -194,7 +194,36 @@ var Terminal = (function () {
 	return TerminalConstructor
 }());
 var wtermobj;
+var  nest_callback;
+var socket = new WebSocket("ws://127.0.0.1:9191/wterm?q=test");
+//ws.binaryType = 'arraybuffer';
+socket.onopen = function(){}
+//{
+   // Web Socket is connected, send data using send()
+//   var msg = "Lorem Ipsum ";
+//   ws.send(msg);
+  //ws.send(array);
+ //  alert("Message is sent...");
+ //};
 
+socket.onmessage = function (e) {
+	if(wtermobj)
+	{
+						   wtermobj.print(e.data);
+						   var par = $("#wterm");
+						   par.animate({
+							   scrollTop: par.get(0).scrollHeight
+						       }, 0);
+						wtermobj.input("antd> ",nest_callback);
+					}
+						};
+						
+
+socket.onclose = function()
+{ 
+   // websocket is closed.
+   alert("Connection is closed..."); 
+};
 var wterm_config = {
 	name: 'wterm_layout',
     panels: [
@@ -210,25 +239,13 @@ var wterm_config = {
 		{
 			wtermobj = new Terminal();
 			wtermobj.setTextSize(11);
-			var nest_callback = function(data)
+			nest_callback = function(data)
 			{
 					if(data.length>0)
 					{
-						//send to server
-						var webtty = new EventSource('/wterm?cmd='+data);
-						webtty.onmessage = function (e) {
-						   wtermobj.print(e.data);
-						   var par = $("#wterm");
-						   par.animate({
-							   scrollTop: par.get(0).scrollHeight
-						       }, 0);
-						};
-						webtty.onerror = function(e)
-						{
-							// finish the command
-							webtty.close();
-							wtermobj.input("antd> ",nest_callback);
-						}
+						//alert("sent " + data);
+						socket.send(data);
+						//alert("sent "+data);
 					}
 					else
 					{

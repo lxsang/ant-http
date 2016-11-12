@@ -41,15 +41,46 @@ dictionary decode_request(int client,const char* method,const char* query)
 	char* line;
 	char * token;
 	if(strcmp(method,"GET") == 0)
-	{
+	{ 
+		// this for check if web socket is enabled
+		int ws= 0;
+		char* ws_key = NULL;
 		while((line = read_line(client)) && strcmp("\r\n",line))
 		{
 			token = strsep(&line,":");
 			trim(token,' ');
 			if(token != NULL &&strcasecmp(token,"Cookie") == 0)
+			{
 				if(!cookie) cookie = decode_cookie(line);
+			}
+			else if(token != NULL && strcasecmp(token,"Upgrade") == 0)
+			{
+				// verify that the connection is upgrade to websocket
+				trim(line, ' ');
+				trim(line, '\n');
+				trim(line, '\r');
+				if(line != NULL && strcasecmp(line,"websocket") == 0)
+					ws = 1;
+			} else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
+			{
+				// get the key from the client
+				trim(line, ' ');
+				trim(line, '\n');
+				trim(line, '\r');
+				ws_key = strdup(line);
+			}
 		}
 		request = decode_url_request(query);
+		if(ws && ws_key != NULL)
+		{
+			ws_confirm_request(client, ws_key);
+			free(ws_key);
+			// insert wsocket flag to request
+			// plugin should handle this ugrade connection
+			// not the server
+			if(!request) request = dict();
+			dput(request,"__web_socket__","1");
+		}
 	}
 	else
 	{
@@ -121,6 +152,40 @@ void __px(const char* data,int size)
 			printf(" %02x", data[i]);
 			
 	printf("\n");
+}
+/**
+* Send header to the client to confirm 
+* that the websocket is accepted by
+* our server
+*/
+void ws_confirm_request(int client, const char* key)
+{
+	char buf[256];
+	char rkey[128];
+	char sha_d[20];
+	char base64[64];
+	strcpy(rkey,key);
+	strcat(rkey,WS_MAGIC_STRING);
+	//printf("RESPONDKEY '%s'\n", rkey);
+	SHA1_CTX context;
+    SHA1_Init(&context);
+    SHA1_Update(&context, rkey, strlen(rkey));
+    SHA1_Final(&context, sha_d); 
+	Base64encode(base64, sha_d, 20);
+	//printf("Base 64 '%s'\n", base64);
+	// send accept to client
+	sprintf(buf, "HTTP/1.1 101 Switching Protocols\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Upgrade: websocket\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Connection: Upgrade\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Sec-WebSocket-Accept: %s\r\n",base64);
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "\r\n");
+	send(client, buf, strlen(buf), 0);
+	
+	LOG("%s\n", "Websocket is now enabled for plugin");
 }
 /**
  * Decode the cookie header to a dictionary

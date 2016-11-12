@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<title>term.js</title>
+<style>
+  html {
+    background: #555;
+  }
+  h1 {
+    margin-bottom: 20px;
+    font: 20px/1.5 sans-serif;
+  }
+
+  .terminal {
+    float: left;
+    border: #000 solid 5px;
+    font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+    font-size: 11px;
+    color: #f0f0f0;
+    background: #000;
+  }
+  .terminal-cursor {
+    color: #000;
+    background: #f0f0f0;
+  }
+
+</style>
+<script src="term/term.js"></script>
+<body>
+<h1>Terminal</h1>
+</body>
+<script>
+  window.onload = function() {
+	  String.prototype.replaceAll = function(search, replacement) {
+	      var target = this;
+	      return target.replace(new RegExp(search, 'g'), replacement);
+	  };
+	  
+	  var socket = new WebSocket("ws://127.0.0.1:9191/wterm?q=test");
+	  var term = null;
+	  socket.onopen = function(){
+	      term = new Terminal({
+	        cols: 80,
+	        rows: 24,
+	        useStyle: true,
+	        screenKeys: true,
+	        cursorBlink: false
+	      });
+	      term.on('data', function(data) {
+			  socket.send(data);
+	      });
+	      term.on('title', function(title) {
+	        document.title = title;
+	      });
+	      term.open(document.body);
+	      term.write('\x1b[31mWelcome to term.js!\x1b[m\r\n');
+	  };
+	  socket.onmessage = function (e) {
+		  if(term && e.data) 
+		  {
+			  term.write(e.data.replaceAll("\n","\r\n"));
+		  }
+	  };
+	  socket.onclose = function()
+	  { 
+	     // websocket is closed.
+	     alert("Connection is closed..."); 
+	  };
+	  window.onbeforeunload = function(e) {
+		  if(socket) socket.close();
+	  };
+      
+  };
+</script>
+</html>
+  

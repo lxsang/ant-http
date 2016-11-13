@@ -231,7 +231,8 @@ int is_bin(const char* file)
 		return true;
 	else 
 		// The other type will be undestant as binary
-		return "application/octet-stream";
+		return true;
+		//return "application/octet-stream";
 }
 
 int match_int(const char* search)

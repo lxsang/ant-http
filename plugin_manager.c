@@ -196,17 +196,21 @@ dictionary decode_cookie(const char* line)
 {
 	char *token,*token1;
 	char *cpstr = strdup(line);
+	trim(cpstr,' ');
+	trim(cpstr,'\n');
+	trim(cpstr,'\r');
+	//printf("FUCKIT %s\n",cpstr );
 	dictionary dic = NULL;
 	while((token = strsep(&cpstr,";")))
 	{
+		trim(token,' ');
 		token1 = strsep(&token,"=");
 		if(token1)
 		{
 			if(dic == NULL)
 				dic = dict();
-			LOG("Found cookie : %s = %s\n",token1,token);
-			trim(token1,' ');
-			dput(dic,token1,token);
+			//LOG("Found cookie : %s = %s\n",token1,token);
+			dput(dic,token1,strdup(token));
 		}
 	}
 		//}

@@ -137,11 +137,11 @@ void cat(int client, FILE *resource)
 {
 	char buf[1024];
 
-	fgets(buf, sizeof(buf), resource);
-	while (!feof(resource))
+	//fgets(buf, sizeof(buf), resource);
+	while (fgets(buf, sizeof(buf), resource) != NULL)
 	{
 		send(client, buf, strlen(buf), 0);
-		fgets(buf, sizeof(buf), resource);
+		//fgets(buf, sizeof(buf), resource);
 	}
 
 

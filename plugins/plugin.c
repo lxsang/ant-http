@@ -200,12 +200,13 @@ int __f(int client, const char* file)
 		LOG("Cannot read : %s\n", file);
 		return 0;
 	}
-	fgets(buf, sizeof(buf), ptr);
-	while(!feof(ptr))
+	;
+	while(fgets(buf, sizeof(buf), ptr) != NULL)
 	{
 		nbytes = send(client, buf, strlen(buf), 0);
 		if(nbytes == -1) return 0;
-		fgets(buf, sizeof(buf), ptr);
+		//LOG("READ : %s\n", buf);
+		//fgets(buf, sizeof(buf), ptr);
 	}
 	fclose(ptr);
 	return 1;

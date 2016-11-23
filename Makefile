@@ -41,7 +41,7 @@ httpd:$(SERVER)
 	cp antd $(BUILDIRD)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -fPIC $(CFLAGS) -c $< -o $@
 plugins: $(PLUGINS)
 	
 %.$(EXT): $(PLUGINSDEP) 

@@ -76,7 +76,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 			ws_confirm_request(client, ws_key);
 			free(ws_key);
 			// insert wsocket flag to request
-			// plugin should handle this ugrade connection
+			// plugin should handle this ugraded connection
 			// not the server
 			if(!request) request = dict();
 			dput(request,"__web_socket__","1");

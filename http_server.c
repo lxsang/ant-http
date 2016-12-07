@@ -68,8 +68,24 @@ void accept_request(int client)
 	{
 		if (S_ISDIR(st.st_mode))
 			strcat(path, "/index.html");
-		serve_file(client, path);
-
+		// check if the mime is supported
+		// if the minme is not supported
+		// find an handler plugin to process it
+		// if the plugin is not found, forbidden access to the file should be sent
+		char* mime_type = mime(path);
+		if(strcmp(mime_type,"application/octet-stream") == 0)
+		{
+			sprintf(buf,"/%s-api%s",ext(path),url);
+			LOG("WARNING::::Access octetstream via handler %s\n", buf);
+			if(execute_plugin(client,buf,method,query_string) < 0)
+				cannot_execute(client);
+		}
+		else
+		{
+			headers(client,mime_type);
+			// if the mime is supported, send the file
+			serve_file(client, path);
+		}		
 	}
 
 	close(client);
@@ -126,10 +142,12 @@ void __b(int client, const unsigned char* data, int size)
 void catb(int client, FILE* ptr)
 {
 	unsigned char buffer[BUFFLEN];
+	size_t size;
 	while(!feof(ptr))
 	{
-		fread(buffer,BUFFLEN,1,ptr);
-		__b(client,buffer,BUFFLEN);
+		size = fread(buffer,1,BUFFLEN,ptr);
+		__b(client,buffer,size);
+		//if(!__b(client,buffer,size)) return;
 	}
 	//fclose(ptr);
 }
@@ -226,7 +244,7 @@ int get_line(int sock, char *buf, int size)
 /* Parameters: the socket to print the headers on
 *             the name of the file */
 /**********************************************************************/
-void headers(int client, const char *filename)
+void headers(int client, const char *mime_type)
 {
 	char buf[1024];
 	//printf("Mime %s\n", mime(filename));
@@ -234,7 +252,7 @@ void headers(int client, const char *filename)
 	send(client, buf, strlen(buf), 0);
 	strcpy(buf, SERVER_STRING);
 	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-Type: %s\r\n",mime(filename));
+	sprintf(buf, "Content-Type: %s\r\n",mime_type);
 	send(client, buf, strlen(buf), 0);
 	strcpy(buf, "\r\n");
 	send(client, buf, strlen(buf), 0);
@@ -289,7 +307,6 @@ void serve_file(int client, const char *filename)
 		not_found(client);
 	else
 	{
-		headers(client, filename);
 		if(is_bin(filename))
 			catb(client,resource);
 		else

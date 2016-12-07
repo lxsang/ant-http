@@ -175,6 +175,9 @@ char* mime(const char* file)
 		return "application/x-font-woff";
 	else if(IEQU(ex,"otf"))
 		return "application/x-font-otf";
+	//audio
+	else if(IEQU(ex,"mp3"))
+		return "audio/mpeg";
 	else 
 		// The other type will be undestant as binary
 		return "application/octet-stream";

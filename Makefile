@@ -11,7 +11,7 @@ SERVER=plugin_manager.o \
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-    BUILDIRD=/root/www
+    BUILDIRD=/opt/www
 	PF_FLAG=-D_GNU_SOURCE -DLINUX
 endif
 ifeq ($(UNAME_S),Darwin)

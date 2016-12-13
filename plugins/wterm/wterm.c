@@ -93,10 +93,49 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 			      				else if(h->opcode == WS_TEXT)
 			      				{
 			      					int l;
+									char * tok = NULL;
+									char* tok1 = NULL;
 			      					while((l = ws_read_data(cl,h,sizeof(buff),buff)) > 0)
 			      					{
-			      						//buff[l] = '\0';
-			   							write(fdm, buff, l);
+										char c = buff[0];
+										switch(c)
+										{
+											case 'i': // input from user
+											write(fdm, buff+1, l-1);
+											break;
+											
+											case 's': // terminal resize event
+											buff[l] = '\0';
+											tok = strdup(buff+1);
+											tok1 = strsep(&tok,":");
+											if(tok != NULL && tok1 != NULL)
+											{
+												int cols = atoi(tok1);
+												int rows = atoi(tok);
+												//free(tok);
+												struct winsize win = { 0, 0, 0, 0 };
+												if (ioctl(fdm, TIOCGWINSZ, &win) != 0) {
+													if (errno != EINVAL) {
+															printf("Exit now \n");
+															break;
+													}
+													memset(&win, 0, sizeof(win));
+												}
+												//printf("Setting winsize\n");
+												if (rows >= 0)
+													win.ws_row = rows;
+												if (cols >= 0)
+													win.ws_col = cols;
+
+												if (ioctl(fdm, TIOCSWINSZ, (char *) &win) != 0)
+													printf("Cannot set winsize\n");
+											}
+											
+											break;
+											
+											default:
+											break;
+										}
 										//ws_t(cl,buff);
 			      					}
 									/*if(l == -1)
@@ -189,3 +228,25 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 
 	LOG("%s\n","All processes exit");
 }
+
+/*
+static void set_window_size(int rows, int cols)
+{
+struct winsize win = { 0, 0, 0, 0 };
+if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win)) {
+	if (errno != EINVAL) {
+			goto bail;
+		}
+		memset(&win, 0, sizeof(win));
+	}
+
+	if (rows >= 0)
+		win.ws_row = rows;
+	if (cols >= 0)
+		win.ws_col = cols;
+
+	if (ioctl(STDIN_FILENO, TIOCSWINSZ, (char *) &win))
+bail:
+		perror_on_device("%s");
+}
+*/

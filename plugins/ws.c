@@ -178,6 +178,7 @@ void ws_f(int client, const char* file)
 	ptr = fopen(file,"rb");
 	if(!ptr)
 	{
+		ws_close(client,1011);
 		return;
 	}
 

@@ -35,6 +35,7 @@ int request_socket(const char* ip, int port)
 		perror("Socket");
 		return -1;
 	}
+	
 	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,sizeof(timeout)) < 0)
 	        perror("setsockopt failed\n");
 

@@ -19,8 +19,10 @@ typedef struct{
 } ws_msg_header_t;
 
 ws_msg_header_t * ws_read_header(int);
+void ws_send_frame(int , uint8_t* , ws_msg_header_t );
 void ws_t(int , const char* );
 void ws_b(int , uint8_t* data, int);
+void ws_f(int, const char*);
 void ws_close(int, unsigned int);
 void pong(int client, int len);
 int ws_read_data(int , ws_msg_header_t*, int, uint8_t*);

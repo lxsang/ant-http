@@ -102,6 +102,7 @@ void _send_header(int client, ws_msg_header_t header)
 	for(int i=0; i< 8; i++) bytes[i] = 0;
 	//first byte |FIN|000|opcode|
 	byte = (header.fin << 7) + header.opcode;
+	//printf("BYTE: %d\n", byte);
 	send(client, &byte, 1, 0);
 	// second byte, payload length
 	// mask = 0
@@ -130,6 +131,17 @@ void _send_header(int client, ws_msg_header_t header)
 	}
 }
 /**
+* Send a frame to client
+*/
+void ws_send_frame(int client, uint8_t* data, ws_msg_header_t header)
+{
+	_send_header(client, header);
+	if(header.opcode == WS_TEXT)
+		send(client,(char*)data,header.plen,0);
+	else
+		send(client,(uint8_t*)data,header.plen,0);
+}
+/**
 * send a text data frame to client
 */
 void ws_t(int client, const char* data)
@@ -138,11 +150,12 @@ void ws_t(int client, const char* data)
 	header.fin = 1;
 	header.opcode = WS_TEXT;
 	header.plen = strlen(data);
-	_send_header(client,header);
-	send(client, data, header.plen,0);
+	//_send_header(client,header);
+	//send(client, data, header.plen,0);
+	ws_send_frame(client,data,header);
 }
 /**
-* send a binary data fram to client
+* send a single binary data fram to client
 * not tested yet, but should work
 */
 void ws_b(int client, uint8_t* data, int l)
@@ -151,8 +164,50 @@ void ws_b(int client, uint8_t* data, int l)
 	header.fin = 1;
 	header.opcode = WS_BIN;
 	header.plen = l;
-	_send_header(client,header);
-	send(client, data, header.plen,0);
+	ws_send_frame(client,data, header);
+	//_send_header(client,header);
+	//send(client, data, header.plen,0);
+}
+/*
+* send a file as binary data
+*/
+void ws_f(int client, const char* file)
+{
+	uint8_t buff[1024];
+	FILE *ptr;
+	ptr = fopen(file,"rb");
+	if(!ptr)
+	{
+		return;
+	}
+
+	ws_msg_header_t header;
+	size_t size;
+	int first_frame = 1;
+	//ws_send_frame(client,buff,header);
+	while(!feof(ptr))
+	{
+		size = fread(buff,1,1024,ptr);
+		if(size >= 0)
+		{
+			if(feof(ptr))
+				header.fin = 1;
+			else
+				header.fin = 0;
+			// clear opcode
+			if(first_frame)
+			{
+				header.opcode = WS_BIN;
+				first_frame = 0;
+			}
+			else
+				header.opcode = 0;
+			header.plen = size;
+			//printf("FIN: %d OC:%d\n", header.fin, header.opcode);
+			ws_send_frame(client,buff,header);
+		} 
+	}
+	fclose(ptr);
 }
 /**
 * Not tested yet
@@ -160,6 +215,7 @@ void ws_b(int client, uint8_t* data, int l)
 */
 void pong(int client, int len)
 {
+	//printf("PONG\n");
 	ws_msg_header_t pheader;
 	pheader.fin = 1;
 	pheader.opcode = WS_PONG;
@@ -174,6 +230,7 @@ void pong(int client, int len)
 */
 void ws_close(int client, unsigned int status)
 {
+	//printf("CLOSED\n");
 	ws_msg_header_t header;
 	header.fin = 1;
 	header.opcode = WS_CLOSE;

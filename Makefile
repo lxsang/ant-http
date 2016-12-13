@@ -20,7 +20,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)
 #-lsocket
-PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT)
+PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT) wsimg.$(EXT)
 
 PLUGINSDEP = plugins/ini.o \
 				plugins/plugin.o \

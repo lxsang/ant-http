@@ -179,7 +179,7 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 			ioctl(0, TIOCSCTTY, 1);
 		
 			//system("/bin/bash");
-			system("sudo login");
+			system("TERM=linux sudo login");
 			// if Error...
 			ws_close(cl,1000);
 			//LOG("%s\n","Terminal exit");

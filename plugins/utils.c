@@ -335,12 +335,27 @@ unsigned simple_hash(const char* key)
       hashval = *key + 31 * hashval;
 	return hashval;
 }
-int is_file(const char* f)
+int _exist(const char* f)
 {
 	struct stat st;
 	return !(stat(f, &st) == -1);
 }
- 
+int is_file(const char* f)
+{
+	int st = is_dir(f);
+	if(st == -1) return -1;
+	else return st==0;
+}
+int is_dir(const char* f)
+{
+	struct stat st;
+	if(stat(f, &st) == -1)
+		return -1; // unknow
+	else if(st.st_mode & S_IFDIR)
+		return 1;
+	else 
+		return 0;
+}
 // These vars will contain the hash
  
 void md5(uint8_t *initial_msg, size_t initial_len, char* buff) {

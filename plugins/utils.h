@@ -86,6 +86,8 @@ char to_hex(char code);
 unsigned hash(const char*, int);
 unsigned simple_hash(const char*);
 int is_file(const char* f);
+int is_dir(const char* f);
+int _exist(const char* f);
 void md5(uint8_t *, size_t , char*);
 void sha1(const char*, char*);
 #endif

@@ -67,7 +67,13 @@ THE SOFTWARE.
 #define RPC_TYPE_I4		235//hash("i4")
 #define RPC_TYPE_STRING	17//hash("string")
 #define RPC_TYPE_NIL	529//hash("nil")
-			
+
+typedef struct{
+	const char* type;
+	const char** ext;
+	int bin;
+} mime_t;
+
 char* __s(const char*,...);
 void trim(char*,const char);
 void removeAll(const char* path,int mode);
@@ -83,6 +89,8 @@ char *url_decode(const char *str);
 char *url_encode(const char *str);
 char from_hex(char ch);
 char to_hex(char code);
+mime_t mime_from_type(const char* type);
+mime_t mime_from_ext(const char* ex);
 unsigned hash(const char*, int);
 unsigned simple_hash(const char*);
 int is_file(const char* f);

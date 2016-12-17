@@ -22,6 +22,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 #include "utils.h"
+
+//define all basic mime here
+
+static mime_t _mimes[] = {
+	{"image/bmp",(const char *[]){"bmp",NULL},1},
+	{"image/jpeg",(const char *[]){"jpg","jpeg",NULL},1},
+	{"text/css",(const char *[]){"css",NULL},0},
+	{"text/csv",(const char *[]){"csv",NULL},0},
+	{"application/pdf",(const char *[]){"pdf",NULL},1},
+	{"image/gif",(const char *[]){"gif",NULL},1},
+	{"text/html",(const char *[]){"html","htm",NULL},0},
+	{"application/json",(const char *[]){"json",NULL},0},
+	{"application/javascript",(const char *[]){"js",NULL},0},
+	{"image/png",(const char *[]){"png",NULL},1},
+	{"image/x-portable-pixmap",(const char *[]){"ppm",NULL},1},
+	{"application/x-rar-compressed",(const char *[]){"rar",NULL},1},
+	{"image/tiff",(const char *[]){"tiff",NULL},1},
+	{"application/x-tar",(const char *[]){"tar",NULL},1},
+	{"text/plain",(const char *[]){"txt",NULL},0},
+	{"application/x-font-ttf",(const char *[]){"ttf",NULL},1},
+	{"application/xhtml+xml",(const char *[]){"xhtml",NULL},0},
+	{"application/xml",(const char *[]){"xml",NULL},0},
+	{"application/zip",(const char *[]){"zip",NULL},1},
+	{"image/svg+xml",(const char *[]){"svg",NULL},0},
+	{"application/vnd.ms-fontobject",(const char *[]){"eot",NULL},1},
+	{"application/x-font-woff",(const char *[]){"woff","woff2",NULL},1},
+	{"application/x-font-otf",(const char *[]){"otf",NULL},1},
+	{"audio/mpeg",(const char *[]){"mp3","mpeg",NULL},1},
+	{NULL,NULL,0}
+};
+
+
 char* __s(const char* fstring,...)
 {
 	char* data;
@@ -119,6 +151,25 @@ char* ext(const char* file)
 	return ltoken;
 
 }
+/*get mime file info from extension*/
+mime_t mime_from_ext(const char* ex)
+{
+	for(int i = 0; _mimes[i].type != NULL; i++)
+		for(int j = 0; _mimes[i].ext[j] != NULL; j++)
+		{
+			if(IEQU(ex,_mimes[i].ext[j])) return _mimes[i];
+		}
+	
+	return (mime_t){"application/octet-stream",(const char *[]){ext,NULL},1};
+}
+/*get mime file info from type*/
+mime_t mime_from_type(const char* type)
+{
+	for(int i = 0; _mimes[i].type != NULL; i++)
+		if(strstr(type, _mimes[i].type) != NULL) 
+	   		return _mimes[i];
+	return (mime_t){NULL,NULL,0};
+}
 /**
  * Get correct HTTP mime type of a file
  * This is a minimalistic mime type list supported
@@ -129,113 +180,15 @@ char* ext(const char* file)
 char* mime(const char* file)
 {
 	char * ex = ext(file);
-	if(IEQU(ex,"bmp"))
-		return "image/bmp";
-	else if(IEQU(ex,"jpg") || IEQU(ex,"jpeg"))
-		return "image/jpeg";
-	else if(IEQU(ex,"css"))
-		return "text/css";
-	else if(IEQU(ex,"csv"))
-		return "text/csv";
-	else if(IEQU(ex,"pdf"))
-		return "application/pdf";
-	else if(IEQU(ex,"gif"))
-		return "image/gif";
-	else if(IEQU(ex,"html")||(IEQU(ex,"htm")))
-		return "text/html";
-	else if(IEQU(ex,"json"))
-		return "application/json";
-	else if(IEQU(ex,"js"))
-		return "application/javascript";
-	else if(IEQU(ex,"png"))
-		return "image/png";
-	else if(IEQU(ex,"ppm"))
-		return "image/x-portable-pixmap";
-	else if(IEQU(ex,"rar"))
-		return "application/x-rar-compressed";
-	else if(IEQU(ex,"tiff"))
-		return "image/tiff";
-	else if(IEQU(ex,"tar"))
-		return "application/x-tar";
-	else if(IEQU(ex,"txt"))
-		return "text/plain";
-	else if(IEQU(ex,"ttf"))
-		return "application/x-font-ttf";
-	else if(IEQU(ex,"xhtml"))
-		return "application/xhtml+xml";
-	else if(IEQU(ex,"xml"))
-		return "application/xml";
-	else if(IEQU(ex,"zip"))
-		return "application/zip";
-	else if(IEQU(ex,"svg"))
-		return "image/svg+xml";
-	else if(IEQU(ex,"eot"))
-		return "application/vnd.ms-fontobject";
-	else if(IEQU(ex,"woff") || IEQU(ex,"woff2"))
-		return "application/x-font-woff";
-	else if(IEQU(ex,"otf"))
-		return "application/x-font-otf";
-	//audio
-	else if(IEQU(ex,"mp3"))
-		return "audio/mpeg";
-	else 
-		// The other type will be undestant as binary
-		return "application/octet-stream";
+	mime_t m = mime_from_ext(ex);
+	return m.type;
 }
 
 int is_bin(const char* file)
 {
 	char * ex = ext(file);
-	if(IEQU(ex,"bmp"))
-		return true;
-	else if(IEQU(ex,"jpg") || IEQU(ex,"jpeg"))
-		return true;
-	else if(IEQU(ex,"css"))
-		return false;
-	else if(IEQU(ex,"csv"))
-		return false;
-	else if(IEQU(ex,"pdf"))
-		return true;
-	else if(IEQU(ex,"gif"))
-		return true;
-	else if(IEQU(ex,"html")||(IEQU(ex,"htm")))
-		return false;
-	else if(IEQU(ex,"json"))
-		return false;
-	else if(IEQU(ex,"js"))
-		return false;
-	else if(IEQU(ex,"png"))
-		return true;
-	else if(IEQU(ex,"ppm"))
-		return true;
-	else if(IEQU(ex,"rar"))
-		return true;
-	else if(IEQU(ex,"tiff"))
-		return true;
-	else if(IEQU(ex,"tar"))
-		return true;
-	else if(IEQU(ex,"txt"))
-		return false;
-	else if(IEQU(ex,"ttf"))
-		return true;
-	else if(IEQU(ex,"xhtml"))
-		return false;
-	else if(IEQU(ex,"xml"))
-		return false;
-	else if(IEQU(ex,"zip"))
-		return true;
-	else if(IEQU(ex,"svg"))
-		return false;
-	else if(IEQU(ex,"eot"))
-		return true;
-	else if(IEQU(ex,"woff") || IEQU(ex,"woff2"))
-		return true;
-	else if(IEQU(ex,"otf"))
-		return true;
-	else 
-		// The other type will be undestant as binary
-		return true;
-		//return "application/octet-stream";
+	mime_t m = mime_from_ext(ex);
+	return m.bin;
 }
 
 int match_int(const char* search)

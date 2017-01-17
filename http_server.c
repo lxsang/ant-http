@@ -24,7 +24,7 @@ void accept_request(int client)
 		i++; j++;
 	}
 	method[i] = '\0';
-
+	
 	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
 	{
 		unimplemented(client);

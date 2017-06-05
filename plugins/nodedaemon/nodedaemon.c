@@ -22,7 +22,7 @@ struct master_conf_t mconfig;
 
 call __init__ = init;
 
-char* get_ip_address()
+/*char* get_ip_address()
 {
 	struct ifaddrs* addrs;
 	getifaddrs(&addrs);
@@ -41,7 +41,7 @@ char* get_ip_address()
 	}
 	freeifaddrs(addrs);
 	return "127.0.0.1";
-}
+}*/
 int inform_master()
 {
 	int sockfd;

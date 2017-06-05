@@ -1,5 +1,12 @@
 #include "ws.h"
-
+static void ws_gen_mask_key(ws_msg_header_t * header)
+{
+	int r = rand();
+	header->mask_key[0]  = (r >> 24) & 0xFF;
+	header->mask_key[1]  = (r >> 16) & 0xFF;
+	header->mask_key[2]  = (r >> 8) & 0xFF;
+	header->mask_key[3]  = r & 0xFF;
+}
 /**
 * Read a frame header
 * based on this header, we'll decide
@@ -26,12 +33,13 @@ ws_msg_header_t * ws_read_header(int client)
 	
 	//printf("MASK: %d paylen:%d\n", BITV(byte,7), (byte & 0x7F));
 	// check mask bit, should be 1
-	if(!BITV(byte,7))
+	header->mask = BITV(byte,7);
+	/*if(!BITV(byte,7))
 	{
 		// close the connection with protocol error
 		ws_close(client, 1002);
 		goto fail;
-	}
+	}*/
 	// get the data length of the frame
 	int len = (byte & 0x7F);
 	if(len <= 125)
@@ -50,7 +58,8 @@ ws_msg_header_t * ws_read_header(int client)
 	}
 	//printf("len: %d\n", header->plen);
 	// last step is to get the maskey
-	if(recv(client,header->mask_key, 4*sizeof(uint8_t), 0) <0) goto fail;
+	if(header->mask)
+		if(recv(client,header->mask_key, 4*sizeof(uint8_t), 0) <0) goto fail;
 	//printf("key 0: %d key 1: %d key2:%d, key3: %d\n",header->mask_key[0],header->mask_key[1],header->mask_key[2], header->mask_key[3] );
 	
 	// check wheather it is a ping or a close message
@@ -90,9 +99,10 @@ int ws_read_data(int client, ws_msg_header_t* header, int len, uint8_t* data)
 	if((dlen = recv(client,data, dlen, 0)) <0) return -1;
 	header->plen = header->plen - dlen;
 	// unmask received data
-	for(int i = 0; i < dlen; ++i)
-		data[i] = data[i]^ header->mask_key[i%4];
-	
+	if(header->mask)
+		for(int i = 0; i < dlen; ++i)
+			data[i] = data[i]^ header->mask_key[i%4];
+	data[dlen] = '\0';
 	return dlen;
 }
 void _send_header(int client, ws_msg_header_t header)
@@ -105,15 +115,17 @@ void _send_header(int client, ws_msg_header_t header)
 	//printf("BYTE: %d\n", byte);
 	send(client, &byte, 1, 0);
 	// second byte, payload length
-	// mask = 0
+	// mask may be 0 or 1
+	//if(header.mask == 1)
+	//	printf("Data is masked\n");
 	if(header.plen <= 125)
 	{
-		byte = header.plen;
+		byte =  (header.mask << 7) + header.plen;
 		send(client, &byte, 1, 0);
 	}
 	else if(header.plen < 65536) // 16 bits
 	{
-		byte = 126;
+		byte = (header.mask << 7) + 126;
 		bytes[0] = (header.plen) >> 8;
 		bytes[1] = (header.plen) & 0x00FF;
 		send(client, &byte, 1, 0);
@@ -121,7 +133,7 @@ void _send_header(int client, ws_msg_header_t header)
 	}
 	else // > 16 bits
 	{
-		byte = 127;
+		byte =  (header.mask << 7) + 127;
 		bytes[4] = (header.plen) >> 24;
 		bytes[5] = ((header.plen)>>16) & 0x00FF;
 		bytes[6] = ((header.plen)>>8) & 0x00FF;
@@ -129,26 +141,43 @@ void _send_header(int client, ws_msg_header_t header)
 		send(client, &byte, 1, 0);
 		send(client, &bytes, 8, 0);
 	}
+	// send mask key
+	if(header.mask)
+	{
+		send(client, header.mask_key,4,0);
+	}
 }
 /**
 * Send a frame to client
 */
 void ws_send_frame(int client, uint8_t* data, ws_msg_header_t header)
 {
+	uint8_t * masked;
+	masked = data;
+	if(header.mask)
+	{
+		ws_gen_mask_key(&header);
+		masked = (uint8_t*) malloc(header.plen);
+		for(int i = 0; i < header.plen; ++i)
+			masked[i] = data[i]^ header.mask_key[i%4];
+	}
 	_send_header(client, header);
 	if(header.opcode == WS_TEXT)
-		send(client,(char*)data,header.plen,0);
+		send(client,(char*)masked,header.plen,0);
 	else
-		send(client,(uint8_t*)data,header.plen,0);
+		send(client,(uint8_t*)masked,header.plen,0);
+	if(masked && header.mask)
+		free(masked);
 }
 /**
 * send a text data frame to client
 */
-void ws_t(int client, const char* data)
+void ws_send_text(int client, const char* data,int mask)
 {
 	ws_msg_header_t header;
 	header.fin = 1;
 	header.opcode = WS_TEXT;
+	header.mask = mask;
 	header.plen = strlen(data);
 	//_send_header(client,header);
 	//send(client, data, header.plen,0);
@@ -158,12 +187,13 @@ void ws_t(int client, const char* data)
 * send a single binary data fram to client
 * not tested yet, but should work
 */
-void ws_b(int client, uint8_t* data, int l)
+void ws_send_binary(int client, uint8_t* data, int l, int mask)
 {
 	ws_msg_header_t header;
 	header.fin = 1;
 	header.opcode = WS_BIN;
 	header.plen = l;
+	header.mask = mask;
 	ws_send_frame(client,data, header);
 	//_send_header(client,header);
 	//send(client, data, header.plen,0);
@@ -171,7 +201,7 @@ void ws_b(int client, uint8_t* data, int l)
 /*
 * send a file as binary data
 */
-void ws_f(int client, const char* file)
+void ws_send_file(int client, const char* file, int mask)
 {
 	uint8_t buff[1024];
 	FILE *ptr;
@@ -186,6 +216,7 @@ void ws_f(int client, const char* file)
 	size_t size;
 	int first_frame = 1;
 	//ws_send_frame(client,buff,header);
+	header.mask = mask;
 	while(!feof(ptr))
 	{
 		size = fread(buff,1,1024,ptr);
@@ -221,24 +252,195 @@ void pong(int client, int len)
 	pheader.fin = 1;
 	pheader.opcode = WS_PONG;
 	pheader.plen = len;
+	pheader.mask = 0;
 	uint8_t data[len];
 	if(recv(client,data, len, 0) < 0) return;
-	_send_header(client, pheader);
-	send(client, data, len, 0);
+	ws_send_frame(client,data,pheader);
+	//_send_header(client, pheader);
+	//send(client, data, len, 0);
 }
 /*
 * Not tested yet, but should work
 */
-void ws_close(int client, unsigned int status)
+void ws_send_close(int client, unsigned int status, int mask)
 {
 	//printf("CLOSED\n");
 	ws_msg_header_t header;
 	header.fin = 1;
 	header.opcode = WS_CLOSE;
 	header.plen = 2;
+	header.mask=mask;
 	uint8_t bytes[2];
 	bytes[0] = status >> 8;
 	bytes[1] = status & 0xFF;
-	_send_header(client, header);
-	send(client,bytes,2,0);
+	/*if(mask)
+	{
+		// XOR itself
+		header.mask_key[0] = bytes[0];
+		header.mask_key[1] = bytes[1];
+		bytes[0] = bytes[1] ^ bytes[1];
+	}*/
+	ws_send_frame(client,bytes,header);
+	//_send_header(client, header);
+	//send(client,bytes,2,0);
+}
+int ip_from_hostname(const char * hostname , char* ip)
+{
+    struct hostent *he;
+    struct in_addr **addr_list;
+    int i;    
+    if ( (he = gethostbyname( hostname ) ) == NULL) 
+    {
+        // get the host info
+        herror("gethostbyname");
+        return -1;
+    }
+    addr_list = (struct in_addr **) he->h_addr_list;
+     
+    for(i = 0; addr_list[i] != NULL; i++) 
+    {
+        //Return the first one;
+        strcpy(ip , inet_ntoa(*addr_list[i]) );
+        return 0;
+    }
+    return -1;
+}
+
+/*
+send a request
+*/
+int request_socket(const char* ip, int port)
+{
+	int sockfd, bytes_read;
+	struct sockaddr_in dest;
+	
+	// time out setting
+	struct timeval timeout;      
+	timeout.tv_sec = CONN_TIME_OUT_S;
+	timeout.tv_usec = 0;//3 s
+	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
+	{
+		perror("Socket");
+		return -1;
+	}
+	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+	        perror("setsockopt failed\n");
+
+    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+        perror("setsockopt failed\n");
+	/*struct linger lingerStruct;
+    lingerStruct.l_onoff = 0;  // turn lingering off for sockets
+    setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &lingerStruct, sizeof(lingerStruct));*/
+	
+    bzero(&dest, sizeof(dest));
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(port);
+    if ( inet_aton(ip, &dest.sin_addr.s_addr) == 0 )
+    {
+		perror(ip);
+		close(sockfd);
+		return -1;
+    }
+	if ( connect(sockfd, (struct sockaddr*)&dest, sizeof(dest)) != 0 )
+	{
+		close(sockfd);
+		perror("Connect");
+		return -1;
+	}
+	return sockfd;
+}
+int sock_read_buf(int sock, char*buf,int size)
+{
+	int i = 0;
+	char c = '\0';
+	int n;
+	while ((i < size - 1) && (c != '\n'))
+	{
+		n = recv(sock, &c, 1, 0);
+		if (n > 0)
+		{
+			buf[i] = c;
+			i++;
+		}
+		else
+			c = '\n';
+	}
+	buf[i] = '\0';
+	return i;
+}
+//TODO: The ping request
+int ws_open_hand_shake(const char* host, int port, const char* resource)
+{
+    char ip[100];
+	char buff[MAX_BUFF];
+    char* rq = NULL;
+    int size;
+    // request socket
+	ip_from_hostname(host ,ip);
+	int sock = request_socket(ip, port);
+	if(sock <= 0) return -1;
+    // now send ws request handshake 
+    rq = __s(CLIENT_RQ,resource,host);
+   //  printf("%s\n",rq);
+    size = send(sock, rq, strlen(rq),0);
+    if(size != strlen(rq))
+    {
+        printf("Cannot send request \n");
+        close(sock);
+        return -1;
+    }
+    // now verify if server accept the socket 
+	 size  = sock_read_buf(sock,buff,MAX_BUFF);
+	char* token;
+    int done = 0;
+	while (size > 0 && strcmp("\r\n",buff))
+	{
+		char* line = strdup(buff);
+		//printf("LINE %s\n", line);
+		token = strsep(&line,":");
+		trim(token,' ');
+		if(token != NULL &&strcasecmp(token,"Sec-WebSocket-Accept") == 0)
+		{
+			token = strsep(&line,":");
+			trim(token,' ');
+			trim(token,'\n');
+			trim(token,'\r');
+            //printf("Key found %s \n", token);
+            if(strcasecmp(token, SERVER_WS_KEY) == 0)
+            {
+               // printf("Handshake sucessfull\n");
+                done = 1;
+            } else
+            {
+                printf("Wrong key %s vs %s\n",token,SERVER_WS_KEY);
+                close(sock);
+                return -1;
+            }
+		} 
+		//if(line) free(line);
+		size  = sock_read_buf(sock,buff,MAX_BUFF);
+	}
+    if(done) return sock;
+    //printf("No server key found \n");
+    return -1;
+}
+char* get_ip_address()
+{
+	struct ifaddrs* addrs;
+	getifaddrs(&addrs);
+	struct ifaddrs* tmp = addrs;
+	char* ip;
+	while (tmp) 
+	{
+	    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+	    {
+			struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	        ip = inet_ntoa(pAddr->sin_addr);
+			if(strcmp(ip,"127.0.0.1") != 0) 
+				return ip;
+	    }
+	    tmp = tmp->ifa_next;
+	}
+	freeifaddrs(addrs);
+	return "127.0.0.1";
 }

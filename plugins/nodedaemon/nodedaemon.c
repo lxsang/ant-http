@@ -21,44 +21,6 @@ struct master_conf_t{
 struct master_conf_t mconfig;
 
 call __init__ = init;
-int request_socket(const char* ip, int port)
-{
-	int sockfd = -1;
-	struct sockaddr_in dest;
-	char* request;
-	// time out setting
-	struct timeval timeout;      
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
-	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
-	{
-		perror("Socket");
-		return -1;
-	}
-	
-	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,sizeof(timeout)) < 0)
-	        perror("setsockopt failed\n");
-
-    //if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-    //    perror("setsockopt failed\n");
-	
-    bzero(&dest, sizeof(dest));
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(port);
-    if ( inet_aton(ip, &dest.sin_addr.s_addr) == 0 )
-    {
-		perror(ip);
-		close(sockfd);
-		return -1;
-    }
-	if ( connect(sockfd, (struct sockaddr*)&dest, sizeof(dest)) != 0 )
-	{
-		close(sockfd);
-		//perror("Connect");
-		return -1;
-	}
-	return sockfd;
-}
 
 char* get_ip_address()
 {

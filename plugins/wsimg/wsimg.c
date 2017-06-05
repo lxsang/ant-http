@@ -11,7 +11,7 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 	char* path = NULL;
 	int nimg = 19;
 	ws_msg_header_t* h = NULL;
-	uint8_t buff[8];
+	char buff[1024];
 	if(ws_enable(rq))
 	{
 		while(1)
@@ -19,21 +19,28 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 			h = ws_read_header(cl);
 			if(h)
 			{
+				if(h->mask == 0)
+				{
+					LOG("%s\n","data is not masked");
+					ws_close(cl, 1012);
+					break;
+				}
 				if(h->opcode == WS_CLOSE)
 				{
 			    	LOG("%s\n","Websocket: connection closed");
 					ws_close(cl, 1011);
 					break;
 				}
-				else if(h->opcode == WS_BIN)
+				else if(h->opcode == WS_TEXT)
 				{
 					int l;
 					if((l = ws_read_data(cl,h,sizeof(buff),buff)) > 0)
 					{
 						
-						path = __s("%s/ws/img%d.jpg",__plugin__.htdocs,buff[0]);
-						LOG("%s : %s\n", "send back data of", path);
-						ws_f(cl,path);
+						//path = __s("%s/ws/img%d.jpg",__plugin__.htdocs,buff[0]);
+						LOG("%s : %s\n", "send back data of", buff);
+						//ws_f(cl,path);
+						ws_t(cl,buff);
 						free(path);
 					}
 					else

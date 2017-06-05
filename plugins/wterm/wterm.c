@@ -84,6 +84,12 @@ void handler(int cl, const char* m, const char* rqp, dictionary rq)
 			      			h = ws_read_header(cl);
 			      			if(h)
 			      			{
+								if(h->mask == 0)
+								{
+			      					LOG("%s\n","Data is not mask");
+			   						write(fdm, "exit\n", 5);
+			      					return;
+								}
 			      				if(h->opcode == WS_CLOSE)
 			      				{
 			      					LOG("%s\n","Websocket: connection closed");

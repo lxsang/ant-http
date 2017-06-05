@@ -6,7 +6,6 @@ SERVER=plugin_manager.o \
 		plugins/dictionary.o \
 		plugins/base64.o \
 		plugins/sha1.o \
-		plugins/ws.o \
 		plugins/utils.o
 SERVERLIB=-lpthread -ldl
 UNAME_S := $(shell uname -s)

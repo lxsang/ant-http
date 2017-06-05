@@ -1,29 +1,55 @@
 #ifndef WS_H
 #define WS_H
-
+#include <resolv.h>
+#include <errno.h>
+#include <ifaddrs.h>
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdint.h>
+#include<netdb.h> //hostent
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <libgen.h>
+#include <sys/time.h>
 
+#include "utils.h"
+
+#define CONN_TIME_OUT_S 3
 #define BITV(v,i)  ((v & (1 << i)) >> i) 
 #define WS_TEXT	0x1
 #define WS_BIN	0x2
 #define WS_CLOSE 0x8
 #define WS_PING	 0x9
 #define WS_PONG 0xA
+#define ws_t(c ,d) (ws_send_text(c,d,0))
+#define ws_b(c , d,z) (ws_send_binary(c,d,z,0))
+#define ws_f(c,f) (ws_send_file(c,f,0))
+#define ws_close(c,r) (ws_send_close(c,r,0))
+#define MAX_BUFF 1024
+#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+
 typedef struct{
 	uint8_t fin;
 	uint8_t opcode;
 	unsigned int plen;
+	uint8_t mask;
 	uint8_t mask_key[4];
 } ws_msg_header_t;
 
 ws_msg_header_t * ws_read_header(int);
 void ws_send_frame(int , uint8_t* , ws_msg_header_t );
-void ws_t(int , const char* );
-void ws_b(int , uint8_t* data, int);
-void ws_f(int, const char*);
-void ws_close(int, unsigned int);
 void pong(int client, int len);
+
+void ws_send_text(int client, const char* data,int mask);
+void ws_send_close(int client, unsigned int status, int mask);
+void ws_send_file(int client, const char* file, int mask);
+void ws_send_binary(int client, uint8_t* data, int l, int mask);
+
 int ws_read_data(int , ws_msg_header_t*, int, uint8_t*);
+int request_socket(const char* ip, int port);
+int ip_from_hostname(const char * hostname , char* ip);
+int sock_read_buf(int sock, char*buf,int size);
+int ws_open_hand_shake(const char* host, int port, const char* resource);
+char* get_ip_address();
 #endif

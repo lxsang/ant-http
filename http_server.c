@@ -17,6 +17,7 @@ void accept_request(int client)
 	char *query_string = NULL;
 
 	numchars = get_line(client, buf, sizeof(buf));
+	//printf("%s\n", buf);
 	i = 0; j = 0;
 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
@@ -24,10 +25,13 @@ void accept_request(int client)
 		i++; j++;
 	}
 	method[i] = '\0';
-	
 	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
 	{
+		printf("METHOD NOT FOUND %s\n", method);
+		// unimplemented
 		unimplemented(client);
+		while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
+		close(client);
 		return;
 	}
 

@@ -29,7 +29,7 @@ CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG)
 
 LIB_PATH=$(BUILDIRD)/plugins
 LIB_NAME=libantd
-LIB_FLAG= $(LIB_PATH$)/$(LIB_NAME).$(EXT)
+LIB_FLAG= $(LIB_NAME).$(EXT)
 SERVERLIB=-lpthread -ldl $(LIB_FLAG)
 
 SERVER_O=plugin_manager.o \
@@ -59,7 +59,8 @@ httpd: lib $(SERVER_O)
 	cp antd $(BUILDIRD)
 
 lib: $(LIBOBJS)
-	$(CC) $(CFLAGS)  $(DB_LIB)  -shared -o $(LIB_PATH$)/$(LIB_NAME).$(EXT) $(LIBOBJS)
+	$(CC) $(CFLAGS)  $(DB_LIB)  -shared -o $(LIB_NAME).$(EXT) $(LIBOBJS)
+	cp $(LIB_NAME).$(EXT) $(LIB_PATH$)/
 %.o: %.c
 	$(CC) -fPIC $(CFLAGS) -c $< -o $@
 	

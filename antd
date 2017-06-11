@@ -1,7 +1,7 @@
 #!/bin/sh
 UNAME=`uname -s`
 
-if [ "$UNAME" == "Darwin" ]; then
+if [ "$UNAME" = "Darwin" ]; then
 	DYLD_LIBRARY_PATH=$(dirname "$0")/plugins/ $(dirname "$0")/httpd $(dirname "$0")/config.ini
 else
 	LD_LIBRARY_PATH=$(dirname "$0")/plugins/ $(dirname "$0")/httpd $(dirname "$0")/config.ini

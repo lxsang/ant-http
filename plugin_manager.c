@@ -38,6 +38,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 {
 	dictionary request = NULL;
 	dictionary cookie = NULL;
+	dictionary xheader = dict();
 	char* line;
 	char * token;
 	if(strcmp(method,"GET") == 0)
@@ -47,8 +48,12 @@ dictionary decode_request(int client,const char* method,const char* query)
 		char* ws_key = NULL;
 		while((line = read_line(client)) && strcmp("\r\n",line))
 		{
+			trim(line, '\n');
+			trim(line, '\r');
 			token = strsep(&line,":");
 			trim(token,' ');
+			trim(line,' ');
+			dput(xheader,token,line);
 			if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 			{
 				if(!cookie) cookie = decode_cookie(line);
@@ -57,16 +62,12 @@ dictionary decode_request(int client,const char* method,const char* query)
 			{
 				// verify that the connection is upgrade to websocket
 				trim(line, ' ');
-				trim(line, '\n');
-				trim(line, '\r');
 				if(line != NULL && strcasecmp(line,"websocket") == 0)
 					ws = 1;
 			} else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
 			{
 				// get the key from the client
 				trim(line, ' ');
-				trim(line, '\n');
-				trim(line, '\r');
 				ws_key = strdup(line);
 			}
 		}
@@ -90,14 +91,16 @@ dictionary decode_request(int client,const char* method,const char* query)
 		while (line && strcmp("\r\n",line))
 		{
 			//printf("%s\n",line);
+			trim(line, '\n');
+			trim(line, '\r');
 			token = strsep(&line,":");
 			trim(token,' ');
+			trim(line, ' ');
+			dput(xheader,token,line);
 			if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
 			{
 				ctype = strsep(&line,":");
 				trim(ctype,' ');
-				trim(ctype,'\n');
-				trim(ctype,'\r');
 			} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
 			{
 				token = strsep(&line,":");
@@ -140,10 +143,11 @@ dictionary decode_request(int client,const char* method,const char* query)
 		}
 	}
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
-	if(cookie && !request)
+	if(!request)
 			request = dict();
 		
 	dput(request,"cookie",cookie);
+	dput(request,"__xheader__",xheader);
 	return request;
 }
 void __px(const char* data,int size)

@@ -30,12 +30,10 @@ sqldb getdb()
 	return getdb(__plugin__.name);
 }
 #endif
-void header_base(int client)
+void set_status(int client,int code,const char* msg)
 {
-
-	response(client, "HTTP/1.0 200 OK");
+	response(client, __s("HTTP/1.0 %d %s", code, msg));
 	response(client, __s("Server: %s ", SERVER_NAME));
-
 }
 void redirect(int client,const char*path)
 {
@@ -60,7 +58,7 @@ void textstream(int client)
 }
 void octstream(int client, char* name)
 {
-	header_base(client);
+	set_status(client,200,"OK");
 	__t(client,"Content-Type: application/octet-stream");
 	__t(client,"Content-Disposition: attachment; filename=\"%s\"", name);
 	response(client,"");
@@ -72,7 +70,7 @@ void jpeg(int client)
 }
 void header(int client, const char* type)
 {
-	header_base(client);
+	set_status(client,200,"OK");
 	__t(client,"Content-Type: %s",type);
 	response(client,"");
 }
@@ -240,7 +238,7 @@ int upload(const char* tmp, const char* path)
 }
 void set_cookie(int client,const char* type, dictionary dic)
 {
-	header_base(client);
+	set_status(client,200,"OK");
 	__t(client,"Content-Type: %s",type);
 	association assoc;
 	for_each_assoc(assoc,dic){
@@ -250,7 +248,7 @@ void set_cookie(int client,const char* type, dictionary dic)
 }
 void clear_cookie(int client,  dictionary dic)
 {
-	header_base(client);
+	set_status(client,200,"OK");
 	__t(client,"Content-Type: text/html; charset=utf-8");
 	association assoc;
 	for_each_assoc(assoc,dic){

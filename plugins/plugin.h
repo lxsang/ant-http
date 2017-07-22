@@ -36,7 +36,6 @@ extern plugin_header __plugin__;
 extern call __init__;
 
 int response(int, const char*);
-void header_base(int);
 void header(int,const char*);
 void redirect(int,const char*);
 void html(int);
@@ -59,6 +58,7 @@ sqldb getdb();
 sqldb __getdb(char *name);
 #endif
 void set_cookie(int, const char*,dictionary);
+void set_status(int,int,const char*);
 void clear_cookie(int, dictionary);
 /*Default function for plugin*/
 void handler(int, const char*,const char*,dictionary);

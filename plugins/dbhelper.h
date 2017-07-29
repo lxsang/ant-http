@@ -1,3 +1,5 @@
+#ifndef DB_HELPER
+#define DB_HELPER
 #include <sqlite3.h>
 #include "utils.h"
 
@@ -32,3 +34,4 @@ char* value_of(const dbfield,const char*);
 void add_field(dbfield*,const char*, const char*);
 void add_record(dbrecord*,dbfield);
 void dbclose(sqlite3*);
+#endif

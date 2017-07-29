@@ -1,29 +1,17 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#ifndef PLUGIN_H
+#define PLUGIN_H
+
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
-#include "dictionary.h"
-#include "list.h"
-#include "ini.h"
-#include "ws.h"
-
-#define SERVER_NAME "antd"
-#define IS_POST(method) (strcmp(method,"POST")== 0)
-#define IS_GET(method) (strcmp(method,"GET")== 0)
-#define R_STR(d,k) ((char*)dvalue(d,k))
-#define R_INT(d,k) (atoi(dvalue(d,k)))
-#define R_FLOAT(d,k) ((double)atof(dvalue(d,k)))
-#define R_PTR(d,k) (dvalue(d,k))
-#define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
+#include "handle.h"
 
 typedef struct  { 
     char *name; 
     char *dbpath;
     char * htdocs;
     char*pdir;
-	int *sport;
+	int sport;
 } plugin_header;
 
  
@@ -35,32 +23,16 @@ typedef sqlite3* sqldb;
 extern plugin_header __plugin__;
 extern call __init__;
 
-int response(int, const char*);
-void header(int,const char*);
-void redirect(int,const char*);
-void html(int);
-void text(int);
-void json(int);
-void jpeg(int);
-void octstream(int, char*);
-void textstream(int);
-int __ti(int,int);
-int __t(int, const char*,...);
-int __b(int, const unsigned char*, int);
-int __f(int, const char*);
-int __fb(int, const char*);
-int upload(const char*, const char*);
-char* config_dir();
-char* route(const char*);
-char* htdocs(const char*);
+
 #ifdef USE_DB
 sqldb getdb();
 sqldb __getdb(char *name);
 #endif
-void set_cookie(int, const char*,dictionary);
-void set_status(int,int,const char*);
-void clear_cookie(int, dictionary);
+
+char* route(const char*);
+char* htdocs(const char*);
+char* config_dir();
 /*Default function for plugin*/
 void handler(int, const char*,const char*,dictionary);
-void unknow(int);
-int ws_enable(dictionary);
+
+#endif

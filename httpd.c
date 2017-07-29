@@ -9,7 +9,7 @@ static int config_handler(void* conf, const char* section, const char* name,
                    const char* value)
 {
     config_t* pconfig = (config_t*)conf;
-	char * ppath = NULL;
+	//char * ppath = NULL;
     if (MATCH("SERVER", "port")) {
         pconfig->port = atoi(value);
     } else if (MATCH("SERVER", "plugins")) {

@@ -1,13 +1,7 @@
+USE_DB=TRUE
 CC=gcc
 EXT=dylib
-SERVER=plugin_manager.o \
-		plugins/ini.o \
-		http_server.o \
-		plugins/dictionary.o \
-		plugins/base64.o \
-		plugins/sha1.o \
-		plugins/utils.o
-SERVERLIB=-lpthread -ldl
+
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/opt/www
@@ -17,46 +11,75 @@ ifeq ($(UNAME_S),Darwin)
 	BUILDIRD=../ant-build
 	PF_FLAG= -DMACOS
 endif
-CFLAGS=-W -Wall -g -std=c99 -D DEBUG -D USE_DB $(PF_FLAG)
+
+ifeq ($(USE_DB),TRUE)
+	DB_OBJ=plugins/dbhelper.o
+	DB_LIB=-lsqlite3
+	DB_FLAG=-D USE_DB
+endif
+
+ifeq ($(USE_DB),FALSE)
+	DB_OBJ=
+	DB_LIB=
+	DB_FLAG=
+endif
+
+
+CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG)
+
+LIB_PATH=$(BUILDIRD)/plugins
+LIB_NAME=libantd
+LIB_FLAG= $(LIB_PATH$)/$(LIB_NAME).$(EXT)
+SERVERLIB=-lpthread -ldl $(LIB_FLAG)
+
+SERVER_O=plugin_manager.o \
+		http_server.o \
+		httpd.o
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT) wsimg.$(EXT)
 
-PLUGINSDEP = plugins/ini.o \
-				plugins/plugin.o \
-				plugins/dbhelper.o \
-				plugins/dictionary.o \
-				plugins/base64.o \
-				plugins/utils.o \
-				plugins/ws.o \
-				plugins/sha1.o \
-				plugins/list.o 
-PLUGINLIBS = -lsqlite3
+LIBOBJS = 	plugins/ini.o \
+			plugins/handle.o \
+			$(DB_OBJ) \
+			plugins/dictionary.o \
+			plugins/base64.o \
+			plugins/utils.o \
+			plugins/ws.o \
+			plugins/sha1.o \
+			plugins/list.o 
+			
+PLUGINSDEP = plugins/plugin.o
+
 
 main: httpd plugins 
 
 
-httpd:$(SERVER)
-	$(CC) $(CFLAGS) $(SERVERLIB) $(SERVER)  -o $(BUILDIRD)/httpd httpd.c
+httpd: lib $(SERVER_O)
+	$(CC) $(CFLAGS)  $(SERVER_O)  $(SERVERLIB)  -o $(BUILDIRD)/httpd 
 	cp antd $(BUILDIRD)
 
+lib: $(LIBOBJS)
+	$(CC) $(CFLAGS)  $(DB_LIB)  -shared -o $(LIB_PATH$)/$(LIB_NAME).$(EXT) $(LIBOBJS)
 %.o: %.c
 	$(CC) -fPIC $(CFLAGS) -c $< -o $@
+	
 plugins: $(PLUGINS)
 	
 %.$(EXT): $(PLUGINSDEP) 
 	for file in $(wildcard plugins/$(basename $@)/*.c) ; do\
 		$(CC) -fPIC $(CFLAGS)  -c  $$file -o $$file.o; \
 	done
-	$(CC) $(CFLAGS) $(PLUGINLIBS) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
-		$(PLUGINSDEP) plugins/$(basename $@)/*.c.o
+	$(CC) $(CFLAGS) $(PLUGINLIBS) $(LIB_FLAG) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
+		$(PLUGINSDEP)  plugins/$(basename $@)/*.c.o
 
 
 clean: sclean pclean
 
 sclean:
-	rm -f *.o $(BUILDIRD)/httpd
+	-rm -f *.o $(BUILDIRD)/httpd
+	-rm *.$(EXT)
 pclean:
-	rm -rf $(BUILDIRD)/plugins/* plugins/*.o
+	-rm -rf $(BUILDIRD)/plugins/* plugins/*.o
 	-for file in plugins/* ;do \
 		if [ -d "$$file" ]; then \
 			rm "$$file"/*.o; \

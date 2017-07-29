@@ -17,7 +17,6 @@ void accept_request(int client)
 	char *query_string = NULL;
 
 	numchars = get_line(client, buf, sizeof(buf));
-	//printf("%s\n", buf);
 	i = 0; j = 0;
 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
@@ -60,11 +59,9 @@ void accept_request(int client)
 
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
-	//LOG("Path %s\n", path);
 	if (path[strlen(path) - 1] == '/')
 		strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
-
 		if(execute_plugin(client,url,method,query_string) < 0)
 			not_found(client);
 	}

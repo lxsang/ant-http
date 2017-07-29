@@ -30,11 +30,10 @@ CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG)
 LIB_PATH=$(BUILDIRD)/plugins
 LIB_NAME=libantd
 LIB_FLAG= $(LIB_NAME).$(EXT)
-SERVERLIB=-lpthread -ldl $(LIB_FLAG)
+SERVERLIB= -ldl $(LIB_FLAG)
 
 SERVER_O=plugin_manager.o \
-		http_server.o \
-		httpd.o
+		http_server.o
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT) wsimg.$(EXT)
 
@@ -55,7 +54,7 @@ main: httpd plugins
 
 
 httpd: lib $(SERVER_O)
-	$(CC) $(CFLAGS)  $(SERVER_O)  $(SERVERLIB)  -o $(BUILDIRD)/httpd 
+	$(CC) $(CFLAGS)  $(SERVER_O)  $(SERVERLIB)  -o $(BUILDIRD)/httpd httpd.c
 	cp antd $(BUILDIRD)
 
 lib: $(LIBOBJS)

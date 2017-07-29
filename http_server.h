@@ -1,3 +1,5 @@
+#ifndef HTTP_SERVER
+#define HTTP_SERVER
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -6,6 +8,7 @@
 #include <signal.h>
 #include <sys/socket.h>
 #include "plugins/dictionary.h"
+#include "plugins/handle.h"
 #include "plugin_manager.h"
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
@@ -39,3 +42,5 @@ char* json_data_decode(int,int);
 
 int execute_plugin(int client, const char *path,
   const char *method, const char *query_string);
+
+#endif

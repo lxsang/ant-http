@@ -68,6 +68,7 @@ void * plugin_from_file(char* name)
   		LOG("Problem when setting data path for %s : %s \n", name,error);
   else
     (*fn)(name,server_config.db_path, server_config.htdocs,server_config.plugins_dir,server_config.port);
+  if(path)
 	free(path);
    return lib_handle;
 }

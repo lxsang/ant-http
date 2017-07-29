@@ -27,7 +27,7 @@ sqldb __getdb(char *name)
 }
 sqldb getdb()
 {
-	return getdb(__plugin__.name);
+	return __getdb(__plugin__.name);
 }
 #endif
 

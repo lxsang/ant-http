@@ -4,7 +4,7 @@
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
-#include "handle.h"
+#include "ws.h"
 
 typedef struct  { 
     char *name; 

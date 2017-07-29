@@ -215,3 +215,42 @@ int ws_enable(dictionary dic)
 {
 	return (dic != NULL && R_INT(dic,"__web_socket__") == 1);
 }
+/**
+ * read the request as a string line format
+ * @param  sock socket
+ * @return      a request string
+ */
+char* read_line(int sock)
+{
+	char buf[BUFFLEN];
+	read_buf(sock,buf,sizeof(buf));
+	return strdup(buf);
+}
+/**
+ * Read the socket request in to a buffer or size
+ * The data is read until the buffer is full or
+ * there are a carrier return character
+ * @param  sock socket
+ * @param  buf  buffer
+ * @param  size size of buffer
+ * @return      number of bytes read
+ */
+int read_buf(int sock, char*buf,int size)
+{
+	int i = 0;
+	char c = '\0';
+	int n;
+	while ((i < size - 1) && (c != '\n'))
+	{
+		n = recv(sock, &c, 1, 0);
+		if (n > 0)
+		{
+			buf[i] = c;
+			i++;
+		}
+		else
+			c = '\n';
+	}
+	buf[i] = '\0';
+	return i;
+}

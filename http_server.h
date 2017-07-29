@@ -17,15 +17,13 @@
 
 #define ISspace(x) isspace((int)(x))
 
-#define SERVER_STRING "Server: ant-httpd\r\n"
+#define SERVER_STRING "Server: ant-httpd"
 
 void accept_request(int);
-void bad_request(int);
 void cat(int, FILE *);
 void cannot_execute(int);
 void error_die(const char *);
 int get_line(int, char *, int);
-void headers(int, const char *);
 void not_found(int);
 void serve_file(int, const char *);
 int startup(unsigned *);
@@ -38,8 +36,6 @@ dictionary decode_request(int client,const char* method,const char* query);
 dictionary decode_multi_part_request(int,const char*);
 dictionary decode_cookie(const char*);
 char* json_data_decode(int,int);
-char* read_line(int sock);
-int read_buf(int sock,char* buf,int i);
 
 int execute_plugin(int client, const char *path,
   const char *method, const char *query_string);

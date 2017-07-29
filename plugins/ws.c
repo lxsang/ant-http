@@ -349,25 +349,7 @@ int request_socket(const char* ip, int port)
 	}
 	return sockfd;
 }
-int sock_read_buf(int sock, char*buf,int size)
-{
-	int i = 0;
-	char c = '\0';
-	int n;
-	while ((i < size - 1) && (c != '\n'))
-	{
-		n = recv(sock, &c, 1, 0);
-		if (n > 0)
-		{
-			buf[i] = c;
-			i++;
-		}
-		else
-			c = '\n';
-	}
-	buf[i] = '\0';
-	return i;
-}
+
 //TODO: The ping request
 int ws_open_hand_shake(const char* host, int port, const char* resource)
 {
@@ -390,7 +372,7 @@ int ws_open_hand_shake(const char* host, int port, const char* resource)
         return -1;
     }
     // now verify if server accept the socket 
-	 size  = sock_read_buf(sock,buff,MAX_BUFF);
+	 size  = read_buf(sock,buff,MAX_BUFF);
 	char* token;
     int done = 0;
 	while (size > 0 && strcmp("\r\n",buff))
@@ -418,7 +400,7 @@ int ws_open_hand_shake(const char* host, int port, const char* resource)
             }
 		} 
 		//if(line) free(line);
-		size  = sock_read_buf(sock,buff,MAX_BUFF);
+		size  = read_buf(sock,buff,MAX_BUFF);
 	}
     if(done) return sock;
     //printf("No server key found \n");

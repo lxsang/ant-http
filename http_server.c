@@ -86,7 +86,7 @@ void accept_request(int client)
 		}
 		else
 		{
-			headers(client,mime_type);
+			ctype(client,mime_type);
 			// if the mime is supported, send the file
 			serve_file(client, path);
 		}		
@@ -95,25 +95,6 @@ void accept_request(int client)
 	close(client);
 }
 
-/**********************************************************************/
-/* Inform the client that a request it has made has a problem.
-* Parameters: client socket */
-/**********************************************************************/
-void bad_request(int client)
-{
-	char buf[1024];
-
-	sprintf(buf, "HTTP/1.0 400 BAD REQUEST\r\n");
-	send(client, buf, sizeof(buf), 0);
-	sprintf(buf, "Content-type: text/html\r\n");
-	send(client, buf, sizeof(buf), 0);
-	sprintf(buf, "\r\n");
-	send(client, buf, sizeof(buf), 0);
-	sprintf(buf, "<P>Your browser sent a bad request, ");
-	send(client, buf, sizeof(buf), 0);
-	sprintf(buf, "such as a POST without a Content-Length.\r\n");
-	send(client, buf, sizeof(buf), 0);
-}
 
 /**********************************************************************/
 /* Put the entire contents of a file out on a socket.  This function
@@ -122,27 +103,6 @@ void bad_request(int client)
 * Parameters: the client socket descriptor
 *             FILE pointer for the file to cat */
 /**********************************************************************/
-void __b(int client, const unsigned char* data, int size)
-{
-	char buf[BUFFLEN];
-	int sent = 0;
-	int buflen = 0;
-	if(size <= BUFFLEN)
-		send(client,data,size,0);
-	else
-	{
-		while(sent < size)
-		{
-			if(size - sent > BUFFLEN)
-				buflen = BUFFLEN;
-			else
-				buflen = size - sent;
-			memcpy(buf,data+sent,buflen);
-			send(client,buf,buflen,0);
-			sent += buflen;
-		}	
-	}
-}
 void catb(int client, FILE* ptr)
 {
 	unsigned char buffer[BUFFLEN];
@@ -175,16 +135,11 @@ void cat(int client, FILE *resource)
 /**********************************************************************/
 void cannot_execute(int client)
 {
-	char buf[1024];
-
-	sprintf(buf, "HTTP/1.0 500 Internal Server Error\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-type: text/html\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "<P>Error prohibited CGI execution.\r\n");
-	send(client, buf, strlen(buf), 0);
+	set_status(client,500,"Internal Server Error");
+	__t(client,SERVER_STRING);
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<P>Error prohibited CGI execution.");
 }
 
 /**********************************************************************/
@@ -243,50 +198,21 @@ int get_line(int sock, char *buf, int size)
 	return(i);
 }
 
-/**********************************************************************/
-/* Return the informational HTTP headers about a file. */
-/* Parameters: the socket to print the headers on
-*             the name of the file */
-/**********************************************************************/
-void headers(int client, const char *mime_type)
-{
-	char buf[1024];
-	//printf("Mime %s\n", mime(filename));
-	strcpy(buf, "HTTP/1.0 200 OK\r\n");
-	send(client, buf, strlen(buf), 0);
-	strcpy(buf, SERVER_STRING);
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-Type: %s\r\n",mime_type);
-	send(client, buf, strlen(buf), 0);
-	strcpy(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
-}
 
 /**********************************************************************/
 /* Give a client a 404 not found status message. */
 /**********************************************************************/
 void not_found(int client)
 {
-	char buf[1024];
-
-	sprintf(buf, "HTTP/1.0 404 NOT FOUND\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, SERVER_STRING);
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-Type: text/html\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "<HTML><TITLE>Not Found</TITLE>\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "<BODY><P>The server could not fulfill\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "your request because the resource specified\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "is unavailable or nonexistent.\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "</BODY></HTML>\r\n");
-	send(client, buf, strlen(buf), 0);
+	set_status(client,404,"NOT FOUND");
+	__t(client,SERVER_STRING);
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<HTML><TITLE>Not Found</TITLE>");
+	__t(client, "<BODY><P>The server could not fulfill");
+	__t(client, "your request because the resource specified");
+	__t(client, "is unavailable or nonexistent.");
+	__t(client, "</BODY></HTML>");
 }
 
 /**********************************************************************/
@@ -360,24 +286,14 @@ int startup(unsigned *port)
 /**********************************************************************/
 void unimplemented(int client)
 {
-	char buf[1024];
-
-	sprintf(buf, "HTTP/1.0 501 Method Not Implemented\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, SERVER_STRING);
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-Type: text/html\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "<HTML><HEAD><TITLE>Method Not Implemented\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "</TITLE></HEAD>\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "<BODY><P>HTTP request method not supported.\r\n");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "</BODY></HTML>\r\n");
-	send(client, buf, strlen(buf), 0);
+	set_status(client,501,"Method Not Implemented");
+	__t(client,SERVER_STRING);
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<HTML><HEAD><TITLE>Method Not Implemented");
+	__t(client, "</TITLE></HEAD>");
+	__t(client, "<BODY><P>HTTP request method not supported.");
+	__t(client, "</BODY></HTML>");
 }
 
 
@@ -778,46 +694,6 @@ char* json_data_decode(int client,int len)
     //query = url_decode(query);
     LOG("JSON Query %s\n", query);
     return query;
-}
-
-/**
- * read the request as a string line format
- * @param  sock socket
- * @return      a request string
- */
-char* read_line(int sock)
-{
-	char buf[BUFFLEN];
-	read_buf(sock,buf,sizeof(buf));
-	return strdup(buf);
-}
-/**
- * Read the socket request in to a buffer or size
- * The data is read until the buffer is full or
- * there are a carrier return character
- * @param  sock socket
- * @param  buf  buffer
- * @param  size size of buffer
- * @return      number of bytes read
- */
-int read_buf(int sock, char*buf,int size)
-{
-	int i = 0;
-	char c = '\0';
-	int n;
-	while ((i < size - 1) && (c != '\n'))
-	{
-		n = recv(sock, &c, 1, 0);
-		if (n > 0)
-		{
-			buf[i] = c;
-			i++;
-		}
-		else
-			c = '\n';
-	}
-	buf[i] = '\0';
-	return i;
 }
 
 /**

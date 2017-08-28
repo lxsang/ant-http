@@ -411,6 +411,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 			LOG("Bad request\n");
 			return NULL;
 		}
+		LOG("ContentType %s\n", ctype);
 		// decide what to do with the data
 		if(strstr(ctype,FORM_URL_ENCODE) > 0)
 		{

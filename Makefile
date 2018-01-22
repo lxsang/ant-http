@@ -30,7 +30,7 @@ CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG)
 LIB_PATH=$(BUILDIRD)/plugins
 LIB_NAME=libantd
 LIB_FLAG= $(LIB_NAME).$(EXT)
-SERVERLIB= -ldl $(LIB_FLAG) -l pthread
+SERVERLIB= -ldl $(LIB_FLAG) $(DB_LIB) -l pthread
 
 SERVER_O=plugin_manager.o \
 		http_server.o

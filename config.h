@@ -1,4 +1,5 @@
 #define CONFIG "config.ini"
+#include "plugins/dictionary.h"
 
 typedef struct  { 
 	int port;
@@ -7,6 +8,7 @@ typedef struct  {
     char *db_path;
     char* htdocs;
     char* tmpdir;
+    dictionary rules;
 }config_t;
 
 extern config_t server_config; 

@@ -22,7 +22,12 @@ static int config_handler(void* conf, const char* section, const char* name,
         pconfig->htdocs = strdup(value);
     } else if(MATCH("SERVER", "tmpdir")) {
         pconfig->tmpdir = strdup(value);
-    }else if(strcmp(section,"AUTOSTART")==0){
+    }
+	else if (strcmp(section, "RULES") == 0)
+	{
+		dput( pconfig->rules, strdup(name),strdup(value));
+    }
+	else if(strcmp(section,"AUTOSTART")==0){
 		// The server section must be added before the autostart section
 		// auto start plugin
 		plugin_load(value);
@@ -56,6 +61,7 @@ void load_config(const char* file)
 	server_config.db_path = "databases/";
 	server_config.htdocs = "htdocs";
 	server_config.tmpdir = "tmp";
+	server_config.rules = dict();
 	if (ini_parse(file, config_handler, &server_config) < 0) {
 		LOG("Can't load '%s'\n. Used defaut configuration", file);
 	}

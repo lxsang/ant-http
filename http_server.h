@@ -7,7 +7,6 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/socket.h>
-#include "plugins/dictionary.h"
 #include "plugins/handle.h"
 #include "plugin_manager.h"
 
@@ -31,7 +30,7 @@ void not_found(int);
 void serve_file(int, const char *);
 int startup(unsigned *);
 void unimplemented(int);
-
+void badrequest(int);
 void ws_confirm_request(int, const char*);
 char* post_url_decode(int client,int len);
 dictionary decode_url_request(const char* query);

@@ -10,7 +10,9 @@ void accept_request(int client)
 	int numchars;
 	char method[255];
 	char url[4096];
-	char path[512];
+	char path[1024];
+	char* token;
+	char *line;
 	size_t i, j;
 	struct stat st;
 
@@ -28,8 +30,8 @@ void accept_request(int client)
 	{
 		printf("METHOD NOT FOUND %s\n", method);
 		// unimplemented
+		//while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
 		unimplemented(client);
-		while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
 		close(client);
 		return;
 	}
@@ -57,10 +59,27 @@ void accept_request(int client)
 		}
 	}
 
+	// get the HOST header
+	line = read_line(client);
+	trim(line, '\n');
+	trim(line, '\r');
+	token = strsep(&line,":");
+	trim(token,' ');
+	trim(line,' ');
+	if(strcasecmp(token, "HOST"))
+	{
+		badrequest(client);
+		close(client);
+		return;
+	}
+
+	// perform rule check in domain
+	
+
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
-	if (path[strlen(path) - 1] == '/')
-		strcat(path, "index.html");
+	//if (path[strlen(path) - 1] == '/')
+	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
 		if(execute_plugin(client,url,method,query_string) < 0)
 			not_found(client);
@@ -293,6 +312,14 @@ void unimplemented(int client)
 	__t(client, "</BODY></HTML>");
 }
 
+void badrequest(int client)
+{
+	set_status(client,400,"Bad Request");
+	__t(client,SERVER_STRING);
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client,"The request could not be understood by the server due to malformed syntax.");
+}
 
 
 /**

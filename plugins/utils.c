@@ -199,6 +199,13 @@ int match_float(const char* search)
 {
 	return regex_match("^[+-]?[0-9]*\\.[0-9]+$",search);
 }
+/*
+regmatch_t matches[MAX_MATCHES]; 
+if (regexec(&exp, sz, MAX_MATCHES, matches, 0) == 0) { 
+    memcpy(buff, sz + matches[1].rm_so, matches[1].rm_eo - matches[1].rm_so); 
+    printf("group1: %s\n", buff); 
+}
+*/
 int regex_match(const char* expr,const char* search)
 {
 	regex_t regex;

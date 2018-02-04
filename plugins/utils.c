@@ -193,11 +193,11 @@ int is_bin(const char* file)
 
 int match_int(const char* search)
 {
-	return regex_match("^[-+]?[0-9]+$",search);
+	return regex_match("^[-+]?[0-9]+$",search,0, NULL);
 }
 int match_float(const char* search)
 {
-	return regex_match("^[+-]?[0-9]*\\.[0-9]+$",search);
+	return regex_match("^[+-]?[0-9]*\\.[0-9]+$",search,0,NULL);
 }
 /*
 regmatch_t matches[MAX_MATCHES]; 
@@ -206,7 +206,7 @@ if (regexec(&exp, sz, MAX_MATCHES, matches, 0) == 0) {
     printf("group1: %s\n", buff); 
 }
 */
-int regex_match(const char* expr,const char* search)
+int regex_match(const char* expr,const char* search, int msize, regmatch_t* matches)
 {
 	regex_t regex;
     int reti;
@@ -220,7 +220,7 @@ int regex_match(const char* expr,const char* search)
     }
 
 	/* Execute regular expression */
-    reti = regexec(&regex, search, 0, NULL, 0);
+    reti = regexec(&regex, search, msize, matches, 0);
     if( !reti ){
             //LOG("Match");
             ret = 1;

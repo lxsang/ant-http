@@ -3,7 +3,7 @@
 
 void set_status(int client,int code,const char* msg)
 {
-	response(client, __s("HTTP/1.0 %d %s", code, msg));
+	response(client, __s("HTTP/1.1 %d %s", code, msg));
 	response(client, __s("Server: %s ", SERVER_NAME));
 }
 void redirect(int client,const char*path)

@@ -16,7 +16,7 @@ void accept_request(int client)
 	size_t i, j;
 	struct stat st;
 
-	char *query_string = NULL;
+	//char *query_string = NULL;
 
 	numchars = get_line(client, buf, sizeof(buf));
 	i = 0; j = 0;
@@ -28,7 +28,7 @@ void accept_request(int client)
 	method[i] = '\0';
 	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
 	{
-		printf("METHOD NOT FOUND %s\n", method);
+		LOG("METHOD NOT FOUND %s\n", method);
 		// unimplemented
 		//while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
 		unimplemented(client);
@@ -47,41 +47,20 @@ void accept_request(int client)
 	}
 	url[i] = '\0';
 
-	if (strcasecmp(method, "GET") == 0)
-	{
-		query_string = url;
-		while ((*query_string != '?') && (*query_string != '\0'))
-			query_string++;
-		if (*query_string == '?')
-		{
-			*query_string = '\0';
-			query_string++;
-		}
-	}
 
-	// get the HOST header
-	line = read_line(client);
-	trim(line, '\n');
-	trim(line, '\r');
-	token = strsep(&line,":");
-	trim(token,' ');
-	trim(line,' ');
-	if(strcasecmp(token, "HOST"))
-	{
-		badrequest(client);
-		close(client);
-		return;
-	}
-
-	// perform rule check in domain
 	
+	char* oldurl = strdup(url);
+	char* tmp = strchr(oldurl,'?');
+	if(tmp)
+		*tmp = '\0';
 
+	dictionary rq = decode_request(client, method, url);	
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
-		if(execute_plugin(client,url,method,query_string) < 0)
+		if(execute_plugin(client,oldurl,method,rq) < 0)
 			not_found(client);
 	}
 	else
@@ -89,7 +68,7 @@ void accept_request(int client)
 		if (S_ISDIR(st.st_mode))
 			strcat(path, "/index.html");
 		// check if the mime is supported
-		// if the minme is not supported
+		// if the mime is not supported
 		// find an handler plugin to process it
 		// if the plugin is not found, forbidden access to the file should be sent
 		char* mime_type = mime(path);
@@ -97,21 +76,76 @@ void accept_request(int client)
 		{
 			sprintf(buf,"/%s-api%s",ext(path),url);
 			LOG("WARNING::::Access octetstream via handler %s\n", buf);
-			if(execute_plugin(client,buf,method,query_string) < 0)
+			if(execute_plugin(client,buf,method,rq) < 0)
 				cannot_execute(client);
 		}
 		else
 		{
 			ctype(client,mime_type);
-			// if the mime is supported, send the file
+			// if the mime is supported, send the file						
 			serve_file(client, path);
+			//response(client,"this is the file");
 		}		
 	}
-
+	free(oldurl);
+	free(rq);
 	close(client);
 }
 
+void rule_check(association it, const char* host, const char* _url, const char* _query, char* buf)
+{
+	// first perfom rule check on host, if not success, perform on url
+	regmatch_t key_matches[10];
+	regmatch_t val_matches[2];
+	char* query = strdup(_query);
+	char* url = strdup(_url);
+	int ret;
+	char* target;
+	char* tmp, rep[10];
+	int idx = 0;
+	memset(rep,0,10);
+	// 1 group
+	if( !(ret = regex_match(it->key,host, 10, key_matches)) )
+	{
+		target = url;
+		ret = regex_match(it->key,url, 10, key_matches);
+	}
+	else
+		target = host;
 
+	if(!ret) return;
+	tmp = (char*) it->value;
+
+	while((ret = regex_match( "{([a-zA-Z0-9]+)}",tmp, 2, val_matches)))
+	{
+		memcpy(buf + idx, tmp, val_matches[1].rm_so - 1);
+		idx += val_matches[1].rm_so - 1;
+		memcpy(rep, tmp + val_matches[1].rm_so, val_matches[1].rm_eo - val_matches[1].rm_so);
+		if(strcasecmp(rep,"url") == 0)
+		{
+			memcpy(buf+idx, url, strlen(url));
+			idx += strlen(url);
+		} else if(strcasecmp(rep,"query") == 0)
+		{
+			memcpy(buf+idx, query, strlen(query));
+			idx += strlen(query);
+		} else if(match_int(rep))
+		{
+			int i = atoi(rep);
+			memcpy(buf+idx, target + key_matches[i].rm_so, key_matches[i].rm_eo - key_matches[i].rm_so);
+			idx += key_matches[i].rm_eo - key_matches[i].rm_so;
+		} else { // just keep it
+			memcpy(buf+idx, tmp + val_matches[1].rm_so-1, val_matches[1].rm_eo + 2 - val_matches[1].rm_so);
+			idx+= val_matches[1].rm_eo + 2 - val_matches[1].rm_so;
+		}
+		tmp += val_matches[1].rm_eo + 1;
+		//break;
+	}
+	// now modify the match 2 group
+	if(idx > 0) buf[idx] = '\0';
+	free(url);
+	free(query);
+}
 /**********************************************************************/
 /* Put the entire contents of a file out on a socket.  This function
 * is named after the UNIX "cat" command, because it might have been
@@ -242,11 +276,11 @@ void serve_file(int client, const char *filename)
 {
 	FILE *resource = NULL;
 	int numchars = 1;
-	char buf[1024];
+	//char buf[1024];
 
-	buf[0] = 'A'; buf[1] = '\0';
-	while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-		numchars = get_line(client, buf, sizeof(buf));
+	//buf[0] = 'A'; buf[1] = '\0';
+	//while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+	//	numchars = get_line(client, buf, sizeof(buf));
 
 	resource = fopen(filename, "rb");
 	if (resource == NULL)
@@ -339,6 +373,34 @@ char* post_url_decode(int client,int len)
     LOG("POST Query %s\n", query);
     return query;
 }
+char* apply_rules(const char* host, char*url)
+{
+	association it;
+	// rule check
+	char* query_string = url;
+	while ((*query_string != '?') && (*query_string != '\0'))
+		query_string++;
+	if (*query_string == '?')
+	{
+		*query_string = '\0';
+		query_string++;
+	}
+	//char* oldurl = strdup(url);
+	for_each_assoc(it, server_config.rules)
+	{
+		// 1 group
+		rule_check(it,host, url, query_string, url);
+		query_string = url;
+		while ((*query_string != '?') && (*query_string != '\0'))
+			query_string++;
+		if (*query_string == '?')
+		{
+			*query_string = '\0';
+			query_string++;
+		}
+	}
+	return strdup(query_string);
+}
 /**
  * Decode the HTTP request
  * Get the cookie values
@@ -352,13 +414,14 @@ char* post_url_decode(int client,int len)
  * @param  query  query string in case of GET
  * @return        a dictionary of key- value
  */
-dictionary decode_request(int client,const char* method,const char* query)
+dictionary decode_request(int client,const char* method, char* url)
 {
 	dictionary request = NULL;
 	dictionary cookie = NULL;
 	dictionary xheader = dict();
 	char* line;
 	char * token;
+	char* query = NULL;
 	if(strcmp(method,"GET") == 0)
 	{ 
 		// this for check if web socket is enabled
@@ -382,7 +445,11 @@ dictionary decode_request(int client,const char* method,const char* query)
 				trim(line, ' ');
 				if(line != NULL && strcasecmp(line,"websocket") == 0)
 					ws = 1;
-			} else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
+			}else if(token != NULL && strcasecmp(token,"Host") == 0)
+			{
+				query = apply_rules(line, url);
+			}
+			 else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
 			{
 				// get the key from the client
 				trim(line, ' ');
@@ -390,6 +457,7 @@ dictionary decode_request(int client,const char* method,const char* query)
 			}
 		}
 		request = decode_url_request(query);
+		if(query) free(query);
 		if(ws && ws_key != NULL)
 		{
 			ws_confirm_request(client, ws_key);
@@ -424,6 +492,9 @@ dictionary decode_request(int client,const char* method,const char* query)
 				token = strsep(&line,":");
 				trim(token,' ');
 				clen = atoi(token);
+			}else if(token != NULL && strcasecmp(token,"Host") == 0)
+			{
+				apply_rules(line, url);
 			}
 			else if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 			{
@@ -735,7 +806,7 @@ char* json_data_decode(int client,int len)
  * @return              -1 if failure
  *                      1 if sucess
  */
-int execute_plugin(int client, const char *path, const char *method, const char *query_string)
+int execute_plugin(int client, const char *path, const char *method, dictionary dic)
 {
 	char pname[255];
  	char pfunc[255];
@@ -768,7 +839,7 @@ int execute_plugin(int client, const char *path, const char *method, const char 
 	LOG("Method:%s\n", method);
 	LOG("Plugin name '%s'\n",pname);
 	LOG("Query path. '%s'\n", pfunc);
-	LOG("query :%s\n", query_string);
+	//LOG("query :%s\n", query_string);
 
 	//load the plugin
 	if((plugin = plugin_lookup(pname)) == NULL)
@@ -781,9 +852,9 @@ int execute_plugin(int client, const char *path, const char *method, const char 
     	LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname,error);
     	return -1;
    }
-   dictionary dic = decode_request(client,method,query_string);
+   //dictionary dic = decode_request(client,method,query_string);
    	(*fn)(client,method,pfunc,dic);
-   free(dic);
+   //free(dic);
    free(rpath);
    return 1;
 }

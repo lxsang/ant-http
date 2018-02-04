@@ -31,15 +31,16 @@ void serve_file(int, const char *);
 int startup(unsigned *);
 void unimplemented(int);
 void badrequest(int);
+void rule_check(association, const char* , const char* , const char* , char*);
 void ws_confirm_request(int, const char*);
 char* post_url_decode(int client,int len);
 dictionary decode_url_request(const char* query);
-dictionary decode_request(int client,const char* method,const char* query);
+dictionary decode_request(int client,const char* method, char* url);
 dictionary decode_multi_part_request(int,const char*);
 dictionary decode_cookie(const char*);
 char* json_data_decode(int,int);
 
 int execute_plugin(int client, const char *path,
-  const char *method, const char *query_string);
+  const char *method, dictionary rq);
 
 #endif

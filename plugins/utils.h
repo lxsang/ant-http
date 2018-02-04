@@ -84,7 +84,7 @@ char* mime(const char*);
 int is_bin(const char*);
 int match_int(const char*);
 int match_float(const char*);
-int regex_match(const char*,const char*);
+int regex_match(const char*,const char*, int, regmatch_t*);
 char *url_decode(const char *str);
 char *url_encode(const char *str);
 char from_hex(char ch);

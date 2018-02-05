@@ -19,8 +19,9 @@ sqldb __getdb(char *name)
 	int plen = strlen(name)+strlen(__plugin__.dbpath)+4;
 	char* path = (char*) malloc(plen*sizeof(char));
 	strcpy(path,__plugin__.dbpath);
-	strcat(path,__plugin__.name);
+	strcat(path,name);
 	strcat(path,".db");
+	LOG("data base: %s\n", path);
 	sqldb ret = (sqldb)database(path);
 	free(path);
 	return ret;

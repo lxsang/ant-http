@@ -62,7 +62,7 @@ void accept_request(int client)
 	}	
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
-	//printf("path is : %s \n", path);
+	LOG("Path is : %s \n", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {

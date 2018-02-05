@@ -54,9 +54,15 @@ void accept_request(int client)
 	if(tmp)
 		*tmp = '\0';
 
-	dictionary rq = decode_request(client, method, url);	
+	dictionary rq = decode_request(client, method, url);
+	if(rq == NULL)
+	{
+		badrequest(client);
+		goto end;
+	}	
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
+	//printf("path is : %s \n", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
@@ -66,7 +72,14 @@ void accept_request(int client)
 	else
 	{
 		if (S_ISDIR(st.st_mode))
+		{
 			strcat(path, "/index.html");
+			if(stat(path, &st) == -1)
+			{
+				not_found(client);
+				goto end;
+			}
+		}
 		// check if the mime is supported
 		// if the mime is not supported
 		// find an handler plugin to process it
@@ -87,8 +100,9 @@ void accept_request(int client)
 			//response(client,"this is the file");
 		}		
 	}
-	free(oldurl);
-	free(rq);
+end:
+	if(oldurl) free(oldurl);
+	if(rq) free(rq);
 	close(client);
 }
 
@@ -115,8 +129,9 @@ void rule_check(association it, const char* host, const char* _url, const char* 
 
 	if(!ret) return;
 	tmp = (char*) it->value;
-
-	while((ret = regex_match( "{([a-zA-Z0-9]+)}",tmp, 2, val_matches)))
+	char * search = "<([a-zA-Z0-9]+)>";
+	//printf("match again %s\n",tmp);
+	while((ret = regex_match( search,tmp, 2, val_matches)))
 	{
 		memcpy(buf + idx, tmp, val_matches[1].rm_so - 1);
 		idx += val_matches[1].rm_so - 1;
@@ -422,40 +437,56 @@ dictionary decode_request(int client,const char* method, char* url)
 	char* line;
 	char * token;
 	char* query = NULL;
-	if(strcmp(method,"GET") == 0)
-	{ 
-		// this for check if web socket is enabled
-		int ws= 0;
-		char* ws_key = NULL;
-		while((line = read_line(client)) && strcmp("\r\n",line))
+	char* ctype = NULL;
+	int clen = -1;
+	// first real all header
+// this for check if web socket is enabled
+	int ws= 0;
+	char* ws_key = NULL;
+	while((line = read_line(client)) && strcmp("\r\n",line))
+	{
+		trim(line, '\n');
+		trim(line, '\r');
+		token = strsep(&line,":");
+		trim(token,' ');
+		trim(line,' ');
+		dput(xheader,token,line);
+		if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 		{
-			trim(line, '\n');
-			trim(line, '\r');
+			if(!cookie) cookie = decode_cookie(line);
+		}
+		else if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
+		{
+			ctype = strsep(&line,":");
+			trim(ctype,' ');
+		} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
+		{
 			token = strsep(&line,":");
 			trim(token,' ');
-			trim(line,' ');
-			dput(xheader,token,line);
-			if(token != NULL &&strcasecmp(token,"Cookie") == 0)
-			{
-				if(!cookie) cookie = decode_cookie(line);
-			}
-			else if(token != NULL && strcasecmp(token,"Upgrade") == 0)
-			{
-				// verify that the connection is upgrade to websocket
-				trim(line, ' ');
-				if(line != NULL && strcasecmp(line,"websocket") == 0)
-					ws = 1;
-			}else if(token != NULL && strcasecmp(token,"Host") == 0)
-			{
-				query = apply_rules(line, url);
-			}
-			 else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
-			{
-				// get the key from the client
-				trim(line, ' ');
-				ws_key = strdup(line);
-			}
+			clen = atoi(token);
 		}
+		else if(token != NULL && strcasecmp(token,"Upgrade") == 0)
+		{
+			// verify that the connection is upgrade to websocket
+			trim(line, ' ');
+			if(line != NULL && strcasecmp(line,"websocket") == 0)
+				ws = 1;
+		}else if(token != NULL && strcasecmp(token,"Host") == 0)
+		{
+			query = apply_rules(line, url);
+		}
+			else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
+		{
+			// get the key from the client
+			trim(line, ' ');
+			ws_key = strdup(line);
+		}
+	}
+	if(line) free(line);
+
+	if(strcmp(method,"GET") == 0)
+	{ 
+		
 		request = decode_url_request(query);
 		if(query) free(query);
 		if(ws && ws_key != NULL)
@@ -471,39 +502,6 @@ dictionary decode_request(int client,const char* method, char* url)
 	}
 	else
 	{
-		char* ctype = NULL;
-		int clen = -1;
-		line = read_line(client);
-		while (line && strcmp("\r\n",line))
-		{
-			//printf("%s\n",line);
-			trim(line, '\n');
-			trim(line, '\r');
-			token = strsep(&line,":");
-			trim(token,' ');
-			trim(line, ' ');
-			dput(xheader,token,line);
-			if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
-			{
-				ctype = strsep(&line,":");
-				trim(ctype,' ');
-			} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
-			{
-				token = strsep(&line,":");
-				trim(token,' ');
-				clen = atoi(token);
-			}else if(token != NULL && strcasecmp(token,"Host") == 0)
-			{
-				apply_rules(line, url);
-			}
-			else if(token != NULL &&strcasecmp(token,"Cookie") == 0)
-			{
-				if(!cookie) cookie = decode_cookie(line);
-			}
-
-			line = read_line(client);
-		}
-		free(line);
 		if(ctype == NULL || clen == -1)
 		{
 			LOG("Bad request\n");

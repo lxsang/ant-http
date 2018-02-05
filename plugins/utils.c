@@ -216,6 +216,8 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
     reti = regcomp(&regex, expr, REG_ICASE | REG_EXTENDED);
     if( reti ){ 
     	LOG("Could not compile regex: %s\n",expr);
+        regerror(reti, &regex, msgbuf, sizeof(msgbuf));
+        LOG("Regex match failed: %s\n", msgbuf);
     	return 0; 
     }
 

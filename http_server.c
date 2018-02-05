@@ -339,7 +339,8 @@ int startup(unsigned *port)
 			error_die("getsockname");
 		*port = ntohs(name.sin_port);
 	}
-	if (listen(httpd, 5) < 0)
+	printf("back log is %d\n", server_config.backlog);
+	if (listen(httpd, server_config.backlog) < 0)
 		error_die("listen");
 	return(httpd);
 }

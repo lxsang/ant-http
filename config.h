@@ -9,6 +9,7 @@ typedef struct  {
     char* htdocs;
     char* tmpdir;
     dictionary rules;
+    int backlog;
 }config_t;
 
 extern config_t server_config; 

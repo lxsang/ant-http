@@ -23,6 +23,9 @@ static int config_handler(void* conf, const char* section, const char* name,
     } else if(MATCH("SERVER", "tmpdir")) {
         pconfig->tmpdir = strdup(value);
     }
+	 else if(MATCH("SERVER", "backlog")) {
+        pconfig->backlog = atoi(value);
+    }
 	else if (strcmp(section, "RULES") == 0)
 	{
 		dput( pconfig->rules, strdup(name),strdup(value));
@@ -61,6 +64,7 @@ void load_config(const char* file)
 	server_config.db_path = "databases/";
 	server_config.htdocs = "htdocs";
 	server_config.tmpdir = "tmp";
+	server_config.backlog = 100;
 	server_config.rules = dict();
 	if (ini_parse(file, config_handler, &server_config) < 0) {
 		LOG("Can't load '%s'\n. Used defaut configuration", file);

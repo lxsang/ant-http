@@ -487,9 +487,11 @@ dictionary decode_request(int client,const char* method, char* url)
 
 	if(strcmp(method,"GET") == 0)
 	{ 
-		
-		request = decode_url_request(query);
-		if(query) free(query);
+		if(query)
+		{
+			request = decode_url_request(query);
+			free(query);
+		}
 		if(ws && ws_key != NULL)
 		{
 			ws_confirm_request(client, ws_key);
@@ -753,10 +755,10 @@ dictionary decode_multi_part_request(int client,const char* ctype)
  */
 dictionary decode_url_request(const char* query)
 {
+	if(query == NULL) return NULL;
 	char* str_copy = strdup(query);
 	//str_copy = ;
 	char* token;
-	if(query == NULL) return NULL;
 	if(strlen(query) == 0) return NULL;
 	dictionary dic = dict();
 	while ((token = strsep(&str_copy, "&")))

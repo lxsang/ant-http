@@ -441,12 +441,17 @@ dictionary decode_request(int client,const char* method, char* url)
 	char* ctype = NULL;
 	char* host = NULL;
 	int clen = -1;
+
 	// first real all header
 // this for check if web socket is enabled
 	int ws= 0;
 	char* ws_key = NULL;
-	while((line = read_line(client)) && strcmp("\r\n",line))
+	char buf[BUFFLEN];
+
+	//while((line = read_line(client)) && strcmp("\r\n",line))
+	while((read_buf(client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{
+		line = buf;
 		trim(line, '\n');
 		trim(line, '\r');
 		token = strsep(&line,":");
@@ -459,7 +464,7 @@ dictionary decode_request(int client,const char* method, char* url)
 		}
 		else if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
 		{
-			ctype = line; //strsep(&line,":");
+			ctype = strdup(line); //strsep(&line,":");
 			trim(ctype,' ');
 		} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
 		{
@@ -475,7 +480,7 @@ dictionary decode_request(int client,const char* method, char* url)
 				ws = 1;
 		}else if(token != NULL && strcasecmp(token,"Host") == 0)
 		{
-			host = line;
+			host = strdup(line);
 		}
 			else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
 		{
@@ -484,11 +489,12 @@ dictionary decode_request(int client,const char* method, char* url)
 			ws_key = strdup(line);
 		}
 	}
-	if(line) free(line);
+	//if(line) free(line);
 
 	if(strcmp(method,"GET") == 0)
 	{ 
 		query = apply_rules(host, url);
+		if(host) free(host);
 		if(query)
 		{
 			request = decode_url_request(query);
@@ -510,6 +516,7 @@ dictionary decode_request(int client,const char* method, char* url)
 		if(ctype == NULL || clen == -1)
 		{
 			LOG("Bad request\n");
+			if(ctype) free(ctype);
 			return NULL;
 		}
 		LOG("ContentType %s\n", ctype);
@@ -535,6 +542,7 @@ dictionary decode_request(int client,const char* method, char* url)
 			return NULL;
 		}
 	}
+	if(ctype) free(ctype);
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
 	if(!request)
 			request = dict();

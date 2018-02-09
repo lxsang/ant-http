@@ -13,7 +13,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 ifeq ($(USE_DB),TRUE)
-	DB_OBJ=plugins/dbhelper.o
+	DB_OBJ=libs/dbhelper.o
 	DB_LIB=-lsqlite3
 	DB_FLAG=-D USE_DB
 endif
@@ -37,17 +37,17 @@ SERVER_O=plugin_manager.o \
 #-lsocket
 PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT) wsimg.$(EXT)
 
-LIBOBJS = 	plugins/ini.o \
-			plugins/handle.o \
+LIBOBJS = 	libs/ini.o \
+			libs/handle.o \
 			$(DB_OBJ) \
-			plugins/dictionary.o \
-			plugins/base64.o \
-			plugins/utils.o \
-			plugins/ws.o \
-			plugins/sha1.o \
-			plugins/list.o 
+			libs/dictionary.o \
+			libs/base64.o \
+			libs/utils.o \
+			libs/ws.o \
+			libs/sha1.o \
+			libs/list.o 
 			
-PLUGINSDEP = plugins/plugin.o
+PLUGINSDEP = libs/plugin.o
 
 
 main: httpd plugins 
@@ -66,11 +66,11 @@ lib: $(LIBOBJS)
 plugins: $(PLUGINS)
 	
 %.$(EXT): $(PLUGINSDEP) 
-	for file in $(wildcard plugins/$(basename $@)/*.c) ; do\
+	for file in $(wildcard libs/$(basename $@)/*.c) ; do\
 		$(CC) -fPIC $(CFLAGS)  -c  $$file -o $$file.o; \
 	done
 	$(CC) $(CFLAGS) $(PLUGINLIBS) $(LIB_FLAG) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
-		$(PLUGINSDEP)  plugins/$(basename $@)/*.c.o
+		$(PLUGINSDEP)  libs/$(basename $@)/*.c.o
 
 
 clean: sclean pclean

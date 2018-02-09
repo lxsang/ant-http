@@ -1,5 +1,5 @@
 #define CONFIG "config.ini"
-#include "plugins/dictionary.h"
+#include "libs/dictionary.h"
 
 typedef struct  { 
 	int port;

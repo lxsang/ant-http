@@ -1,7 +1,7 @@
 #ifndef PLUGIN_MANAGER_H
 #define PLUGIN_MANAGER_H
 #include <dlfcn.h>
-#include "plugins/utils.h"
+#include "libs/utils.h"
 #include "config.h"
 
 struct plugin_entry { 

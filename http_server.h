@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/socket.h>
-#include "plugins/handle.h"
+#include "libs/handle.h"
 #include "plugin_manager.h"
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"

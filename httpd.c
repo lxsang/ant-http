@@ -1,7 +1,7 @@
 
 #include <dirent.h>
 #include "http_server.h"
-#include "plugins/ini.h"
+#include "libs/ini.h"
 
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 

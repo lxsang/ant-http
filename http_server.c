@@ -119,7 +119,7 @@ void rule_check(association it, const char* host, const char* _url, const char* 
 	int idx = 0;
 	memset(rep,0,10);
 	// 1 group
-	if( !(ret = regex_match(it->key,host, 10, key_matches)) )
+	if(!host ||  !(ret = regex_match(it->key,host, 10, key_matches)) )
 	{
 		target = url;
 		ret = regex_match(it->key,url, 10, key_matches);
@@ -439,6 +439,7 @@ dictionary decode_request(int client,const char* method, char* url)
 	char * token;
 	char* query = NULL;
 	char* ctype = NULL;
+	char* host = NULL;
 	int clen = -1;
 	// first real all header
 // this for check if web socket is enabled
@@ -458,11 +459,11 @@ dictionary decode_request(int client,const char* method, char* url)
 		}
 		else if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
 		{
-			ctype = strsep(&line,":");
+			ctype = line; //strsep(&line,":");
 			trim(ctype,' ');
 		} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
 		{
-			token = strsep(&line,":");
+			token = line; //strsep(&line,":");
 			trim(token,' ');
 			clen = atoi(token);
 		}
@@ -474,7 +475,7 @@ dictionary decode_request(int client,const char* method, char* url)
 				ws = 1;
 		}else if(token != NULL && strcasecmp(token,"Host") == 0)
 		{
-			query = apply_rules(line, url);
+			host = line;
 		}
 			else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
 		{
@@ -487,6 +488,7 @@ dictionary decode_request(int client,const char* method, char* url)
 
 	if(strcmp(method,"GET") == 0)
 	{ 
+		query = apply_rules(host, url);
 		if(query)
 		{
 			request = decode_url_request(query);

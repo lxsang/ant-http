@@ -23,7 +23,7 @@ sqldb __getdb(char *name)
 	strcpy(path,__plugin__.dbpath);
 	strcat(path,name);
 	strcat(path,".db");
-	LOG("data base: %s\n", path);
+	//LOG("database: %s\n", path);
 	sqldb ret = (sqldb)database(path);
 	free(path);
 	return ret;

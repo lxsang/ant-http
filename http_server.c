@@ -183,14 +183,10 @@ void catb(void* client, FILE* ptr)
 void cat(void* client, FILE *resource)
 {
 	char buf[1024];
-	int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
 	//fgets(buf, sizeof(buf), resource);
 	while (fgets(buf, sizeof(buf), resource) != NULL)
 	{
-		antd_send(client, buf, strlen(buf), _ssl);
+		antd_send(client, buf, strlen(buf));
 		//fgets(buf, sizeof(buf), resource);
 	}
 
@@ -387,11 +383,7 @@ char* post_url_decode(void* client,int len)
 {
 	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
-#ifdef USE_OPENSSL
-		antd_recv(client, (query+i), 1, server_config.usessl);
-#else
-		antd_recv(client, (query+i), 1, 0);
-#endif
+		antd_recv(client, (query+i), 1);
     }
     query[len]='\0';
     //query = url_decode(query);
@@ -581,9 +573,7 @@ void ws_confirm_request(void* client, const char* key)
 	strcpy(rkey,key);
 	strcat(rkey,WS_MAGIC_STRING);
 	//printf("RESPONDKEY '%s'\n", rkey);
-int _ssl = 0;
 #ifdef USE_OPENSSL
-	_ssl = usessl();
 	SHA_CTX context;
 #else
 	SHA1_CTX context;
@@ -596,15 +586,15 @@ int _ssl = 0;
 	//printf("Base 64 '%s'\n", base64);
 	// send accept to client
 	sprintf(buf, "HTTP/1.1 101 Switching Protocols\r\n");
-	antd_send(client, buf, strlen(buf), _ssl);
+	antd_send(client, buf, strlen(buf));
 	sprintf(buf, "Upgrade: websocket\r\n");
-	antd_send(client, buf, strlen(buf), _ssl);
+	antd_send(client, buf, strlen(buf));
 	sprintf(buf, "Connection: Upgrade\r\n");
-	antd_send(client, buf, strlen(buf), _ssl);
+	antd_send(client, buf, strlen(buf));
 	sprintf(buf, "Sec-WebSocket-Accept: %s\r\n",base64);
-	antd_send(client, buf, strlen(buf), _ssl);
+	antd_send(client, buf, strlen(buf));
 	sprintf(buf, "\r\n");
-	antd_send(client, buf, strlen(buf), _ssl);
+	antd_send(client, buf, strlen(buf));
 	
 	LOG("%s\n", "Websocket is now enabled for plugin");
 }
@@ -809,13 +799,9 @@ dictionary decode_url_request(const char* query)
 */
 char* json_data_decode(void* client,int len)
 {
-	int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
 	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
-      antd_recv(client, (query+i), 1, _ssl);
+      antd_recv(client, (query+i), 1);
     }
     query[len]='\0';
     //query = url_decode(query);

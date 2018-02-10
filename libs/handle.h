@@ -74,7 +74,7 @@ void unknow(void*);
 int ws_enable(dictionary);
 char* read_line(void* sock);
 int read_buf(void* sock,char* buf,int i);
-int antd_send(const void *source, const void* data, int len, int usessl);
-int antd_recv(const void *source,  void* data, int len, int usessl);
+int antd_send(const void *source, const void* data, int len);
+int antd_recv(const void *source,  void* data, int len);
 int antd_close(void* source);
 #endif

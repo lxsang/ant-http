@@ -12,7 +12,7 @@ static void ws_gen_mask_key(ws_msg_header_t * header)
 * based on this header, we'll decide
 * the appropriate handle for frame data
 */
-ws_msg_header_t * ws_read_header(int client)
+ws_msg_header_t * ws_read_header(void* client)
 {
 	
 	uint8_t byte;
@@ -20,7 +20,7 @@ ws_msg_header_t * ws_read_header(int client)
 	ws_msg_header_t* header = (ws_msg_header_t*) malloc(sizeof(*header));
 	
 	// get first byte
-	if(recv(client, &byte, sizeof(byte), 0) <0) goto fail;
+	if(antd_recv(client, &byte, sizeof(byte)) <0) goto fail;
 	if(BITV(byte,6) || BITV(byte,5) || BITV(byte,4)) goto fail;// all RSV bit must be 0
 	
 	//printf("FIN: %d, RSV1: %d, RSV2: %d, RSV3:%d, opcode:%d\n", BITV(byte,7), BITV(byte,6), BITV(byte,5), BITV(byte,4),(byte & 0x0F) );
@@ -29,7 +29,7 @@ ws_msg_header_t * ws_read_header(int client)
 	header->opcode = (byte & 0x0F);
 	
 	// get next byte
-	if(recv(client, &byte, sizeof(byte), 0) <0) goto fail;
+	if(antd_recv(client, &byte, sizeof(byte)) <0) goto fail;
 	
 	//printf("MASK: %d paylen:%d\n", BITV(byte,7), (byte & 0x7F));
 	// check mask bit, should be 1
@@ -47,19 +47,19 @@ ws_msg_header_t * ws_read_header(int client)
 		header->plen = len;
 	} else if(len == 126)
 	{
-		if(recv(client,bytes, 2*sizeof(uint8_t), 0) <0) goto fail;
+		if(antd_recv(client,bytes, 2*sizeof(uint8_t)) <0) goto fail;
 		header->plen = (bytes[0]<<8) + bytes[1];
 		
 	} else
 	{
 		//read only last 4 byte
-		if(recv(client,bytes, 8*sizeof(uint8_t), 0) <0) goto fail;
+		if(antd_recv(client,bytes, 8*sizeof(uint8_t)) <0) goto fail;
 		header->plen = (bytes[4]<<24) + (bytes[5]<<16) + (bytes[6] << 8) + bytes[7] ;
 	}
 	//printf("len: %d\n", header->plen);
 	// last step is to get the maskey
 	if(header->mask)
-		if(recv(client,header->mask_key, 4*sizeof(uint8_t), 0) <0) goto fail;
+		if(antd_recv(client,header->mask_key, 4*sizeof(uint8_t)) <0) goto fail;
 	//printf("key 0: %d key 1: %d key2:%d, key3: %d\n",header->mask_key[0],header->mask_key[1],header->mask_key[2], header->mask_key[3] );
 	
 	// check wheather it is a ping or a close message
@@ -91,12 +91,12 @@ ws_msg_header_t * ws_read_header(int client)
 * Read data from client
 * and unmask data using the key
 */
-int ws_read_data(int client, ws_msg_header_t* header, int len, uint8_t* data)
+int ws_read_data(void* client, ws_msg_header_t* header, int len, uint8_t* data)
 {
 	// if len  == -1 ==> read all remaining data to 'data';
 	if(header->plen == 0) return 0;
 	int dlen = (len==-1 || len > header->plen)?header->plen:len;
-	if((dlen = recv(client,data, dlen, 0)) <0) return -1;
+	if((dlen = antd_recv(client,data, dlen)) <0) return -1;
 	header->plen = header->plen - dlen;
 	// unmask received data
 	if(header->mask)
@@ -105,7 +105,7 @@ int ws_read_data(int client, ws_msg_header_t* header, int len, uint8_t* data)
 	data[dlen] = '\0';
 	return dlen;
 }
-void _send_header(int client, ws_msg_header_t header)
+void _send_header(void* client, ws_msg_header_t header)
 {
 	uint8_t byte = 0;
 	uint8_t bytes[8];
@@ -113,7 +113,7 @@ void _send_header(int client, ws_msg_header_t header)
 	//first byte |FIN|000|opcode|
 	byte = (header.fin << 7) + header.opcode;
 	//printf("BYTE: %d\n", byte);
-	send(client, &byte, 1, 0);
+	antd_send(client, &byte, 1);
 	// second byte, payload length
 	// mask may be 0 or 1
 	//if(header.mask == 1)
@@ -121,15 +121,15 @@ void _send_header(int client, ws_msg_header_t header)
 	if(header.plen <= 125)
 	{
 		byte =  (header.mask << 7) + header.plen;
-		send(client, &byte, 1, 0);
+		antd_send(client, &byte, 1);
 	}
 	else if(header.plen < 65536) // 16 bits
 	{
 		byte = (header.mask << 7) + 126;
 		bytes[0] = (header.plen) >> 8;
 		bytes[1] = (header.plen) & 0x00FF;
-		send(client, &byte, 1, 0);
-		send(client, &bytes, 2, 0);
+		antd_send(client, &byte, 1);
+		antd_send(client, &bytes, 2);
 	}
 	else // > 16 bits
 	{
@@ -138,19 +138,19 @@ void _send_header(int client, ws_msg_header_t header)
 		bytes[5] = ((header.plen)>>16) & 0x00FF;
 		bytes[6] = ((header.plen)>>8) & 0x00FF;
 		bytes[7] = (header.plen) & 0x00FF;
-		send(client, &byte, 1, 0);
-		send(client, &bytes, 8, 0);
+		antd_send(client, &byte, 1);
+		antd_send(client, &bytes, 8);
 	}
 	// send mask key
 	if(header.mask)
 	{
-		send(client, header.mask_key,4,0);
+		antd_send(client, header.mask_key,4);
 	}
 }
 /**
 * Send a frame to client
 */
-void ws_send_frame(int client, uint8_t* data, ws_msg_header_t header)
+void ws_send_frame(void* client, uint8_t* data, ws_msg_header_t header)
 {
 	uint8_t * masked;
 	masked = data;
@@ -163,16 +163,16 @@ void ws_send_frame(int client, uint8_t* data, ws_msg_header_t header)
 	}
 	_send_header(client, header);
 	if(header.opcode == WS_TEXT)
-		send(client,(char*)masked,header.plen,0);
+		antd_send(client,(char*)masked,header.plen);
 	else
-		send(client,(uint8_t*)masked,header.plen,0);
+		antd_send(client,(uint8_t*)masked,header.plen);
 	if(masked && header.mask)
 		free(masked);
 }
 /**
 * send a text data frame to client
 */
-void ws_send_text(int client, const char* data,int mask)
+void ws_send_text(void* client, const char* data,int mask)
 {
 	ws_msg_header_t header;
 	header.fin = 1;
@@ -187,7 +187,7 @@ void ws_send_text(int client, const char* data,int mask)
 * send a single binary data fram to client
 * not tested yet, but should work
 */
-void ws_send_binary(int client, uint8_t* data, int l, int mask)
+void ws_send_binary(void* client, uint8_t* data, int l, int mask)
 {
 	ws_msg_header_t header;
 	header.fin = 1;
@@ -201,7 +201,7 @@ void ws_send_binary(int client, uint8_t* data, int l, int mask)
 /*
 * send a file as binary data
 */
-void ws_send_file(int client, const char* file, int mask)
+void ws_send_file(void* client, const char* file, int mask)
 {
 	uint8_t buff[1024];
 	FILE *ptr;
@@ -245,7 +245,7 @@ void ws_send_file(int client, const char* file, int mask)
 * Not tested yet
 * but should work
 */
-void pong(int client, int len)
+void pong(void* client, int len)
 {
 	//printf("PONG\n");
 	ws_msg_header_t pheader;
@@ -254,7 +254,7 @@ void pong(int client, int len)
 	pheader.plen = len;
 	pheader.mask = 0;
 	uint8_t data[len];
-	if(recv(client,data, len, 0) < 0) return;
+	if(antd_recv(client,data, len) < 0) return;
 	ws_send_frame(client,data,pheader);
 	//_send_header(client, pheader);
 	//send(client, data, len, 0);
@@ -262,7 +262,7 @@ void pong(int client, int len)
 /*
 * Not tested yet, but should work
 */
-void ws_send_close(int client, unsigned int status, int mask)
+void ws_send_close(void* client, unsigned int status, int mask)
 {
 	//printf("CLOSED\n");
 	ws_msg_header_t header;

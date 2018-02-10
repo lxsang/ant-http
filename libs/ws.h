@@ -37,19 +37,19 @@ typedef struct{
 	uint8_t mask_key[4];
 } ws_msg_header_t;
 
-ws_msg_header_t * ws_read_header(int);
-void ws_send_frame(int , uint8_t* , ws_msg_header_t );
-void pong(int client, int len);
+ws_msg_header_t * ws_read_header(void*);
+void ws_send_frame(void* , uint8_t* , ws_msg_header_t );
+void pong(void* client, int len);
 
-void ws_send_text(int client, const char* data,int mask);
-void ws_send_close(int client, unsigned int status, int mask);
-void ws_send_file(int client, const char* file, int mask);
-void ws_send_binary(int client, uint8_t* data, int l, int mask);
+void ws_send_text(void* client, const char* data,int mask);
+void ws_send_close(void* client, unsigned int status, int mask);
+void ws_send_file(void* client, const char* file, int mask);
+void ws_send_binary(void* client, uint8_t* data, int l, int mask);
 
-int ws_read_data(int , ws_msg_header_t*, int, uint8_t*);
+int ws_read_data(void* , ws_msg_header_t*, int, uint8_t*);
 int request_socket(const char* ip, int port);
 int ip_from_hostname(const char * hostname , char* ip);
-int sock_read_buf(int sock, char*buf,int size);
+int sock_read_buf(void* sock, char*buf,int size);
 int ws_open_hand_shake(const char* host, int port, const char* resource);
 char* get_ip_address();
 #endif

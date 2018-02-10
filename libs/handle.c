@@ -61,19 +61,16 @@ int response(void* client, const char* data)
 	buf[size] = '\r';
 	buf[size+1] = '\n';
 	buf[size+2] = '\0'; 
-	int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
-	nbytes = antd_send(client, buf, strlen(buf), _ssl);
+	
+	nbytes = antd_send(client, buf, strlen(buf));
 	return (nbytes ==-1?0:1);
 }
-int antd_send(const void *src, const void* data, int len, int _ssl)
+int antd_send(const void *src, const void* data, int len)
 {
 	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(_ssl)
+	if(usessl())
 	{
 		//LOG("SSL WRITE\n");
 		return SSL_write((SSL*) source->ssl, data, len);
@@ -86,12 +83,12 @@ int antd_send(const void *src, const void* data, int len, int _ssl)
 	}
 #endif
 }
-int antd_recv(const void *src,  void* data, int len, int _ssl)
+int antd_recv(const void *src,  void* data, int len)
 {
 	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(_ssl)
+	if(usessl())
 	{
 		//LOG("SSL READ\n");
 		return SSL_read((SSL*) source->ssl, data, len);
@@ -138,10 +135,6 @@ int __t(void* client, const char* fstring,...)
     va_start( arguments, fstring);
     dlen = vsnprintf(0,0,fstring,arguments) + 1;
     va_end(arguments); 
-int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
     if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
     {
         va_start(arguments, fstring);
@@ -164,12 +157,12 @@ int _ssl = 0;
 				//chunk[buflen-1] = '\0';
 				//response(client,chunk);
 				sent += buflen;
-				nbytes = antd_send(client, chunk, buflen, _ssl);
+				nbytes = antd_send(client, chunk, buflen);
 				free(chunk);	
 				if(nbytes == -1) return 0;
 			}
 			chunk = "\r\n";
-			antd_send(client, chunk, strlen(chunk), _ssl);
+			antd_send(client, chunk, strlen(chunk));
 		}
         free(data);
     }
@@ -182,13 +175,10 @@ int __b(void* client, const unsigned char* data, int size)
 	int sent = 0;
 	int buflen = 0;
 	int nbytes;
-int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
+
 	if(size <= BUFFLEN)
 	{
-		nbytes = antd_send(client,data,size,_ssl);
+		nbytes = antd_send(client,data,size);
 		return (nbytes==-1?0:1);
 	}
 	else
@@ -200,7 +190,7 @@ int _ssl = 0;
 			else
 				buflen = size - sent;
 			memcpy(buf,data+sent,buflen);
-			nbytes = antd_send(client,buf,buflen,_ssl);
+			nbytes = antd_send(client,buf,buflen);
 			sent += buflen;
 			if(nbytes == -1) return 0;
 		}	
@@ -238,13 +228,9 @@ int __f(void* client, const char* file)
 		LOG("Cannot read : %s\n", file);
 		return 0;
 	}
-	int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
 	while(fgets(buf, sizeof(buf), ptr) != NULL)
 	{
-		nbytes = antd_send(client, buf, strlen(buf), _ssl);
+		nbytes = antd_send(client, buf, strlen(buf));
 		if(nbytes == -1) return 0;
 		//LOG("READ : %s\n", buf);
 		//fgets(buf, sizeof(buf), ptr);
@@ -312,13 +298,9 @@ int read_buf(void* sock, char*buf,int size)
 	int i = 0;
 	char c = '\0';
 	int n;
-int _ssl = 0;
-#ifdef USE_OPENSSL
-	_ssl = usessl();
-#endif
 	while ((i < size - 1) && (c != '\n'))
 	{
-		n = antd_recv(sock, &c, 1, _ssl);
+		n = antd_recv(sock, &c, 1);
 		if (n > 0)
 		{
 			buf[i] = c;

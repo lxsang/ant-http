@@ -61,13 +61,14 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 			// Close the slave side of the PTY
 			close(fds);
 			int max_fdm;
+			int cl_fd = ((antd_client_t*)cl)->sock;
 			while (1)
 			{	
 				FD_ZERO(&fd_in);
 				//FD_SET(0, &fd_in);
 				FD_SET(fdm, &fd_in);
-				FD_SET(cl,&fd_in);
-				max_fdm = fdm>cl?fdm:cl;
+				FD_SET(cl_fd,&fd_in);
+				max_fdm = fdm>cl_fd?fdm:cl_fd;
 				rc = select(max_fdm + 1, &fd_in, NULL, NULL, NULL);
 				switch(rc)
 				{
@@ -79,7 +80,7 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 					default :
 					{
 	   					// If data is on websocket side
-						if (FD_ISSET(cl, &fd_in))
+						if (FD_ISSET(cl_fd, &fd_in))
 						{
 			      			h = ws_read_header(cl);
 			      			if(h)

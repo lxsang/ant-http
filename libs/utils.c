@@ -444,9 +444,13 @@ void md5(uint8_t *initial_msg, size_t initial_len, char* buff) {
 void sha1(const char* text, char* out)
 {	
 	uint8_t d [20];
-	 SHA1_CTX context;
-     SHA1_Init(&context);
-     SHA1_Update(&context, text, strlen(text));
-     SHA1_Final(&context, d);
-	 digest_to_hex(d,out);
+#ifdef USE_OPENSSL
+    SHA_CTX context;
+#else
+    SHA1_CTX context;
+#endif
+    SHA1_Init(&context);
+    SHA1_Update(&context, text, strlen(text));
+    SHA1_Final(d, &context);
+    digest_to_hex(d,out);
 }

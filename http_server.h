@@ -21,26 +21,29 @@
 
 #define SERVER_STRING "Server: ant-httpd"
 
-void accept_request(int);
-void cat(int, FILE *);
-void cannot_execute(int);
+#define CONFIG "config.ini"
+extern config_t server_config;
+
+void accept_request(void*);
+void cat(void*, FILE *);
+void cannot_execute(void*);
 void error_die(const char *);
 int get_line(int, char *, int);
-void not_found(int);
-void serve_file(int, const char *);
+void not_found(void*);
+void serve_file(void*, const char *);
 int startup(unsigned *);
-void unimplemented(int);
-void badrequest(int);
+void unimplemented(void*);
+void badrequest(void*);
 void rule_check(association, const char* , const char* , const char* , char*);
-void ws_confirm_request(int, const char*);
-char* post_url_decode(int client,int len);
+void ws_confirm_request(void*, const char*);
+char* post_url_decode(void* client,int len);
 dictionary decode_url_request(const char* query);
-dictionary decode_request(int client,const char* method, char* url);
-dictionary decode_multi_part_request(int,const char*);
+dictionary decode_request(void* client,const char* method, char* url);
+dictionary decode_multi_part_request(void*,const char*);
 dictionary decode_cookie(const char*);
-char* json_data_decode(int,int);
+char* json_data_decode(void*,int);
 
-int execute_plugin(int client, const char *path,
+int execute_plugin(void* client, const char *path,
   const char *method, dictionary rq);
 
 #endif

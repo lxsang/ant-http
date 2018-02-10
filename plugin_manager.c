@@ -55,7 +55,7 @@ void * plugin_from_file(char* name)
 	void *lib_handle;
   char* error;
   char* path = __s("%s%s%s",server_config.plugins_dir,name,server_config.plugins_ext);
-  void (*fn)(const char*,const char*,const char*,const char*,int);
+  void (*fn)(const char*, config_t*);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 
    {
@@ -63,11 +63,11 @@ void * plugin_from_file(char* name)
       return NULL;
    }
    // set database path
-   fn = (void (*)(const char *, const char *, const char *, const char *,int))dlsym(lib_handle, "__init_plugin__");
+   fn = (void (*)(const char *, config_t*))dlsym(lib_handle, "__init_plugin__");
   if ((error = dlerror()) != NULL)  
   		LOG("Problem when setting data path for %s : %s \n", name,error);
   else
-    (*fn)(name,server_config.db_path, server_config.htdocs,server_config.plugins_dir,server_config.port);
+	(*fn)(name,&server_config); 
   if(path)
 	free(path);
    return lib_handle;

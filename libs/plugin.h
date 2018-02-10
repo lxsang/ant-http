@@ -12,6 +12,9 @@ typedef struct  {
     char * htdocs;
     char*pdir;
 	int sport;
+#ifdef USE_OPENSSL
+    int usessl;
+#endif
 } plugin_header;
 
  
@@ -33,6 +36,6 @@ char* route(const char*);
 char* htdocs(const char*);
 char* config_dir();
 /*Default function for plugin*/
-void handler(int, const char*,const char*,dictionary);
+void handler(void*, const char*,const char*,dictionary);
 
 #endif

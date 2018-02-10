@@ -2,7 +2,7 @@
 #define PLUGIN_MANAGER_H
 #include <dlfcn.h>
 #include "libs/utils.h"
-#include "config.h"
+#include "libs/handle.h"
 
 struct plugin_entry { 
     struct plugin_entry *next; 

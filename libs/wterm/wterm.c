@@ -13,7 +13,7 @@ void pexit()
 {
 	
 }
-void handler(int cl, const char* m, const char* rqp, dictionary rq)
+void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 {
 	ws_msg_header_t* h = NULL;
 	if(ws_enable(rq))

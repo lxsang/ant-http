@@ -8,7 +8,7 @@ void init()
 	printf("Finish init\n");
 }
 
-void execute(int client,const char* method,dictionary rq)
+void execute(void* client,const char* method,dictionary rq)
 {
 
 	/**
@@ -25,7 +25,7 @@ void execute(int client,const char* method,dictionary rq)
 	freedict(d);
 }
 
-void get(int client,const char* method,dictionary rq)
+void get(void* client,const char* method,dictionary rq)
 {
 	html(client);
 	if(rq)
@@ -46,7 +46,7 @@ void get(int client,const char* method,dictionary rq)
 		__t(client,"no request");
 	
 }
-void handler(int client, const char* method, const char* rqpth, dictionary rq)
+void handler(void* client, const char* method, const char* rqpth, dictionary rq)
 {
 	if(EQU(rqpth,"default"))
 	{

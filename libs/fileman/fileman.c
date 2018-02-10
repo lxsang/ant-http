@@ -27,7 +27,7 @@ char* folder_list_from(const char* aPath)
   	return flist;
 }
 
-void execute(int client,const char* method,dictionary rq)
+void execute(void* client,const char* method,dictionary rq)
 {
 	DIR           *d;
   	struct dirent *dir;
@@ -96,7 +96,7 @@ void execute(int client,const char* method,dictionary rq)
   	
 }
 
-void add(int c, const char* m, dictionary rq)
+void add(void* c, const char* m, dictionary rq)
 {
 	json(c);
 	if(IS_GET(m))
@@ -133,7 +133,7 @@ void add(int c, const char* m, dictionary rq)
 	return;
 }
 
-void mkfolder(int c, const char* m, dictionary rq)
+void mkfolder(void* c, const char* m, dictionary rq)
 {
 	json(c);
 	if(IS_GET(m))
@@ -161,7 +161,7 @@ void mkfolder(int c, const char* m, dictionary rq)
 	__t(c,__RESULT__,1,"OK");
 }
 
-void rmfolder(int c, const char* m, dictionary rq)
+void rmfolder(void* c, const char* m, dictionary rq)
 {
 	json(c);
 	if(IS_GET(m))
@@ -190,7 +190,7 @@ void pexit()
 {
 	LOG("Exit file manager,plugins\n");
 }
-void handler(int client, const char* method, const char* rqpth, dictionary rq)
+void handler(void* client, const char* method, const char* rqpth, dictionary rq)
 {
 	if(EQU(rqpth,"default"))
 	{

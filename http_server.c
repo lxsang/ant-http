@@ -4,12 +4,12 @@
 * return.  Process the request appropriately.
 * Parameters: the socket connected to the client */
 /**********************************************************************/
-void accept_request(int client)
+void accept_request(void* client)
 {
 	char buf[1024];
 	int numchars;
 	char method[255];
-	char url[4096];
+	char url[4096]; 
 	char path[1024];
 	char* token;
 	char *line;
@@ -17,8 +17,9 @@ void accept_request(int client)
 	struct stat st;
 
 	//char *query_string = NULL;
-
-	numchars = get_line(client, buf, sizeof(buf));
+	LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
+	numchars = get_line(((antd_client_t*)client)->sock, buf, sizeof(buf));
+	printf("BUF: %s\n", buf);
 	i = 0; j = 0;
 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
@@ -32,7 +33,7 @@ void accept_request(int client)
 		// unimplemented
 		//while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
 		unimplemented(client);
-		close(client);
+		antd_close(client);
 		return;
 	}
 
@@ -103,7 +104,7 @@ void accept_request(int client)
 end:
 	if(oldurl) free(oldurl);
 	if(rq) free(rq);
-	close(client);
+	antd_close(client);
 }
 
 void rule_check(association it, const char* host, const char* _url, const char* _query, char* buf)
@@ -168,7 +169,7 @@ void rule_check(association it, const char* host, const char* _url, const char* 
 * Parameters: the client socket descriptor
 *             FILE pointer for the file to cat */
 /**********************************************************************/
-void catb(int client, FILE* ptr)
+void catb(void* client, FILE* ptr)
 {
 	unsigned char buffer[BUFFLEN];
 	size_t size;
@@ -180,14 +181,17 @@ void catb(int client, FILE* ptr)
 	}
 	//fclose(ptr);
 }
-void cat(int client, FILE *resource)
+void cat(void* client, FILE *resource)
 {
 	char buf[1024];
-
+	int _ssl = 0;
+#ifdef USE_OPENSSL
+	_ssl = usessl();
+#endif
 	//fgets(buf, sizeof(buf), resource);
 	while (fgets(buf, sizeof(buf), resource) != NULL)
 	{
-		send(client, buf, strlen(buf), 0);
+		antd_send(client, buf, strlen(buf), _ssl);
 		//fgets(buf, sizeof(buf), resource);
 	}
 
@@ -198,7 +202,7 @@ void cat(int client, FILE *resource)
 /* Inform the client that a CGI script could not be executed.
 * Parameter: the client socket descriptor. */
 /**********************************************************************/
-void cannot_execute(int client)
+void cannot_execute(void* client)
 {
 	set_status(client,500,"Internal Server Error");
 	__t(client,SERVER_STRING);
@@ -231,6 +235,7 @@ void error_die(const char *sc)
 *             the size of the buffer
 * Returns: the number of bytes stored (excluding null) */
 /**********************************************************************/
+//This function is deprecate
 int get_line(int sock, char *buf, int size)
 {
 	int i = 0;
@@ -240,13 +245,13 @@ int get_line(int sock, char *buf, int size)
 	while ((i < size - 1) && (c != '\n'))
 	{
 		n = recv(sock, &c, 1, 0);
-		/* DEBUG printf("%02X\n", c); */
+		
 		if (n > 0)
 		{
 			if (c == '\r')
 			{
 				n = recv(sock, &c, 1, MSG_PEEK);
-				/* DEBUG printf("%02X\n", c); */
+				
 				if ((n > 0) && (c == '\n'))
 					recv(sock, &c, 1, 0);
 				else
@@ -267,7 +272,7 @@ int get_line(int sock, char *buf, int size)
 /**********************************************************************/
 /* Give a client a 404 not found status message. */
 /**********************************************************************/
-void not_found(int client)
+void not_found(void* client)
 {
 	set_status(client,404,"NOT FOUND");
 	__t(client,SERVER_STRING);
@@ -287,8 +292,9 @@ void not_found(int client)
 *              file descriptor
 *             the name of the file to serve */
 /**********************************************************************/
-void serve_file(int client, const char *filename)
+void serve_file(void* client, const char *filename)
 {
+	LOG("Serve file: %s\n", filename);
 	FILE *resource = NULL;
 	int numchars = 1;
 	//char buf[1024];
@@ -350,7 +356,7 @@ int startup(unsigned *port)
 * implemented.
 * Parameter: the client socket */
 /**********************************************************************/
-void unimplemented(int client)
+void unimplemented(void* client)
 {
 	set_status(client,501,"Method Not Implemented");
 	__t(client,SERVER_STRING);
@@ -362,7 +368,7 @@ void unimplemented(int client)
 	__t(client, "</BODY></HTML>");
 }
 
-void badrequest(int client)
+void badrequest(void* client)
 {
 	set_status(client,400,"Bad Request");
 	__t(client,SERVER_STRING);
@@ -378,11 +384,15 @@ void badrequest(int client)
  * @param  len    content length
  * @return        query string
  */
-char* post_url_decode(int client,int len)
+char* post_url_decode(void* client,int len)
 {
 	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
-      recv(client, (query+i), 1, 0);
+#ifdef USE_OPENSSL
+		antd_recv(client, (query+i), 1, server_config.usessl);
+#else
+		antd_recv(client, (query+i), 1, 0);
+#endif
     }
     query[len]='\0';
     //query = url_decode(query);
@@ -430,7 +440,7 @@ char* apply_rules(const char* host, char*url)
  * @param  query  query string in case of GET
  * @return        a dictionary of key- value
  */
-dictionary decode_request(int client,const char* method, char* url)
+dictionary decode_request(void* client,const char* method, char* url)
 {
 	dictionary request = NULL;
 	dictionary cookie = NULL;
@@ -452,6 +462,7 @@ dictionary decode_request(int client,const char* method, char* url)
 	while((read_buf(client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{
 		line = buf;
+		printf("LINE1: %s \n", line);
 		trim(line, '\n');
 		trim(line, '\r');
 		token = strsep(&line,":");
@@ -563,7 +574,7 @@ void __px(const char* data,int size)
 * that the websocket is accepted by
 * our server
 */
-void ws_confirm_request(int client, const char* key)
+void ws_confirm_request(void* client, const char* key)
 {
 	char buf[256];
 	char rkey[128];
@@ -572,23 +583,30 @@ void ws_confirm_request(int client, const char* key)
 	strcpy(rkey,key);
 	strcat(rkey,WS_MAGIC_STRING);
 	//printf("RESPONDKEY '%s'\n", rkey);
+int _ssl = 0;
+#ifdef USE_OPENSSL
+	_ssl = usessl();
+	SHA_CTX context;
+#else
 	SHA1_CTX context;
+#endif
+	
     SHA1_Init(&context);
     SHA1_Update(&context, rkey, strlen(rkey));
-    SHA1_Final(&context, sha_d); 
+    SHA1_Final(sha_d, &context); 
 	Base64encode(base64, sha_d, 20);
 	//printf("Base 64 '%s'\n", base64);
 	// send accept to client
 	sprintf(buf, "HTTP/1.1 101 Switching Protocols\r\n");
-	send(client, buf, strlen(buf), 0);
+	antd_send(client, buf, strlen(buf), _ssl);
 	sprintf(buf, "Upgrade: websocket\r\n");
-	send(client, buf, strlen(buf), 0);
+	antd_send(client, buf, strlen(buf), _ssl);
 	sprintf(buf, "Connection: Upgrade\r\n");
-	send(client, buf, strlen(buf), 0);
+	antd_send(client, buf, strlen(buf), _ssl);
 	sprintf(buf, "Sec-WebSocket-Accept: %s\r\n",base64);
-	send(client, buf, strlen(buf), 0);
+	antd_send(client, buf, strlen(buf), _ssl);
 	sprintf(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
+	antd_send(client, buf, strlen(buf), _ssl);
 	
 	LOG("%s\n", "Websocket is now enabled for plugin");
 }
@@ -631,7 +649,7 @@ dictionary decode_cookie(const char* line)
  * @param  clen   Content length, but not used here
  * @return        a dictionary of key - value
  */
-dictionary decode_multi_part_request(int client,const char* ctype)
+dictionary decode_multi_part_request(void* client,const char* ctype)
 {
 	char * boundary;
 	char * boundend;
@@ -791,11 +809,15 @@ dictionary decode_url_request(const char* query)
 /**
 * Decode JSON query string to string
 */
-char* json_data_decode(int client,int len)
+char* json_data_decode(void* client,int len)
 {
+	int _ssl = 0;
+#ifdef USE_OPENSSL
+	_ssl = usessl();
+#endif
 	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
-      recv(client, (query+i), 1, 0);
+      antd_recv(client, (query+i), 1, _ssl);
     }
     query[len]='\0';
     //query = url_decode(query);
@@ -817,11 +839,11 @@ char* json_data_decode(int client,int len)
  * @return              -1 if failure
  *                      1 if sucess
  */
-int execute_plugin(int client, const char *path, const char *method, dictionary dic)
+int execute_plugin(void* client, const char *path, const char *method, dictionary dic)
 {
 	char pname[255];
  	char pfunc[255];
- 	void (*fn)(int, const char*,const char*, dictionary);
+ 	void (*fn)(void*, const char*,const char*, dictionary);
  	struct plugin_entry *plugin ;
 	int plen = strlen(path);
 	char * rpath = (char*) malloc((plen+1)*sizeof(char));
@@ -857,7 +879,7 @@ int execute_plugin(int client, const char *path, const char *method, dictionary 
 		if((plugin= plugin_load(pname)) == NULL)
 			return -1;
 	// load the function
-   fn = (void (*)(int, const char *, const char*, dictionary))dlsym(plugin->handle, PLUGIN_HANDLER);
+   fn = (void (*)(void*, const char *, const char*, dictionary))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)  
 	{
     	LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname,error);
@@ -869,3 +891,10 @@ int execute_plugin(int client, const char *path, const char *method, dictionary 
    free(rpath);
    return 1;
 }
+
+ #ifdef USE_OPENSSL
+ int usessl()
+ {
+	 return server_config.usessl;
+ }
+ #endif

@@ -1,4 +1,5 @@
 USE_DB=TRUE
+USE_SSL = TRUE
 CC=gcc
 EXT=dylib
 
@@ -10,6 +11,8 @@ endif
 ifeq ($(UNAME_S),Darwin)
 	BUILDIRD=../ant-build
 	PF_FLAG= -DMACOS
+	SSL_HEADER_PATH = -I/usr/local/opt/openssl/include
+	SSL_LIB_PATH = -L/usr/local/opt/openssl/lib
 endif
 
 ifeq ($(USE_DB),TRUE)
@@ -24,13 +27,25 @@ ifeq ($(USE_DB),FALSE)
 	DB_FLAG=
 endif
 
+ifeq ($(USE_SSL),TRUE)
+	SSL_LIB= $(SSL_LIB_PATH) -lssl -lcrypto 
+	SSL_FLAG=-D USE_OPENSSL
+endif
 
-CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG)
+ifeq ($(USE_SSL),FALSE)
+	SSL_LIB=
+	SSL_FLAG=
+	SSL_HEADER_PATH =
+	SSL_LIB_PATH = 
+endif
+
+
+CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG) $(SSL_FLAG) $(SSL_HEADER_PATH)
 
 LIB_PATH=$(BUILDIRD)/plugins
 LIB_NAME=libantd
 LIB_FLAG= $(LIB_NAME).$(EXT)
-SERVERLIB= -ldl $(LIB_FLAG) $(DB_LIB) -l pthread
+SERVERLIB= -ldl $(LIB_FLAG) $(DB_LIB) $(SSL_LIB)  -l pthread
 
 SERVER_O=plugin_manager.o \
 		http_server.o
@@ -58,7 +73,7 @@ httpd: lib $(SERVER_O)
 	cp antd $(BUILDIRD)
 
 lib: $(LIBOBJS)
-	$(CC) $(CFLAGS)  $(DB_LIB)  -shared -o $(LIB_NAME).$(EXT) $(LIBOBJS)
+	$(CC) $(CFLAGS)  $(DB_LIB) $(SSL_LIB)  -shared -o $(LIB_NAME).$(EXT) $(LIBOBJS)
 	cp $(LIB_NAME).$(EXT) $(LIB_PATH$)/
 %.o: %.c
 	$(CC) -fPIC $(CFLAGS) -c $< -o $@
@@ -79,8 +94,8 @@ sclean:
 	-rm -f *.o $(BUILDIRD)/httpd
 	-rm *.$(EXT)
 pclean:
-	-rm -rf $(BUILDIRD)/plugins/* plugins/*.o
-	-for file in plugins/* ;do \
+	-rm -rf $(BUILDIRD)/plugins/* libs/*.o
+	-for file in libs/* ;do \
 		if [ -d "$$file" ]; then \
 			rm "$$file"/*.o; \
 		fi \

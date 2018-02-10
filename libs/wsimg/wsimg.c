@@ -6,7 +6,7 @@ void pexit()
 {
 	
 }
-void handler(int cl, const char* m, const char* rqp, dictionary rq)
+void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 {
 	char* path = NULL;
 	int nimg = 19;

@@ -2,7 +2,7 @@
 #define PEXT "dylib"
 #define MAXSIZE 500000
 
-void execute(int client,const char* method,dictionary rq)
+void execute(void* client,const char* method,dictionary rq)
 {
 	//all plugin file
 	DIR           *d;
@@ -36,7 +36,7 @@ void execute(int client,const char* method,dictionary rq)
 	
 }
 
-void install(int c, const char* m, dictionary rq)
+void install(void* c, const char* m, dictionary rq)
 {
 	char * result = "{\"result\":%d,\"msg\":\"%s\"}";
 	json(c);
@@ -74,7 +74,7 @@ void install(int c, const char* m, dictionary rq)
 	
 	__t(c,result,0,"This is not a plugin file");
 }
-void handler(int client, const char* method, const char* rqpth, dictionary rq)
+void handler(void* client, const char* method, const char* rqpth, dictionary rq)
 {
 	if(EQU(rqpth,"default"))
 	{

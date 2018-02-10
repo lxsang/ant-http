@@ -36,7 +36,11 @@ THE SOFTWARE.
 #include <regex.h>
 #include <time.h>
 #include <stdint.h>
+#ifdef USE_OPENSSL
+#include <openssl/sha.h>
+#else
 #include "sha1.h"
+#endif
 #include "base64.h"
 
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))

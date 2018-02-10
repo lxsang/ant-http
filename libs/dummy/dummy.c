@@ -19,7 +19,7 @@ void pexit()
 {
 	LOG("%s\n","Plugin DUMMY is exited");
 }
-void execute(int client,const char* method,dictionary rq)
+void execute(void* client,const char* method,dictionary rq)
 {
 
 	char * question;
@@ -56,7 +56,7 @@ void execute(int client,const char* method,dictionary rq)
 }
 
 // delete record
-void delete(int client,const char* method,dictionary rq)
+void delete(void* client,const char* method,dictionary rq)
 {
 	char* id = dvalue(rq,"id");
 	html(client);
@@ -76,7 +76,7 @@ void delete(int client,const char* method,dictionary rq)
 	}
 
 }
-void update(int client,const char* method,dictionary rq)
+void update(void* client,const char* method,dictionary rq)
 {
 	char * id;
 	html(client);
@@ -121,14 +121,14 @@ void update(int client,const char* method,dictionary rq)
 }
 
 
-void jsonex(int client,const char* method,dictionary rq)
+void jsonex(void* client,const char* method,dictionary rq)
 {	
 	//json(client);
 	//__t(client,"{name:\"%s\", age:%d}","Sang",30);
 	jpeg(client);
 	__f(client,htdocs("images/ex.jpg"));
 }
-void handler(int client, const char* method, const char* rqpth, dictionary rq)
+void handler(void* client, const char* method, const char* rqpth, dictionary rq)
 {
 	if(EQU(rqpth,"default"))
 	{

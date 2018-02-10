@@ -3,6 +3,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+//open ssl
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
@@ -20,30 +25,56 @@
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 
 
- 
+#ifdef USE_OPENSSL
+int __attribute__((weak)) usessl();
+#endif
 
-int response(int, const char*);
-void ctype(int,const char*);
-void redirect(int,const char*);
-void html(int);
-void text(int);
-void json(int);
-void jpeg(int);
-void octstream(int, char*);
-void textstream(int);
-int __ti(int,int);
-int __t(int, const char*,...);
-int __b(int, const unsigned char*, int);
-int __f(int, const char*);
-int __fb(int, const char*);
+typedef struct  { 
+	int port;
+    char *plugins_dir; 
+    char *plugins_ext;
+    char *db_path;
+    char* htdocs;
+    char* tmpdir;
+    dictionary rules;
+    int backlog;
+#ifdef USE_OPENSSL
+    int usessl;
+    char* sslcert;
+    char* sslkey;
+#endif
+}config_t;
+
+typedef struct{
+    int sock;
+    void* ssl;
+} antd_client_t;
+
+int response(void*, const char*);
+void ctype(void*,const char*);
+void redirect(void*,const char*);
+void html(void*);
+void text(void*);
+void json(void*);
+void jpeg(void*);
+void octstream(void*, char*);
+void textstream(void*);
+int __ti(void*,int);
+int __t(void*, const char*,...);
+int __b(void*, const unsigned char*, int);
+int __f(void*, const char*);
+int __fb(void*, const char*);
 int upload(const char*, const char*);
 
-void set_cookie(int, const char*,dictionary,const char*);
-void set_status(int,int,const char*);
-void clear_cookie(int, dictionary);
+void set_cookie(void*, const char*,dictionary,const char*);
+void set_status(void*,int,const char*);
+void clear_cookie(void*, dictionary);
 /*Default function for plugin*/
-void unknow(int);
+void unknow(void*);
 int ws_enable(dictionary);
-char* read_line(int sock);
-int read_buf(int sock,char* buf,int i);
+char* read_line(void* sock);
+int read_buf(void* sock,char* buf,int i);
+int antd_send(const void *source, const void* data, int len, int usessl);
+int antd_recv(const void *source,  void* data, int len, int usessl);
+int antd_close(void* source);
 #endif

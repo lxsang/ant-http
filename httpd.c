@@ -136,9 +136,9 @@ void load_config(const char* file)
 	{
 		LOG("Using configuration : %s\n", file);
 #ifdef USE_OPENSSL
-		LOG("Enable %d\n", server_config.usessl);
-		LOG("cert %s\n", server_config.sslcert);
-		LOG("key %s\n", server_config.sslkey);
+		LOG("SSL enable %d\n", server_config.usessl);
+		LOG("SSL cert %s\n", server_config.sslcert);
+		LOG("SSL key %s\n", server_config.sslkey);
 #endif
 	}
 	init_file_system();
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 
 	while (1)
 	{
-		antd_client_t client;
+		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
@@ -195,26 +195,27 @@ int main(int argc, char* argv[])
 		/* accept_request(client_sock); */
 
 #ifdef USE_OPENSSL
-		client.ssl = NULL;
+		client->ssl = NULL;
 		if(server_config.usessl == 1)
 		{
-			client.ssl = (void*)SSL_new(ctx);
-        	SSL_set_fd((SSL*)client.ssl, client_sock);
+			client->ssl = (void*)SSL_new(ctx);
+        	SSL_set_fd((SSL*)client->ssl, client_sock);
 
-        	if (SSL_accept((SSL*)client.ssl) <= 0) {
+        	if (SSL_accept((SSL*)client->ssl) <= 0) {
             	ERR_print_errors_fp(stderr);
 				continue;
         	}
 		}
 #endif
-		client.sock = client_sock;
-		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)&client) != 0)
+		client->sock = client_sock;
+		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
 			perror("pthread_create");
 		else
 		{
 			//reclaim the stack data when thread finish
 			pthread_detach(newthread) ;
 		}
+		//accept_request(&client);
 	}
 
 	close(server_sock);

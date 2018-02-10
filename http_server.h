@@ -28,7 +28,7 @@ void accept_request(void*);
 void cat(void*, FILE *);
 void cannot_execute(void*);
 void error_die(const char *);
-int get_line(int, char *, int);
+//int get_line(int, char *, int);
 void not_found(void*);
 void serve_file(void*, const char *);
 int startup(unsigned *);

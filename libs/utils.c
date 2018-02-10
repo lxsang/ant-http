@@ -81,6 +81,7 @@ char* __s(const char* fstring,...)
  */
 void trim(char* str, const char delim)
 {
+    if(!str) return;
     char * p = str;
     int l = strlen(p);
 

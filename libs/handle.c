@@ -70,10 +70,12 @@ int response(void* client, const char* data)
 }
 int antd_send(const void *src, const void* data, int len, int _ssl)
 {
+	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(_ssl)
 	{
+		//LOG("SSL WRITE\n");
 		return SSL_write((SSL*) source->ssl, data, len);
 	}
 	else
@@ -86,10 +88,12 @@ int antd_send(const void *src, const void* data, int len, int _ssl)
 }
 int antd_recv(const void *src,  void* data, int len, int _ssl)
 {
+	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(_ssl)
 	{
+		//LOG("SSL READ\n");
 		return SSL_read((SSL*) source->ssl, data, len);
 	}
 	else
@@ -102,15 +106,18 @@ int antd_recv(const void *src,  void* data, int len, int _ssl)
 }
 int antd_close(void* src)
 {
+	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(source->ssl && usessl()){
 		SSL_free((SSL*) source->ssl);
-		LOG("Freeing SSL\n");
+		//LOG("Freeing SSL\n");
 	}
 #endif
-	printf("Close sock %d\n", source->sock);
-	close(source->sock);
+	//printf("Close sock %d\n", source->sock);
+	int ret = close(source->sock);
+	free(src);
+	return ret;
 }
 int __ti(void* client,int data)
 {

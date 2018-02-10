@@ -34,12 +34,13 @@ sqldb getdb()
 }
 #endif
 
-#ifdef USE_OPENSSL
+/*#ifdef USE_OPENSSL
 int usessl()
  {
+	 LOG("CALLED from plugin \n");
 	 return __plugin__.usessl;
  }
- #endif
+ #endif*/
 
 char* route(const char* repath)
 {

@@ -17,9 +17,8 @@ void accept_request(void* client)
 	struct stat st;
 
 	//char *query_string = NULL;
-	LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
-	numchars = get_line(((antd_client_t*)client)->sock, buf, sizeof(buf));
-	printf("BUF: %s\n", buf);
+	//LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
+	numchars = read_buf(client, buf, sizeof(buf));
 	i = 0; j = 0;
 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
@@ -236,7 +235,7 @@ void error_die(const char *sc)
 * Returns: the number of bytes stored (excluding null) */
 /**********************************************************************/
 //This function is deprecate
-int get_line(int sock, char *buf, int size)
+/*int get_line(int sock, char *buf, int size)
 {
 	int i = 0;
 	char c = '\0';
@@ -266,7 +265,7 @@ int get_line(int sock, char *buf, int size)
 	buf[i] = '\0';
 
 	return(i);
-}
+}*/
 
 
 /**********************************************************************/
@@ -462,7 +461,6 @@ dictionary decode_request(void* client,const char* method, char* url)
 	while((read_buf(client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{
 		line = buf;
-		printf("LINE1: %s \n", line);
 		trim(line, '\n');
 		trim(line, '\r');
 		token = strsep(&line,":");
@@ -867,7 +865,7 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
 		memcpy(pfunc,rpath+npos+1,fpos);
 		pfunc[fpos-1]='\0';
 	}
-	LOG("Client %d\n",client );
+	LOG("Client %d\n",((antd_client_t*)client)->sock );
 	LOG("Path : '%s'\n", rpath);
 	LOG("Method:%s\n", method);
 	LOG("Plugin name '%s'\n",pname);

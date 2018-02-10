@@ -176,9 +176,9 @@ dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
 }
 int hastable(sqlite3* db,const char* table)
 {
-	char * prefix = __s("type='table' and name='%s'",table);
-	dbrecord rc = dbselect(db,"sqlite_master",prefix);
-	free(prefix);
+	//char * prefix = __s("type='table' and name='%s'",table);
+	dbrecord rc = dbselect(db,"sqlite_master","type='table' and name='%s'", table);
+	//free(prefix);
 	if(!rc) return 0;
 	if(!rc->fields) return 0;
 	free(rc);

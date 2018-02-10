@@ -6,6 +6,7 @@
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 
 #ifdef USE_OPENSSL
+static int ssl_session_ctx_id = 1;
 void init_openssl()
 { 
     SSL_load_error_strings();	
@@ -37,16 +38,27 @@ SSL_CTX *create_context()
 void configure_context(SSL_CTX *ctx)
 {
     SSL_CTX_set_ecdh_auto(ctx, 1);
-
+	/* Set some options and the session id.
+     * SSL_OP_NO_SSLv2: SSLv2 is insecure, disable it.
+     * SSL_OP_NO_TICKET: We don't want TLS tickets used because this is an SSL server caching example.
+     *                   It should be fine to use tickets in addition to server side caching.
+     */
+    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
+    SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     /* Set the key and cert */
     if (SSL_CTX_use_certificate_file(ctx, server_config.sslcert, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
-	exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
     }
 
     if (SSL_CTX_use_PrivateKey_file(ctx, server_config.sslkey, SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
-	exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
+    }
+	if (!SSL_CTX_check_private_key(ctx)) {
+        LOG("Failed to validate cert \n");
+        ERR_print_errors_fp(stderr);
+		exit(EXIT_FAILURE);
     }
 }
 
@@ -217,7 +229,9 @@ int main(int argc, char* argv[])
 		}
 		//accept_request(&client);
 	}
-
+#ifdef USE_OPENSSL
+	SSL_CTX_free(ctx);
+#endif
 	close(server_sock);
 
 	return(0);

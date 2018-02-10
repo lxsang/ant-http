@@ -107,6 +107,10 @@ int antd_close(void* src)
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(source->ssl && usessl()){
+		//printf("SSL:Shutdown ssl\n");
+        //SSL_shutdown((SSL*) source->ssl);
+		SSL_set_shutdown((SSL*) source->ssl, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
+		//printf("SSL:Free ssl\n");
 		SSL_free((SSL*) source->ssl);
 		//LOG("Freeing SSL\n");
 	}

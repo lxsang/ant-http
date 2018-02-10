@@ -69,7 +69,7 @@ main: httpd plugins
 
 
 httpd: lib $(SERVER_O)
-	$(CC) $(CFLAGS)  $(SERVER_O)  $(SERVERLIB)  -o $(BUILDIRD)/httpd httpd.c
+	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/httpd httpd.c $(SERVERLIB)
 	cp antd $(BUILDIRD)
 
 lib: $(LIBOBJS)

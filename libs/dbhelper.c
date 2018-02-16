@@ -132,7 +132,7 @@ dbrecord dball(sqlite3* db,const char* table)
 dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
 {
 	char* sql;
-	char* prefix = "SELECT * FROM %s WHERE (%s)";
+	char* prefix = "SELECT * FROM %s WHERE %s";
 	char* cond;
 	va_list arguments; 
 	int dlen;

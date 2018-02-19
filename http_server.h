@@ -12,7 +12,6 @@
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-#define APP_JSON		 "application/json"
 #define PLUGIN_HANDLER	 "handler"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -41,7 +40,7 @@ dictionary decode_url_request(const char* query);
 dictionary decode_request(void* client,const char* method, char* url);
 dictionary decode_multi_part_request(void*,const char*);
 dictionary decode_cookie(const char*);
-char* json_data_decode(void*,int);
+char* post_data_decode(void*,int);
 
 int execute_plugin(void* client, const char *path,
   const char *method, dictionary rq);

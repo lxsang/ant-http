@@ -372,24 +372,6 @@ void badrequest(void* client)
 	__t(client,"The request could not be understood by the server due to malformed syntax.");
 }
 
-
-/**
- * Decode the HTTP POST request with URL encode
- * @param  client socket client
- * @param  len    content length
- * @return        query string
- */
-char* post_url_decode(void* client,int len)
-{
-	char *query = (char*) malloc((len+1)*sizeof(char));
-    for (int i = 0; i < len; i++) {
-		antd_recv(client, (query+i), 1);
-    }
-    query[len]='\0';
-    //query = url_decode(query);
-    LOG("POST Query %s\n", query);
-    return query;
-}
 char* apply_rules(const char* host, char*url)
 {
 	association it;
@@ -458,7 +440,7 @@ dictionary decode_request(void* client,const char* method, char* url)
 		token = strsep(&line,":");
 		trim(token,' ');
 		trim(line,' ');
-		dput(xheader,token,line);
+		dput(xheader,token,strdup(line));
 		if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 		{
 			if(!cookie) cookie = decode_cookie(line);
@@ -524,24 +506,25 @@ dictionary decode_request(void* client,const char* method, char* url)
 		// decide what to do with the data
 		if(strstr(ctype,FORM_URL_ENCODE) > 0)
 		{
-			request = decode_url_request(post_url_decode(client,clen));
+			request = decode_url_request(post_data_decode(client,clen));
 		} else if(strstr(ctype,FORM_MULTI_PART)> 0)
 		{
 			//printf("Multi part form : %s\n", ctype);
 			request = decode_multi_part_request(client,ctype);
 		} 
-		else if(strstr(ctype,APP_JSON) > 0)
-		{
-			char* query = json_data_decode(client,clen);
-			request = dict();
-			dput(request,"json", strdup(query));
-			free(query);
-		}
 		else
 		{
-			LOG("Un supported yet %s\n",ctype);
-			return NULL;
+			char* query = post_data_decode(client,clen);
+			char* key = strstr(ctype,"/");
+			if(key)
+				key++;
+			else
+				key = ctype;
+			request = dict();
+			dput(request,key, strdup(query));
+			free(query);
 		}
+		
 	}
 	if(ctype) free(ctype);
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
@@ -795,9 +778,9 @@ dictionary decode_url_request(const char* query)
 	return dic;
 }
 /**
-* Decode JSON query string to string
+* Decode post query string to string
 */
-char* json_data_decode(void* client,int len)
+char* post_data_decode(void* client,int len)
 {
 	char *query = (char*) malloc((len+1)*sizeof(char));
     for (int i = 0; i < len; i++) {
@@ -805,7 +788,7 @@ char* json_data_decode(void* client,int len)
     }
     query[len]='\0';
     //query = url_decode(query);
-    LOG("JSON Query %s\n", query);
+    //LOG("JSON Query %s\n", query);
     return query;
 }
 

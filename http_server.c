@@ -73,11 +73,32 @@ void accept_request(void* client)
 	{
 		if (S_ISDIR(st.st_mode))
 		{
+			int l = strlen(path);
+			int ul = strlen(url);
 			strcat(path, "/index.html");
 			if(stat(path, &st) == -1)
 			{
-				not_found(client);
-				goto end;
+				association it;
+				for_each_assoc(it, server_config.handlers)
+				{
+					path[l] = '\0';
+					url[ul] = '\0';
+					strcat(url,"/index.");
+					strcat(path, "/index.");
+					strcat(url,it->key);
+					strcat(path, it->key);
+					if(stat(path, &st) == 0)
+					{
+						l = -1;
+						i = HASHSIZE;
+						break;
+					}
+				}
+				if(l!= -1)
+				{
+					not_found(client);
+					goto end;
+				}
 			}
 		}
 		// check if the mime is supported
@@ -87,10 +108,17 @@ void accept_request(void* client)
 		char* mime_type = mime(path);
 		if(strcmp(mime_type,"application/octet-stream") == 0)
 		{
-			sprintf(buf,"/%s-api%s",ext(path),url);
-			LOG("WARNING::::Access octetstream via handler %s\n", buf);
-			if(execute_plugin(client,buf,method,rq) < 0)
-				cannot_execute(client);
+			char* h = dvalue(server_config.handlers,ext(path));
+			if(h)
+			{
+				sprintf(buf,"/%s%s",h,url);
+				LOG("WARNING::::Access octetstream via handler %s\n", buf);
+				if(execute_plugin(client,buf,method,rq) < 0)
+					cannot_execute(client);
+			}
+			else
+				unknow(client);
+			
 		}
 		else
 		{

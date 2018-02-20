@@ -100,6 +100,10 @@ static int config_handler(void* conf, const char* section, const char* name,
 	{
 		dput( pconfig->rules, strdup(name),strdup(value));
     }
+	else if (strcmp(section, "FILEHANDLER") == 0)
+	{
+		dput( pconfig->handlers, strdup(name),strdup(value));
+    }
 	else if(strcmp(section,"AUTOSTART")==0){
 		// The server section must be added before the autostart section
 		// auto start plugin
@@ -136,6 +140,7 @@ void load_config(const char* file)
 	server_config.tmpdir = "tmp";
 	server_config.backlog = 100;
 	server_config.rules = dict();
+	server_config.handlers = dict();
 #ifdef USE_OPENSSL
 	server_config.usessl = 0;
 	server_config.sslcert = "cert.pem";
@@ -157,6 +162,7 @@ void load_config(const char* file)
 }
 void stop_serve(int dummy) {
 	free(server_config.rules);
+	free(server_config.handlers);
     unload_all_plugin();
 }
 int main(int argc, char* argv[])

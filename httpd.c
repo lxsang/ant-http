@@ -98,7 +98,8 @@ static int config_handler(void* conf, const char* section, const char* name,
 #endif
 	else if (strcmp(section, "RULES") == 0)
 	{
-		dput( pconfig->rules, strdup(name),strdup(value));
+		list_put_s(&pconfig->rules,  strdup(name));
+		list_put_s(&pconfig->rules,  strdup(value));
     }
 	else if (strcmp(section, "FILEHANDLER") == 0)
 	{
@@ -139,7 +140,7 @@ void load_config(const char* file)
 	server_config.htdocs = "htdocs";
 	server_config.tmpdir = "tmp";
 	server_config.backlog = 100;
-	server_config.rules = dict();
+	server_config.rules = list_init();
 	server_config.handlers = dict();
 #ifdef USE_OPENSSL
 	server_config.usessl = 0;
@@ -161,7 +162,7 @@ void load_config(const char* file)
 	init_file_system();
 }
 void stop_serve(int dummy) {
-	free(server_config.rules);
+	list_free(&server_config.rules);
 	free(server_config.handlers);
     unload_all_plugin();
 }

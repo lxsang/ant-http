@@ -36,7 +36,7 @@ typedef struct  {
     char *db_path;
     char* htdocs;
     char* tmpdir;
-    dictionary rules;
+    list rules;
     dictionary handlers;
     int backlog;
 #ifdef USE_OPENSSL

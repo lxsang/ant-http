@@ -134,7 +134,7 @@ end:
 	antd_close(client);
 }
 
-void rule_check(association it, const char* host, const char* _url, const char* _query, char* buf)
+int rule_check(const char*k, const char* v, const char* host, const char* _url, const char* _query, char* buf)
 {
 	// first perfom rule check on host, if not success, perform on url
 	regmatch_t key_matches[10];
@@ -147,16 +147,16 @@ void rule_check(association it, const char* host, const char* _url, const char* 
 	int idx = 0;
 	memset(rep,0,10);
 	// 1 group
-	if(!host ||  !(ret = regex_match(it->key,host, 10, key_matches)) )
+	if(!host ||  !(ret = regex_match(k,host, 10, key_matches)) )
 	{
 		target = url;
-		ret = regex_match(it->key,url, 10, key_matches);
+		ret = regex_match(k,url, 10, key_matches);
 	}
 	else
 		target = host;
 
-	if(!ret) return;
-	tmp = (char*) it->value;
+	if(!ret) return 0;
+	tmp = (char*) v;
 	char * search = "<([a-zA-Z0-9]+)>";
 	//printf("match again %s\n",tmp);
 	while((ret = regex_match( search,tmp, 2, val_matches)))
@@ -185,9 +185,19 @@ void rule_check(association it, const char* host, const char* _url, const char* 
 		//break;
 	}
 	// now modify the match 2 group
-	if(idx > 0) buf[idx] = '\0';
+	if(idx > 0)
+	{
+		if(tmp)
+		{
+			// copy the remainning of tmp
+			memcpy(buf+idx, tmp, strlen(tmp));
+			idx += strlen(tmp);
+		}
+		buf[idx] = '\0';
+	}
 	free(url);
 	free(query);
+	return 1;
 }
 /**********************************************************************/
 /* Put the entire contents of a file out on a socket.  This function
@@ -413,19 +423,26 @@ char* apply_rules(const char* host, char*url)
 		query_string++;
 	}
 	//char* oldurl = strdup(url);
-	for_each_assoc(it, server_config.rules)
+	int size = list_size(server_config.rules);
+	for(int i = 0; i < size; i+= 2)
 	{
+		char *k, *v;
+		k  = list_at(server_config.rules, i)->value.s;
+		v  = list_at(server_config.rules, i+1)->value.s;
 		// 1 group
-		rule_check(it,host, url, query_string, url);
-		query_string = url;
-		while ((*query_string != '?') && (*query_string != '\0'))
-			query_string++;
-		if (*query_string == '?')
-		{
-			*query_string = '\0';
-			query_string++;
+		if(rule_check(k, v,host, url, query_string, url)){
+			query_string = url;
+		
+			while ((*query_string != '?') && (*query_string != '\0'))
+				query_string++;
+			if (*query_string == '?')
+			{
+				*query_string = '\0';
+				query_string++;
+			}
 		}
 	}
+	
 	return strdup(query_string);
 }
 /**
@@ -501,13 +518,13 @@ dictionary decode_request(void* client,const char* method, char* url)
 		}
 	}
 	//if(line) free(line);
-
+	query = apply_rules(host, url);
 	if(strcmp(method,"GET") == 0)
 	{ 
-		query = apply_rules(host, url);
 		if(host) free(host);
 		if(query)
 		{
+			LOG("Query: %s\n", query);
 			request = decode_url_request(query);
 			free(query);
 		}

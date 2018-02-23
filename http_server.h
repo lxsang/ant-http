@@ -33,7 +33,7 @@ void serve_file(void*, const char *);
 int startup(unsigned *);
 void unimplemented(void*);
 void badrequest(void*);
-void rule_check(association, const char* , const char* , const char* , char*);
+int rule_check(const char*, const char*, const char* , const char* , const char* , char*);
 void ws_confirm_request(void*, const char*);
 char* post_url_decode(void* client,int len);
 dictionary decode_url_request(const char* query);

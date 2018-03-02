@@ -60,6 +60,8 @@ void * plugin_from_file(char* name)
    if (!lib_handle) 
    {
       LOG("Cannot load plugin '%s' : '%s'\n",name,dlerror());
+	  if(path)
+		free(path);
       return NULL;
    }
    // set database path
@@ -87,7 +89,16 @@ void unload_plugin(struct plugin_entry* np)
 	{
 		// execute it
 		(*fn)();
-	}	
+	}
+	fn = (void(*)()) dlsym(np->handle, "__release");
+	if ((error = dlerror()) != NULL)  
+ 	{
+     	LOG("Cant not release plugin %s : %s \n", np->pname,error);
+    }
+	if(fn)
+	{
+		(*fn)();
+	}
 	dlclose(np->handle);
 	//free((void *) np->handle);
 	free((void *) np->pname);
@@ -124,11 +135,15 @@ void unload_all_plugin()
 	LOG("Unload all plugins\n");
 	for(int i=0;i<HASHSIZE;i++)
 	{
-		struct plugin_entry *np;
-    	for (np = plugin_table[i]; np != NULL; np = np->next)
-    	{
-			unload_plugin(np);
-        }
+		struct plugin_entry **np, *curr;
+		np = &plugin_table[i];
+
+		while((curr = *np) != NULL)
+		{
+			(*np) = (*np)->next;
+			unload_plugin(curr);
+			free(curr);
+		}
         plugin_table[i] = NULL;
 	}
 	exit(0);

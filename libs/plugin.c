@@ -74,3 +74,12 @@ char* config_dir()
 		mkdir(path, 0755);
 	return path;
 }
+
+void __release()
+{
+	printf("Releasing plugin\n");
+	if(__plugin__.name) free(__plugin__.name);
+	if(__plugin__.dbpath) free(__plugin__.dbpath);
+	if(__plugin__.htdocs) free(__plugin__.htdocs);
+	if(__plugin__.pdir) free(__plugin__.pdir);
+}

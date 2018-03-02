@@ -15,7 +15,7 @@ static void ws_gen_mask_key(ws_msg_header_t * header)
 ws_msg_header_t * ws_read_header(void* client)
 {
 	
-	uint8_t byte;
+	uint8_t byte = 0;
 	uint8_t bytes[8];
 	ws_msg_header_t* header = (ws_msg_header_t*) malloc(sizeof(*header));
 	

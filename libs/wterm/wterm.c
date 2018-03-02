@@ -89,12 +89,14 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 								{
 			      					LOG("%s\n","Data is not mask");
 			   						write(fdm, "exit\n", 5);
+									free(h);
 			      					return;
 								}
 			      				if(h->opcode == WS_CLOSE)
 			      				{
 			      					LOG("%s\n","Websocket: connection closed");
 			   						write(fdm, "exit\n", 5);
+									free(h);
 			      					return;
 			      				}
 			      				else if(h->opcode == WS_TEXT)
@@ -102,6 +104,7 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 			      					int l;
 									char * tok = NULL;
 									char* tok1 = NULL;
+									char* orgs = NULL;
 			      					while((l = ws_read_data(cl,h,sizeof(buff),buff)) > 0)
 			      					{
 										char c = buff[0];
@@ -114,6 +117,7 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 											case 's': // terminal resize event
 											buff[l] = '\0';
 											tok = strdup(buff+1);
+											orgs = tok;
 											tok1 = strsep(&tok,":");
 											if(tok != NULL && tok1 != NULL)
 											{
@@ -136,6 +140,8 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 
 												if (ioctl(fdm, TIOCSWINSZ, (char *) &win) != 0)
 													printf("Cannot set winsize\n");
+												
+												free(orgs);
 											}
 											
 											break;

@@ -9,8 +9,12 @@ int usessl()
 
 void set_status(void* client,int code,const char* msg)
 {
-	response(client, __s("HTTP/1.1 %d %s", code, msg));
-	response(client, __s("Server: %s ", SERVER_NAME));
+	char *s = __s("HTTP/1.1 %d %s", code, msg);
+	response(client, s);
+	free(s);
+	s = __s("Server: %s ", SERVER_NAME);
+	response(client, s);
+	free(s);
 }
 void redirect(void* client,const char*path)
 {
@@ -67,7 +71,7 @@ int response(void* client, const char* data)
 }
 int antd_send(const void *src, const void* data, int len)
 {
-	if(!src) return -1;
+	if(!src || !data) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
@@ -146,7 +150,11 @@ int __t(void* client, const char* fstring,...)
         va_end(arguments);
         
         if(dlen < BUFFLEN) 
-			return response(client,data);
+		{
+			int ret = response(client,data);
+			free(data);
+			return ret;
+		}
 		else
 		{
 			while(sent < dlen - 1)
@@ -163,7 +171,12 @@ int __t(void* client, const char* fstring,...)
 				sent += buflen;
 				nbytes = antd_send(client, chunk, buflen);
 				free(chunk);	
-				if(nbytes == -1) return 0;
+				if(nbytes == -1)
+				{
+					//free(data);
+					//return 0;
+					break;
+				}
 			}
 			chunk = "\r\n";
 			antd_send(client, chunk, strlen(chunk));

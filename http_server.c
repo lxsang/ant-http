@@ -130,7 +130,24 @@ void accept_request(void* client)
 	}
 end:
 	if(oldurl) free(oldurl);
-	if(rq) free(rq);
+	if(rq)
+	{
+		dictionary subdict;
+		subdict = (dictionary)dvalue(rq, "__xheader__");
+		if(subdict)
+		{
+			freedict(subdict);
+			dput(rq, "__xheader__", NULL);
+		}
+
+		subdict = (dictionary)dvalue(rq, "cookie");
+		if(subdict)
+		{
+			freedict(subdict);
+			dput(rq, "cookie", NULL);
+		}
+		freedict(rq);
+	}
 	antd_close(client);
 }
 
@@ -155,7 +172,12 @@ int rule_check(const char*k, const char* v, const char* host, const char* _url, 
 	else
 		target = host;
 
-	if(!ret) return 0;
+	if(!ret) 
+	{
+		free(url);
+		free(query);
+		return 0;
+	}
 	tmp = (char*) v;
 	char * search = "<([a-zA-Z0-9]+)>";
 	//printf("match again %s\n",tmp);
@@ -519,9 +541,10 @@ dictionary decode_request(void* client,const char* method, char* url)
 	}
 	//if(line) free(line);
 	query = apply_rules(host, url);
+	if(host) free(host);
 	if(strcmp(method,"GET") == 0)
-	{ 
-		if(host) free(host);
+	{
+		if(ctype) free(ctype); 
 		if(query)
 		{
 			LOG("Query: %s\n", query);
@@ -536,15 +559,21 @@ dictionary decode_request(void* client,const char* method, char* url)
 			// plugin should handle this ugraded connection
 			// not the server
 			if(!request) request = dict();
-			dput(request,"__web_socket__","1");
+			dput(request,"__web_socket__",strdup("1"));
 		}
 	}
 	else
 	{
+		if(query)
+			free(query);
+		if(ws_key)
+			free(ws_key);
 		if(ctype == NULL || clen == -1)
 		{
 			LOG("Bad request\n");
 			if(ctype) free(ctype);
+			if(cookie) freedict(cookie);
+			free(xheader);
 			return NULL;
 		}
 		LOG("ContentType %s\n", ctype);
@@ -575,8 +604,8 @@ dictionary decode_request(void* client,const char* method, char* url)
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
 	if(!request)
 			request = dict();
-		
-	dput(request,"cookie",cookie);
+	if(cookie)
+		dput(request,"cookie",cookie);
 	dput(request,"__xheader__",xheader);
 	return request;
 }
@@ -635,10 +664,11 @@ dictionary decode_cookie(const char* line)
 {
 	char *token,*token1;
 	char *cpstr = strdup(line);
+	char *orgcpy = cpstr;
 	trim(cpstr,' ');
 	trim(cpstr,'\n');
 	trim(cpstr,'\r');
-	//printf("FUCKIT %s\n",cpstr );
+	
 	dictionary dic = NULL;
 	while((token = strsep(&cpstr,";")))
 	{
@@ -648,13 +678,12 @@ dictionary decode_cookie(const char* line)
 		{
 			if(dic == NULL)
 				dic = dict();
-			//LOG("Found cookie : %s = %s\n",token1,token);
 			dput(dic,token1,strdup(token));
 		}
 	}
 		//}
+	free(orgcpy);
 	return dic;
-	//free(cpstr);
 }
 /**
  * Decode the multi-part form data from the POST request
@@ -670,7 +699,9 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 	char * boundary;
 	char * boundend;
 	char * line;
+	char * orgline;
 	char * str_copy = strdup(ctype);
+	char* orgcpy = str_copy;
 	char* token;
 	char* keytoken ;
 	char* valtoken ;
@@ -689,13 +720,29 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 		trim(boundary,' ');
 		boundend = __s("%s--",boundary);
 		//find first boundary
-		while((line = read_line(client))&&strstr(line,boundary) <= 0); 
+		while((line = read_line(client))&&strstr(line,boundary) <= 0)
+		{
+			if(line) free(line);
+		}
 		// loop through each part separated by the boundary
 		while(line && strstr(line,boundary) > 0){
+			free(line);
 			// search for content disposition:
 			while((line = read_line(client)) &&
-					strstr(line,"Content-Disposition:") <= 0);
-			if(strstr(line,"Content-Disposition:") <= 0) return NULL;
+					strstr(line,"Content-Disposition:") <= 0)
+			{
+				free(line);
+				line = NULL;
+			}
+			if(!line || strstr(line,"Content-Disposition:") <= 0)
+			{
+				if(line)
+					free(line);
+				free(orgcpy);
+				free(boundend);
+				return NULL;
+			}
+			orgline = line;
 			// extract parameters from header
 			part_name = NULL;
 			part_file = NULL;
@@ -714,19 +761,24 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 						trim(valtoken,'\"');
 						if(strcmp(keytoken,"name") == 0)
 						{
-							part_name = valtoken;
+							part_name = strdup(valtoken);
 						} else if(strcmp(keytoken,"filename") == 0)
 						{
-							part_file = valtoken;
+							part_file = strdup(valtoken);
 						}
 					}
 				}
 			}
+			free(orgline);
 			// get the binary data
 			if(part_name != NULL)
 			{
 				// go to the beginer of data bock
-				while((line = read_line(client)) && strcmp(line,"\r\n") != 0);
+				while((line = read_line(client)) && strcmp(line,"\r\n") != 0)
+				{
+					free(line);
+				}
+				if(line) free(line);
 				if(part_file == NULL)
 				{
 					/**
@@ -740,7 +792,10 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 					trim(line,' ');
 					dput(dic,part_name,line);
 					// find the next boundary
-					while((line = read_line(client)) && strstr(line,boundary) <= 0); 
+					while((line = read_line(client)) && strstr(line,boundary) <= 0)
+					{
+						free(line);
+					}
 				}
 				else
 				{
@@ -762,11 +817,14 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 						line = buf;
 
 						field = __s("%s.file",part_name);
-						dput(dic,field,part_file);
+						dput(dic,field, strdup(part_file));
+						free(field);
 						field = __s("%s.tmp",part_name);
 						dput(dic,field,strdup(file_path));
+						free(field);
 						field = __s("%s.size",part_name);
 						dput(dic,field,__s("%d",totalsize));
+						free(field);
 						field = __s("%s.ext",part_name);
 						dput(dic,field,ext(part_file));
 						free(field);
@@ -777,7 +835,9 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 						LOG("Cannot wirte file to :%s\n", file_path );
 					}
 					free(file_path);
+					free(part_file);
 				}
+				free(part_name);
 			}
 			//printf("[Lines]:%s\n",line);
 			// check if end of request
@@ -786,9 +846,10 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 				LOG("End request %s\n", boundend);
 				break;
 			}
-		} 
+		}
+		free(boundend);
 	}
-	free(str_copy);
+	free(orgcpy);
 	return dic;
 }
 /**
@@ -800,10 +861,11 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 dictionary decode_url_request(const char* query)
 {
 	if(query == NULL) return NULL;
-	char* str_copy = strdup(query);
 	//str_copy = ;
 	char* token;
 	if(strlen(query) == 0) return NULL;
+	char* str_copy = strdup(query);
+	char* org_copy = str_copy;
 	dictionary dic = dict();
 	while ((token = strsep(&str_copy, "&")))
 	{
@@ -819,7 +881,7 @@ dictionary decode_url_request(const char* query)
 			}
 		}
 	}
-	free(str_copy);
+	free(org_copy);
 	return dic;
 }
 /**
@@ -859,6 +921,7 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
  	struct plugin_entry *plugin ;
 	int plen = strlen(path);
 	char * rpath = (char*) malloc((plen+1)*sizeof(char));
+	char* orgs = rpath;
 	char *error;
 	memcpy(rpath,path+1,plen);
 	rpath[plen] = '\0';
@@ -900,7 +963,7 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
    //dictionary dic = decode_request(client,method,query_string);
    	(*fn)(client,method,pfunc,dic);
    //free(dic);
-   free(rpath);
+   free(orgs);
    return 1;
 }
 

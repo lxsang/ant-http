@@ -34,6 +34,7 @@ void list_put(list* l, item it)
 {
 	if(*l == NULL || (*l)->type == RPC_TYPE_NIL)
 	{
+		free(*l);
 		*l = it;
 		return ;
 	}	
@@ -167,6 +168,7 @@ list split(const char* str, const char* delim)
 {
 	if(str == NULL || delim == NULL) return NULL;
 	char* str_cpy = strdup(str);
+	char* org_str = str_cpy;
 	char* token;
 	list l = list_init();
 	while((token = strsep(&str_cpy,delim)))
@@ -176,7 +178,7 @@ list split(const char* str, const char* delim)
 			list_put_special(&l,token);
 		}
 	}
-	free(str_cpy);
+	free(org_str);
 	if(l->type== RPC_TYPE_NIL)
 		return NULL;
 	return l;
@@ -227,9 +229,15 @@ void list_free(list *l)
 {
 	item curr;
 	while ((curr = (*l)) != NULL) { 
-	    (*l) = (*l)->next;
+		(*l) = (*l)->next;
 		if(curr->type == RPC_TYPE_ARRAY)
 			list_free(&curr->value.array);
+		else if(curr->type == RPC_TYPE_STRING)
+			free(curr->value.s);
+		else if(curr->type == RPC_TYPE_DATE)
+			free(curr->value.date);
+		else if(curr->type == RPC_TYPE_BASE64)
+			free(curr->value.b64);
 	    free (curr);
 	}
 }

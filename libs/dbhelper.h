@@ -34,4 +34,6 @@ char* value_of(const dbfield,const char*);
 void add_field(dbfield*,const char*, const char*);
 void add_record(dbrecord*,dbfield);
 void dbclose(sqlite3*);
+void freerecord(dbrecord *);
+void freefield(dbfield *);
 #endif

@@ -4,9 +4,10 @@
 #include "libs/ini.h"
 
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
-
+int server_sock = -1;
 #ifdef USE_OPENSSL
 static int ssl_session_ctx_id = 1;
+SSL_CTX *ctx;
 void init_openssl()
 { 
     SSL_load_error_strings();	
@@ -98,12 +99,12 @@ static int config_handler(void* conf, const char* section, const char* name,
 #endif
 	else if (strcmp(section, "RULES") == 0)
 	{
-		list_put_s(&pconfig->rules,  strdup(name));
-		list_put_s(&pconfig->rules,  strdup(value));
+		list_put_s(&pconfig->rules,  name);
+		list_put_s(&pconfig->rules,  value);
     }
 	else if (strcmp(section, "FILEHANDLER") == 0)
 	{
-		dput( pconfig->handlers, strdup(name),strdup(value));
+		dput( pconfig->handlers, name ,strdup(value));
     }
 	else if(strcmp(section,"AUTOSTART")==0){
 		// The server section must be added before the autostart section
@@ -162,9 +163,13 @@ void load_config(const char* file)
 	init_file_system();
 }
 void stop_serve(int dummy) {
-	list_free(&server_config.rules);
-	free(server_config.handlers);
+	list_free(&(server_config.rules));
+	freedict(server_config.handlers);
     unload_all_plugin();
+#ifdef USE_OPENSSL
+	SSL_CTX_free(ctx);
+#endif
+	close(server_sock);
 }
 int main(int argc, char* argv[])
 {
@@ -173,8 +178,6 @@ int main(int argc, char* argv[])
 		load_config(CONFIG);
 	else
 		load_config(argv[1]);
-
-	int server_sock = -1;
 	unsigned port = server_config.port;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
@@ -188,7 +191,6 @@ int main(int argc, char* argv[])
 	signal(SIGINT, stop_serve);
 
 #ifdef USE_OPENSSL
-	SSL_CTX *ctx;
 	if( server_config.usessl == 1 )
 	{
 		init_openssl();
@@ -236,9 +238,7 @@ int main(int argc, char* argv[])
 		}
 		//accept_request(&client);
 	}
-#ifdef USE_OPENSSL
-	SSL_CTX_free(ctx);
-#endif
+
 	close(server_sock);
 
 	return(0);

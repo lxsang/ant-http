@@ -93,5 +93,29 @@ void* dvalue(dictionary dic, const char* key)
 	return as->value;
 }
 
-void freedict(dictionary dic){free(dic);}
+void free_association(association * asoc)
+{
+	
+	while( (*asoc) != NULL )
+	{
+		association a = *asoc;
+		(* asoc) = (*asoc) ->next;
+		
+		if(a->key)
+		{
+			free(a->key);
+			if(a->value) free(a->value);
+		}
+		free(a);
+	}
+
+}
+
+void freedict(dictionary dic){
+	for(int i = 0; i < HASHSIZE; i++)
+		free_association(&(dic[i]));
+	free(dic);
+
+}
+
 

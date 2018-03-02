@@ -37,5 +37,5 @@ char* htdocs(const char*);
 char* config_dir();
 /*Default function for plugin*/
 void handler(void*, const char*,const char*,dictionary);
-
+void __release();
 #endif

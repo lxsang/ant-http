@@ -81,7 +81,10 @@ void add_record(dbrecord* r,dbfield f)
 	new_r->idx =  1;
 	new_r->next = NULL;
 	if((*r)->idx == 0)
+	{
+		freerecord(&(*r));
 		*r = new_r;
+	}
 	else
 	{
 		dbrecord* temp;
@@ -157,8 +160,8 @@ dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
             dbfield fields = __field();
             for(int col = 0; col < cols; col++)
             {
-                char *value = (char*)sqlite3_column_text(statement, col);
-               	char *name = (char*)sqlite3_column_name(statement, col);
+                const char *value = sqlite3_column_text(statement, col);
+               	const char *name = sqlite3_column_name(statement, col);
                 add_field(&fields,name,(value!=0)?value:"");
             }
             add_record(&records,fields);
@@ -180,8 +183,12 @@ int hastable(sqlite3* db,const char* table)
 	dbrecord rc = dbselect(db,"sqlite_master","type='table' and name='%s'", table);
 	//free(prefix);
 	if(!rc) return 0;
-	if(!rc->fields) return 0;
-	free(rc);
+	if(!rc->fields)
+	{
+		freerecord(&rc);
+		return 0;
+	}
+	freerecord(&rc);
 	return 1;
 }
 int dbupdate(sqlite3* db,const char* table,const dbfield field,const char* fstring,...)
@@ -228,4 +235,26 @@ int dbdelete(sqlite3* db,const char* table,const char* fstring,...)
     free(cond);
     free(sql);
     return ret;
-}	
+}
+
+void freerecord(dbrecord * r)
+{
+	dbrecord curr;
+	while ((curr = (*r)) != NULL) { 
+		(*r) = (*r)->next;
+		if(curr->fields)
+			freefield(&(curr->fields));
+	    free (curr);
+	}
+}
+void freefield(dbfield *f)
+{
+	dbfield curr;
+	while( (curr = (*f)) != NULL )
+	{
+		(*f) = (*f)->next;
+		if(curr->name) free(curr->name);
+		if(curr->value) free(curr->value);
+		free(curr);
+	}
+}

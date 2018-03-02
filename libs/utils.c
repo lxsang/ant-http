@@ -143,13 +143,15 @@ char* ext(const char* file)
 	char* token,*ltoken = "";
 	if(file == NULL) return NULL;
 	char* str_cpy = strdup(file);
+    char* str_org = str_cpy;
 	if(strstr(str_cpy,".")<= 0) return "";
 	if(*file == '.')
 		trim(str_cpy,'.');
 
 	while((token = strsep(&str_cpy,".")) && strlen(token)>0) {ltoken = token;}
-	free(str_cpy);
-	return ltoken;
+    char* ext = strdup(ltoken);
+    free(str_org);
+	return ext;
 
 }
 /*get mime file info from extension*/
@@ -182,6 +184,7 @@ char* mime(const char* file)
 {
 	char * ex = ext(file);
 	mime_t m = mime_from_ext(ex);
+    free(ex);
 	return m.type;
 }
 
@@ -189,6 +192,7 @@ int is_bin(const char* file)
 {
 	char * ex = ext(file);
 	mime_t m = mime_from_ext(ex);
+    free(ex);
 	return m.bin;
 }
 

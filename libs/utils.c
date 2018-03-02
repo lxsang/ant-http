@@ -144,7 +144,7 @@ char* ext(const char* file)
 	if(file == NULL) return NULL;
 	char* str_cpy = strdup(file);
     char* str_org = str_cpy;
-	if(strstr(str_cpy,".")<= 0) return "";
+	if(strstr(str_cpy,".")<= 0) return strdup("");
 	if(*file == '.')
 		trim(str_cpy,'.');
 
@@ -184,7 +184,8 @@ char* mime(const char* file)
 {
 	char * ex = ext(file);
 	mime_t m = mime_from_ext(ex);
-    free(ex);
+    if(ex)
+        free(ex);
 	return m.type;
 }
 
@@ -192,7 +193,8 @@ int is_bin(const char* file)
 {
 	char * ex = ext(file);
 	mime_t m = mime_from_ext(ex);
-    free(ex);
+    if(ex)
+        free(ex);
 	return m.bin;
 }
 

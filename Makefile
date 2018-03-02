@@ -50,7 +50,7 @@ SERVERLIB= -ldl $(LIB_FLAG) $(DB_LIB) $(SSL_LIB)  -lpthread
 SERVER_O=plugin_manager.o \
 		http_server.o
 #-lsocket
-PLUGINS=	dummy.$(EXT) fileman.$(EXT) pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) cookiex.$(EXT) wsimg.$(EXT)
+PLUGINS=	pluginsman.$(EXT) wterm.$(EXT) nodedaemon.$(EXT) wsimg.$(EXT)
 
 LIBOBJS = 	libs/ini.o \
 			libs/handle.o \

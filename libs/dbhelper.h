@@ -22,7 +22,7 @@ int dbquery(sqlite3*,const char*, int (*)());
 int dbinsert(sqlite3*,const char*,const dbfield);
 int hastable(sqlite3*,const char*);
 int dbupdate(sqlite3*,const char*,const dbfield,const char*,...);
-dbrecord dbselect(sqlite3*, const char*,const char*,...);
+dbrecord dbselect(sqlite3*, const char*, const char*,const char*,...);
 dbrecord dball(sqlite3*,const char*);
 int dbdelete(sqlite3*,const char*,const char*,...);
 dbfield __field();

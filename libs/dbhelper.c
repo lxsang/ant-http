@@ -132,10 +132,10 @@ dbrecord dball(sqlite3* db,const char* table)
 {
 	return dbselect(db,table,"1=%d",1);
 }
-dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
+dbrecord dbselect(sqlite3* db, const char* table, const char* fname,const char* fstring,...)
 {
 	char* sql;
-	char* prefix = "SELECT * FROM %s WHERE %s";
+	char* prefix = "SELECT (%s) FROM %s WHERE %s";
 	char* cond;
 	va_list arguments; 
 	int dlen;
@@ -149,7 +149,7 @@ dbrecord dbselect(sqlite3* db, const char* table,const char* fstring,...)
     va_start(arguments, fstring);
     vsnprintf(cond, dlen, fstring, arguments);
     va_end(arguments);
-    sql = __s(prefix,table,cond);
+    sql = __s(prefix, fname,table,cond);
 
     if(sqlite3_prepare_v2(db, sql, -1, &statement, 0) == SQLITE_OK)
     {

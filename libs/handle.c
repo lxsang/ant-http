@@ -1,5 +1,5 @@
 #include "handle.h"
-
+config_t server_config; 
 #ifdef USE_OPENSSL
 int usessl()
 {

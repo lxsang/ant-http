@@ -9,7 +9,7 @@ struct plugin_entry {
     char *pname; 
     void *handle;
 };
-
+extern config_t server_config;
 /* lookup: look for s in hashtab */
 struct plugin_entry *plugin_lookup(char *s);
 /* install: put (name, defn) in hashtab */

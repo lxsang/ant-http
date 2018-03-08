@@ -3,7 +3,6 @@
  * Plugin table to store the loaded plugin
  */
 static struct plugin_entry *plugin_table[HASHSIZE]; 
-config_t server_config; 
 
 /**
  * Locate a plugin in the plugin table

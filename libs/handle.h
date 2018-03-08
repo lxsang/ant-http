@@ -47,7 +47,7 @@ typedef struct  {
     char* sslkey;
 #endif
 }config_t;
-extern config_t server_config;
+//extern config_t server_config;
 typedef struct{
     int sock;
     void* ssl;

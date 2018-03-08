@@ -121,6 +121,8 @@ int antd_close(void* src)
 #endif
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->sock);
+	server_config.connection--; 
+	LOG("Remaining connection %d\n", server_config.connection);
 	free(src);
 	return ret;
 }

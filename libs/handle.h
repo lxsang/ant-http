@@ -39,13 +39,15 @@ typedef struct  {
     list rules;
     dictionary handlers;
     int backlog;
+    int maxcon;
+    int connection;
 #ifdef USE_OPENSSL
     int usessl;
     char* sslcert;
     char* sslkey;
 #endif
 }config_t;
-
+extern config_t server_config;
 typedef struct{
     int sock;
     void* ssl;

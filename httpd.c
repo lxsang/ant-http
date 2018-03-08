@@ -83,6 +83,9 @@ static int config_handler(void* conf, const char* section, const char* name,
     } else if(MATCH("SERVER", "tmpdir")) {
         pconfig->tmpdir = strdup(value);
     }
+ 	else if(MATCH("SERVER", "maxcon")) {
+        pconfig->maxcon = atoi(value);
+    }
 	else if(MATCH("SERVER", "backlog")) {
         pconfig->backlog = atoi(value);
     }
@@ -143,6 +146,8 @@ void load_config(const char* file)
 	server_config.backlog = 100;
 	server_config.rules = list_init();
 	server_config.handlers = dict();
+	server_config.maxcon = 1000;
+	server_config.connection = 0;
 #ifdef USE_OPENSSL
 	server_config.usessl = 0;
 	server_config.sslcert = "cert.pem";
@@ -165,6 +170,7 @@ void load_config(const char* file)
 void stop_serve(int dummy) {
 	list_free(&(server_config.rules));
 	freedict(server_config.handlers);
+	LOG("Unclosed connection: %d\n", server_config.connection);
     unload_all_plugin();
 #ifdef USE_OPENSSL
 	SSL_CTX_free(ctx);
@@ -206,6 +212,11 @@ int main(int argc, char* argv[])
 
 	while (1)
 	{
+		if( server_config.connection >= server_config.maxcon )
+		{
+			LOG("Too many unclosed connection (%d). Wait for it\n", server_config.connection);
+			continue;
+		}
 		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
@@ -214,7 +225,8 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		/* accept_request(client_sock); */
-
+		server_config.connection++;
+		//LOG("Unclosed connection: %d\n", server_config.connection);
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
 		if(server_config.usessl == 1)
@@ -224,13 +236,17 @@ int main(int argc, char* argv[])
 
         	if (SSL_accept((SSL*)client->ssl) <= 0) {
             	ERR_print_errors_fp(stderr);
+				antd_close(client);
 				continue;
         	}
 		}
 #endif
 		client->sock = client_sock;
 		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
+		{
 			perror("pthread_create");
+			antd_close(client);
+		}
 		else
 		{
 			//reclaim the stack data when thread finish

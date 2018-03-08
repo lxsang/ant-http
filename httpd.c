@@ -225,6 +225,7 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		/* accept_request(client_sock); */
+		client->sock = client_sock;
 		server_config.connection++;
 		//LOG("Unclosed connection: %d\n", server_config.connection);
 #ifdef USE_OPENSSL
@@ -241,7 +242,6 @@ int main(int argc, char* argv[])
         	}
 		}
 #endif
-		client->sock = client_sock;
 		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
 		{
 			perror("pthread_create");

@@ -19,8 +19,13 @@ void accept_request(void* client)
 	//char *query_string = NULL;
 	//LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
 	numchars = read_buf(client, buf, sizeof(buf));
+	if(numchars < 0)
+	{
+		unknow(client); 
+		goto end;
+	}
 	i = 0; j = 0;
-	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
+	while (j < numchars && !ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
 		method[i] = buf[j];
 		i++; j++;
@@ -108,7 +113,9 @@ void accept_request(void* client)
 		char* mime_type = mime(path);
 		if(strcmp(mime_type,"application/octet-stream") == 0)
 		{
-			char* h = dvalue(server_config.handlers,ext(path));
+			char * ex = ext(path);
+			char* h = dvalue(server_config.handlers,ex);
+			if(ex) free(ex);
 			if(h)
 			{
 				sprintf(buf,"/%s%s",h,url);

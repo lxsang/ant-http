@@ -81,11 +81,11 @@ char* __s(const char* fstring,...)
  */
 void trim(char* str, const char delim)
 {
-    if(!str) return;
+    if(!str || strlen(str) == 0) return;
     char * p = str;
     int l = strlen(p);
-
-    while(p[l - 1] == delim) p[--l] = 0;
+    while(l > 0 && p[l - 1] == delim)
+        p[--l] = 0;
     while(* p && (* p) == delim ) ++p, --l;
     memmove(str, p, l + 1);
 }

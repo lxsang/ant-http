@@ -189,7 +189,7 @@ int main(int argc, char* argv[])
 	struct sockaddr_in client_name;
 	socklen_t client_name_len = sizeof(client_name);
 	pthread_t newthread;
-
+	char* client_ip = NULL;
 	// ignore the broken PIPE error when writing 
 	//or reading to/from a closed socked connection
 	signal(SIGPIPE, SIG_IGN);
@@ -224,6 +224,15 @@ int main(int argc, char* argv[])
 			perror("Cannot accept client request\n");
 			continue;
 		}
+		/*
+			get the remote IP
+		*/
+		if (client_name.sin_family == AF_INET)
+		{
+			client_ip =  inet_ntoa(client_name.sin_addr);
+			LOG("Client IP: %s\n", client_ip);
+		}
+		//return &(((struct sockaddr_in6*)sa)->sin6_addr);
 		/* accept_request(client_sock); */
 		client->sock = client_sock;
 		server_config.connection++;

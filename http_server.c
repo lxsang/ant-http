@@ -14,6 +14,9 @@ void accept_request(void* client)
 	char path[1024];
 	char* token;
 	char *line;
+	char* oldurl = NULL;
+	char* tmp = NULL;
+	dictionary rq = NULL;
 	size_t i, j;
 	struct stat st;
 
@@ -55,12 +58,12 @@ void accept_request(void* client)
 
 
 	
-	char* oldurl = strdup(url);
-	char* tmp = strchr(oldurl,'?');
+	oldurl = strdup(url);
+	tmp = strchr(oldurl,'?');
 	if(tmp)
 		*tmp = '\0';
 
-	dictionary rq = decode_request(client, method, url);
+	rq = decode_request(client, method, url);
 	if(rq == NULL)
 	{
 		badrequest(client);

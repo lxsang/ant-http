@@ -242,6 +242,7 @@ int main(int argc, char* argv[])
 		if(server_config.usessl == 1)
 		{
 			client->ssl = (void*)SSL_new(ctx);
+			if(!client->ssl) continue;
         	SSL_set_fd((SSL*)client->ssl, client_sock);
 
         	if (SSL_accept((SSL*)client->ssl) <= 0) {

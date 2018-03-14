@@ -20,7 +20,7 @@ void accept_request(void* client)
 	//char *query_string = NULL;
 	//LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
 	numchars = read_buf(client, buf, sizeof(buf));
-	if(numchars < 0)
+	if(numchars <= 0)
 	{
 		unknow(client); 
 		goto end;

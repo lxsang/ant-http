@@ -682,7 +682,7 @@ dictionary decode_cookie(const char* line)
 	{
 		trim(token,' ');
 		token1 = strsep(&token,"=");
-		if(token1)
+		if(token1 && token && strlen(token) > 0)
 		{
 			if(dic == NULL)
 				dic = dict();

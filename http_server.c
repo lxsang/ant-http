@@ -1,4 +1,5 @@
 #include "http_server.h"
+static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
 * return.  Process the request appropriately.
@@ -958,11 +959,16 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
 
 	//load the plugin
 	if((plugin = plugin_lookup(pname)) == NULL)
-		if((plugin= plugin_load(pname)) == NULL)
+	{
+		pthread_mutex_lock(&server_mux);
+		plugin= plugin_load(pname);
+		pthread_mutex_unlock(&server_mux);
+		if( plugin == NULL)
 		{
 			if(orgs) free(orgs);
 			return -1;
 		}
+	}
 	// load the function
    fn = (void (*)(void*, const char *, const char*, dictionary))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)  

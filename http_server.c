@@ -518,7 +518,8 @@ dictionary decode_request(void* client,const char* method, char* url)
 		token = strsep(&line,":");
 		trim(token,' ');
 		trim(line,' ');
-		dput(xheader,token,strdup(line));
+		if(token && line && strlen(line) > 0)
+			dput(xheader,token,strdup(line));
 		if(token != NULL &&strcasecmp(token,"Cookie") == 0)
 		{
 			if(!cookie) cookie = decode_cookie(line);

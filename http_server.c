@@ -881,13 +881,15 @@ dictionary decode_url_request(const char* query)
 	while ((token = strsep(&str_copy, "&")))
 	{
 		char* key;
-		char* val;
+		char* val = NULL;
 		if(strlen(token)>0)
 		{
 			key = strsep(&token,"=");
 			if(key && strlen(key)>0)
 			{
-				val = strsep(&token,"="); 
+				val = strsep(&token,"=");
+				if(!val)
+					val = "";
 				dput(dic,key,url_decode(val));
 			}
 		}

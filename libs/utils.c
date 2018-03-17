@@ -249,6 +249,8 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
 	return ret;
 }
 char *url_decode(const char *str) {
+    if(!str)
+        return NULL;
 	char *pstr = str, *buf = malloc(strlen(str) + 1), *pbuf = buf;
 
 	while (*pstr) {

@@ -29,6 +29,7 @@ static mime_t _mimes[] = {
 	{"image/bmp",(const char *[]){"bmp",NULL},1},
 	{"image/jpeg",(const char *[]){"jpg","jpeg",NULL},1},
 	{"text/css",(const char *[]){"css",NULL},0},
+    {"text/markdown",(const char *[]){"md",NULL},0},
 	{"text/csv",(const char *[]){"csv",NULL},0},
 	{"application/pdf",(const char *[]){"pdf",NULL},1},
 	{"image/gif",(const char *[]){"gif",NULL},1},

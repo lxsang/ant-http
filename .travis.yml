@@ -1,5 +1,6 @@
 language: c
-install:
+before_install:
+  - sudo apt-get -qq update
   - sudo apt-get install libssl-dev
 script:
   - make initd

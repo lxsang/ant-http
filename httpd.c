@@ -38,7 +38,12 @@ SSL_CTX *create_context()
 
 void configure_context(SSL_CTX *ctx)
 {
+#if defined(SSL_CTX_set_ecdh_auto)
     SSL_CTX_set_ecdh_auto(ctx, 1);
+#else
+    SSL_CTX_set_tmp_ecdh(ctx, EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
+#endif
+    //SSL_CTX_set_ecdh_auto(ctx, 1);
 	/* Set some options and the session id.
      * SSL_OP_NO_SSLv2: SSLv2 is insecure, disable it.
      * SSL_OP_NO_TICKET: We don't want TLS tickets used because this is an SSL server caching example.

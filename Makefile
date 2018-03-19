@@ -2,7 +2,7 @@ USE_DB=TRUE
 USE_SSL = TRUE
 CC=gcc
 EXT=dylib
-
+BUILDIRD=build
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/opt/www
@@ -67,6 +67,8 @@ PLUGINSDEP = libs/plugin.o
 
 main: httpd plugins 
 
+initd:
+	-mkdir -p $(BUILDIRD)
 
 httpd: lib $(SERVER_O)
 	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/httpd httpd.c $(SERVERLIB)

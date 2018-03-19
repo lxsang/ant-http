@@ -68,7 +68,7 @@ PLUGINSDEP = libs/plugin.o
 main: httpd plugins 
 
 initd:
-	-mkdir -p $(BUILDIRD)
+	-mkdir -p $(LIB_PATH)
 
 httpd: lib $(SERVER_O)
 	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/httpd httpd.c $(SERVERLIB)

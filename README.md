@@ -1,5 +1,7 @@
 ![Logo](https://github.com/lxsang/ant-http/raw/master/ant-logo.png)
 # ant-http
+[![Build Status](https://travis-ci.org/lxsang/ant-http.svg?branch=master)](https://travis-ci.org/lxsang/ant-http)
+
 A lightweight and portable HTTP/HTTPs web server written in standard C: 
 - It can be configurable to work well on embedded Linux for server application. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated

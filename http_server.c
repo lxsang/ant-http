@@ -41,8 +41,8 @@ void accept_request(void* client)
 		// unimplemented
 		//while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
 		unimplemented(client);
-		antd_close(client);
-		return;
+		//antd_close(client);
+		goto end;
 	}
 
 

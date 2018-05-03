@@ -239,6 +239,18 @@ int main(int argc, char* argv[])
 		}
 		//return &(((struct sockaddr_in6*)sa)->sin6_addr);
 		/* accept_request(client_sock); */
+
+		// set timeout to socket
+		struct timeval timeout;      
+		timeout.tv_sec = 20;
+		timeout.tv_usec = 0;
+
+		if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+			perror("setsockopt failed\n");
+
+		if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+			perror("setsockopt failed\n");
+
 		client->sock = client_sock;
 		server_config.connection++;
 		//LOG("Unclosed connection: %d\n", server_config.connection);

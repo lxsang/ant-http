@@ -72,38 +72,50 @@ int response(void* client, const char* data)
 int antd_send(const void *src, const void* data, int len)
 {
 	if(!src || !data) return -1;
+	int ret;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
 		//LOG("SSL WRITE\n");
-		return SSL_write((SSL*) source->ssl, data, len);
+		ret = SSL_write((SSL*) source->ssl, data, len);
 	}
 	else
 	{
 #endif
-		return send(source->sock, data, len, 0);
+		ret = send(source->sock, data, len, 0);
 #ifdef USE_OPENSSL
 	}
 #endif
+	if(ret <= 0)
+	{
+		antd_close(src);
+	}
+	return ret;
 }
 int antd_recv(const void *src,  void* data, int len)
 {
 	if(!src) return -1;
+	int ret;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
 		//LOG("SSL READ\n");
-		return SSL_read((SSL*) source->ssl, data, len);
+		ret = SSL_read((SSL*) source->ssl, data, len);
 	}
 	else
 	{
 #endif
-		return recv(((int) source->sock), data, len, 0);
+		ret = recv(((int) source->sock), data, len, 0);
 #ifdef USE_OPENSSL
 	}
 #endif
+	if(ret == 0)
+	{
+		antd_close(src);
+	}
+	return ret;
 }
 int antd_close(void* src)
 {

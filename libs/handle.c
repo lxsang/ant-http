@@ -69,7 +69,7 @@ int response(void* client, const char* data)
 	nbytes = antd_send(client, buf, strlen(buf));
 	return (nbytes ==-1?0:1);
 }
-int antd_send(const void *src, const void* data, int len)
+int antd_send(void *src, const void* data, int len)
 {
 	if(!src || !data) return -1;
 	int ret;
@@ -93,7 +93,7 @@ int antd_send(const void *src, const void* data, int len)
 	}
 	return ret;
 }
-int antd_recv(const void *src,  void* data, int len)
+int antd_recv(void *src,  void* data, int len)
 {
 	if(!src) return -1;
 	int ret;

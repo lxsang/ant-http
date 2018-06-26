@@ -87,10 +87,10 @@ int antd_send(void *src, const void* data, int len)
 #ifdef USE_OPENSSL
 	}
 #endif
-	if(ret <= 0)
+	/*if(ret <= 0)
 	{
 		antd_close(src);
-	}
+	}*/
 	return ret;
 }
 int antd_recv(void *src,  void* data, int len)
@@ -111,10 +111,10 @@ int antd_recv(void *src,  void* data, int len)
 #ifdef USE_OPENSSL
 	}
 #endif
-	if(ret == 0)
+	/*if(ret == 0)
 	{
 		antd_close(src);
-	}
+	}*/
 	return ret;
 }
 int antd_close(void* src)
@@ -136,6 +136,7 @@ int antd_close(void* src)
 	server_config.connection--; 
 	LOG("Remaining connection %d\n", server_config.connection);
 	free(src);
+	src = NULL;
 	return ret;
 }
 int __ti(void* client,int data)

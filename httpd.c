@@ -52,8 +52,10 @@ void configure_context(SSL_CTX *ctx)
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, server_config.sslcert, SSL_FILETYPE_PEM) <= 0) {
-        ERR_print_errors_fp(stderr);
+	/* use the full chain bundle of certificate */
+    //if (SSL_CTX_use_certificate_file(ctx, server_config.sslcert, SSL_FILETYPE_PEM) <= 0) {
+	if (SSL_CTX_use_certificate_chain_file(ctx, server_config.sslcert) <= 0) {
+	    ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
 

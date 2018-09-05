@@ -576,8 +576,6 @@ dictionary decode_request(void* client,const char* method, char* url)
 	}
 	else
 	{
-		if(query)
-			free(query);
 		if(ws_key)
 			free(ws_key);
 		if(ctype == NULL || clen == -1)
@@ -600,17 +598,21 @@ dictionary decode_request(void* client,const char* method, char* url)
 		} 
 		else
 		{
-			char* query = post_data_decode(client,clen);
+			if(query)
+				request = decode_url_request(query);
+			char* pquery = post_data_decode(client,clen);
 			char* key = strstr(ctype,"/");
 			if(key)
 				key++;
 			else
 				key = ctype;
-			request = dict();
-			dput(request,key, strdup(query));
-			free(query);
+			if(!request)
+				request = dict();
+			dput(request,key, strdup(pquery));
+			free(pquery);
 		}
-		
+		if(query)
+			free(query);
 	}
 	if(ctype) free(ctype);
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}

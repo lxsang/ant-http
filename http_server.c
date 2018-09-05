@@ -493,7 +493,7 @@ char* apply_rules(const char* host, char*url)
  */
 dictionary decode_request(void* client,const char* method, char* url)
 {
-	dictionary request = NULL;
+	dictionary request = dict();
 	dictionary cookie = NULL;
 	dictionary xheader = dict();
 	char* line;
@@ -553,16 +553,16 @@ dictionary decode_request(void* client,const char* method, char* url)
 	}
 	//if(line) free(line);
 	query = apply_rules(host, url);
+	if(query)
+	{
+		LOG("Query: %s\n", query);
+		decode_url_request(query, request);
+		free(query);
+	}
 	if(host) free(host);
 	if(strcmp(method,"GET") == 0)
 	{
-		if(ctype) free(ctype); 
-		if(query)
-		{
-			LOG("Query: %s\n", query);
-			request = decode_url_request(query);
-			free(query);
-		}
+		//if(ctype) free(ctype); 
 		if(ws && ws_key != NULL)
 		{
 			ws_confirm_request(client, ws_key);
@@ -570,7 +570,7 @@ dictionary decode_request(void* client,const char* method, char* url)
 			// insert wsocket flag to request
 			// plugin should handle this ugraded connection
 			// not the server
-			if(!request) request = dict();
+			//if(!request) request = dict();
 			dput(request,"__web_socket__",strdup("1"));
 		}
 	}
@@ -583,43 +583,36 @@ dictionary decode_request(void* client,const char* method, char* url)
 			LOG("Bad request\n");
 			if(ctype) free(ctype);
 			if(cookie) freedict(cookie);
-			if(query)
-				free(query);
-			free(xheader);
+			freedict(request);
+			freedict(xheader);
 			return NULL;
 		}
 		LOG("ContentType %s\n", ctype);
 		// decide what to do with the data
 		if(strstr(ctype,FORM_URL_ENCODE) > 0)
 		{
-			request = decode_url_request(post_data_decode(client,clen));
+			decode_url_request(post_data_decode(client,clen), request);
 		} else if(strstr(ctype,FORM_MULTI_PART)> 0)
 		{
 			//printf("Multi part form : %s\n", ctype);
-			request = decode_multi_part_request(client,ctype);
+			decode_multi_part_request(client,ctype,request);
 		} 
 		else
 		{
-			if(query)
-				request = decode_url_request(query);
 			char* pquery = post_data_decode(client,clen);
 			char* key = strstr(ctype,"/");
 			if(key)
 				key++;
 			else
 				key = ctype;
-			if(!request)
-				request = dict();
 			dput(request,key, strdup(pquery));
 			free(pquery);
 		}
-		if(query)
-			free(query);
 	}
 	if(ctype) free(ctype);
 	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
-	if(!request)
-			request = dict();
+	//if(!request)
+	//		request = dict();
 	if(cookie)
 		dput(request,"cookie",cookie);
 	dput(request,"__xheader__",xheader);
@@ -710,7 +703,7 @@ dictionary decode_cookie(const char* line)
  * @param  clen   Content length, but not used here
  * @return        a dictionary of key - value
  */
-dictionary decode_multi_part_request(void* client,const char* ctype)
+void decode_multi_part_request(void* client,const char* ctype, dictionary dic)
 {
 	char * boundary;
 	char * boundend;
@@ -726,13 +719,13 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 	char* file_path;
 	char  buf[BUFFLEN];
 	char* field;
-	dictionary dic = NULL;
+	//dictionary dic = NULL;
 	FILE *fp = NULL;
 	boundary = strsep(&str_copy,"="); //discard first part
 	boundary = strsep(&str_copy,"="); 
 	if(boundary && strlen(boundary)>0)
 	{
-		dic = dict();
+		//dic = dict();
 		trim(boundary,' ');
 		boundend = __s("%s--",boundary);
 		//find first boundary
@@ -742,7 +735,11 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 		}
 		// loop through each part separated by the boundary
 		while(line && strstr(line,boundary) > 0){
-			free(line);
+			if(line)
+			{
+				free(line);
+				line = NULL;
+			}
 			// search for content disposition:
 			while((line = read_line(client)) &&
 					strstr(line,"Content-Disposition:") <= 0)
@@ -756,7 +753,7 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 					free(line);
 				free(orgcpy);
 				free(boundend);
-				return NULL;
+				return;
 			}
 			orgline = line;
 			// extract parameters from header
@@ -786,6 +783,7 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 				}
 			}
 			free(orgline);
+			line = NULL;
 			// get the binary data
 			if(part_name != NULL)
 			{
@@ -793,8 +791,13 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 				while((line = read_line(client)) && strcmp(line,"\r\n") != 0)
 				{
 					free(line);
+					line = NULL;
 				}
-				if(line) free(line);
+				if(line)
+				{
+					free(line);
+					line = NULL;
+				}
 				if(part_file == NULL)
 				{
 					/**
@@ -811,6 +814,7 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 					while((line = read_line(client)) && strstr(line,boundary) <= 0)
 					{
 						free(line);
+						line = NULL;
 					}
 				}
 				else
@@ -830,7 +834,7 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 						fseek(fp,-2, SEEK_CUR);
 						totalsize -= 2;
 						fclose(fp);
-						line = buf;
+						line = strdup(buf);
 
 						field = __s("%s.file",part_name);
 						dput(dic,field, strdup(part_file));
@@ -860,13 +864,14 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
 			if(line&&strstr(line,boundend)>0)
 			{
 				LOG("End request %s\n", boundend);
+				free(line);
 				break;
 			}
 		}
 		free(boundend);
 	}
 	free(orgcpy);
-	return dic;
+	//return dic;
 }
 /**
  * Decode a query string (GET request or POST URL encoded) to  
@@ -874,15 +879,15 @@ dictionary decode_multi_part_request(void* client,const char* ctype)
  * @param  query : the query string
  * @return       a dictionary of key-value
  */
-dictionary decode_url_request(const char* query)
+void decode_url_request(const char* query, dictionary dic)
 {
-	if(query == NULL) return NULL;
+	if(query == NULL) return;
 	//str_copy = ;
 	char* token;
-	if(strlen(query) == 0) return NULL;
+	if(strlen(query) == 0) return;
 	char* str_copy = strdup(query);
 	char* org_copy = str_copy;
-	dictionary dic = dict();
+	//dictionary dic = dict();
 	while ((token = strsep(&str_copy, "&")))
 	{
 		char* key;
@@ -900,7 +905,7 @@ dictionary decode_url_request(const char* query)
 		}
 	}
 	free(org_copy);
-	return dic;
+	//return dic;
 }
 /**
 * Decode post query string to string

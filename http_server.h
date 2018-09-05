@@ -36,9 +36,9 @@ void badrequest(void*);
 int rule_check(const char*, const char*, const char* , const char* , const char* , char*);
 void ws_confirm_request(void*, const char*);
 char* post_url_decode(void* client,int len);
-dictionary decode_url_request(const char* query);
+void decode_url_request(const char* query, dictionary);
 dictionary decode_request(void* client,const char* method, char* url);
-dictionary decode_multi_part_request(void*,const char*);
+void decode_multi_part_request(void*,const char*, dictionary);
 dictionary decode_cookie(const char*);
 char* post_data_decode(void*,int);
 

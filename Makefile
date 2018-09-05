@@ -9,7 +9,7 @@ ifeq ($(UNAME_S),Linux)
 	PF_FLAG=-D_GNU_SOURCE -DLINUX
 endif
 ifeq ($(UNAME_S),Darwin)
-	BUILDIRD=../ant-build
+	BUILDIRD=/Users/mrsang/Documents/build/www
 	PF_FLAG= -DMACOS
 	SSL_HEADER_PATH = -I/usr/local/opt/openssl/include
 	SSL_LIB_PATH = -L/usr/local/opt/openssl/lib

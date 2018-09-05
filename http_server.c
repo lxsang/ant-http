@@ -583,6 +583,8 @@ dictionary decode_request(void* client,const char* method, char* url)
 			LOG("Bad request\n");
 			if(ctype) free(ctype);
 			if(cookie) freedict(cookie);
+			if(query)
+				free(query);
 			free(xheader);
 			return NULL;
 		}

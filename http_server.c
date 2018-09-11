@@ -591,7 +591,9 @@ dictionary decode_request(void* client,const char* method, char* url)
 		// decide what to do with the data
 		if(strstr(ctype,FORM_URL_ENCODE) > 0)
 		{
-			decode_url_request(post_data_decode(client,clen), request);
+			char* pquery = post_data_decode(client,clen);
+			decode_url_request(pquery, request);
+			free(pquery);
 		} else if(strstr(ctype,FORM_MULTI_PART)> 0)
 		{
 			//printf("Multi part form : %s\n", ctype);

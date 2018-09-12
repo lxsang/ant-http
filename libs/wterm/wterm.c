@@ -13,16 +13,16 @@ void pexit()
 {
 	
 }
-void handler(void* cl, const char* m, const char* rqp, dictionary rq)
+void handle(void* cl, const char* m, const char* rqp, dictionary rq)
 {
 	ws_msg_header_t* h = NULL;
 	if(ws_enable(rq))
 	{
 		
 		int fdm, fds;
-		int rc;
+		int rc, status;
 		char buff[1024];
-		
+		pid_t pid;
 		// Check arguments
 		fdm = posix_openpt(O_RDWR);
 		if (fdm < 0)
@@ -52,7 +52,8 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 		fds = open(ptsname(fdm), O_RDWR);
 
 		// Create the child process
-		if (fork())
+		pid = fork();
+		if (pid)
 		{
 			fd_set fd_in;
 
@@ -75,7 +76,7 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 					case -1 : 
 						LOG("Error %d on select()\n", errno);
 						ws_close(cl, 1011);
-						return;
+						goto wait_for_child;
 
 					default :
 					{
@@ -90,14 +91,14 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 			      					LOG("%s\n","Data is not mask");
 			   						write(fdm, "exit\n", 5);
 									free(h);
-			      					return;
+			      					goto wait_for_child;;
 								}
 			      				if(h->opcode == WS_CLOSE)
 			      				{
 			      					LOG("%s\n","Websocket: connection closed");
 			   						write(fdm, "exit\n", 5);
 									free(h);
-			      					return;
+			      					goto wait_for_child;;
 			      				}
 			      				else if(h->opcode == WS_TEXT)
 			      				{
@@ -183,7 +184,7 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 									LOG("Error %d on read standard input. Exit now\n", errno);
 									write(fdm, "exit\n", 5);
 									ws_close(cl,1011);
-									return;
+									goto wait_for_child;
 								}
 							}
 						}
@@ -191,6 +192,8 @@ void handler(void* cl, const char* m, const char* rqp, dictionary rq)
 					}
 				} // End switch
 			} // End while
+			wait_for_child:
+				waitpid(pid, &status, 0);
 		}
 		else
 		{

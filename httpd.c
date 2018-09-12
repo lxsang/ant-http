@@ -234,9 +234,11 @@ int main(int argc, char* argv[])
 		/*
 			get the remote IP
 		*/
+		client->ip = NULL;
 		if (client_name.sin_family == AF_INET)
 		{
 			client_ip =  inet_ntoa(client_name.sin_addr);
+			client->ip = strdup(client_ip);
 			LOG("Client IP: %s\n", client_ip);
 		}
 		//return &(((struct sockaddr_in6*)sa)->sin6_addr);

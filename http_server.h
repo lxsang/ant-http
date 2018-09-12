@@ -12,7 +12,7 @@
 
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-#define PLUGIN_HANDLER	 "handler"
+#define PLUGIN_HANDLER	 "handle"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 

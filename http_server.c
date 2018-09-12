@@ -504,11 +504,12 @@ dictionary decode_request(void* client,const char* method, char* url)
 	int clen = -1;
 
 	// first real all header
-// this for check if web socket is enabled
+	// this for check if web socket is enabled
 	int ws= 0;
 	char* ws_key = NULL;
 	char buf[BUFFLEN];
-
+	// ip address
+	dput(xheader,"REMOTE_ADDR", (void*)strdup(((antd_client_t*)client)->ip ));
 	//while((line = read_line(client)) && strcmp("\r\n",line))
 	while((read_buf(client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{

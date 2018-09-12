@@ -51,6 +51,7 @@ typedef struct  {
 typedef struct{
     int sock;
     void* ssl;
+    char* ip;
 } antd_client_t;
 
 int response(void*, const char*);

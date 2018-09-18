@@ -304,7 +304,10 @@ void unknow(void* client)
 }
 int ws_enable(dictionary dic)
 {
-	return (dic != NULL && R_INT(dic,"__web_socket__") == 1);
+	if(!dic) return 0;
+	char*v = (char*)dvalue(dic, "__web_socket__");
+	if(!v) return 0;
+	return atoi(v) == 1;
 }
 /**
  * read the request as a string line format

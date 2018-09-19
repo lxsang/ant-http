@@ -45,6 +45,9 @@ antd_plugins:
 		fi \
 	done
 
+plugin:
+	read -r -p "Enter package name: " PKG;\
+	cd plugins/$$PKG && make clean && make\
 
 clean: sclean pclean
 

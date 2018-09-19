@@ -1,47 +1,4 @@
-USE_DB=TRUE
-USE_SSL = TRUE
-CC=gcc
-EXT=dylib
-BUILDIRD=build
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    BUILDIRD=/opt/www
-	PF_FLAG=-D_GNU_SOURCE -DLINUX
-endif
-ifeq ($(UNAME_S),Darwin)
-	BUILDIRD=/Users/mrsang/Documents/build/www
-	PF_FLAG= -DMACOS
-	SSL_HEADER_PATH = -I/usr/local/opt/openssl/include
-	SSL_LIB_PATH = -L/usr/local/opt/openssl/lib
-endif
-
-ifeq ($(USE_DB),TRUE)
-	DB_OBJ=libs/dbhelper.o
-	DB_LIB=-lsqlite3
-	DB_FLAG=-D USE_DB
-endif
-
-ifeq ($(USE_DB),FALSE)
-	DB_OBJ=
-	DB_LIB=
-	DB_FLAG=
-endif
-
-ifeq ($(USE_SSL),TRUE)
-	SSL_LIB= $(SSL_LIB_PATH) -lssl -lcrypto 
-	SSL_FLAG=-D USE_OPENSSL
-endif
-
-ifeq ($(USE_SSL),FALSE)
-	SSL_LIB=
-	SSL_FLAG=
-	SSL_HEADER_PATH =
-	SSL_LIB_PATH = 
-endif
-
-
-CFLAGS= -W  -Wall -g -std=c99 -D DEBUG $(DB_FLAG) $(PF_FLAG) $(SSL_FLAG) $(SSL_HEADER_PATH)
-
+include var.mk
 LIB_PATH=$(BUILDIRD)/plugins
 LIB_NAME=libantd
 LIB_FLAG= $(LIB_NAME).$(EXT)
@@ -50,7 +7,6 @@ SERVERLIB= -ldl $(LIB_FLAG) $(DB_LIB) $(SSL_LIB)  -lpthread
 SERVER_O=plugin_manager.o \
 		http_server.o
 #-lsocket
-PLUGINS=	wterm.$(EXT) nodedaemon.$(EXT)
 
 LIBOBJS = 	libs/ini.o \
 			libs/handle.o \
@@ -65,7 +21,7 @@ LIBOBJS = 	libs/ini.o \
 PLUGINSDEP = libs/plugin.o
 
 
-main: httpd plugins 
+main:  initd httpd antd_plugins 
 
 initd:
 	-mkdir -p $(LIB_PATH)
@@ -80,14 +36,14 @@ lib: $(LIBOBJS)
 %.o: %.c
 	$(CC) -fPIC $(CFLAGS) -c $< -o $@
 	
-plugins: $(PLUGINS)
-	
-%.$(EXT): $(PLUGINSDEP) 
-	for file in $(wildcard libs/$(basename $@)/*.c) ; do\
-		$(CC) -fPIC $(CFLAGS)  -c  $$file -o $$file.o; \
+antd_plugins:
+	- echo "make plugin"
+	-for file in plugins/* ; do\
+		echo $$file;\
+		if [ -d "$$file" ]; then \
+			make -C  "$$file"; \
+		fi \
 	done
-	$(CC) $(CFLAGS) $(PLUGINLIBS) $(LIB_FLAG) -shared -o $(BUILDIRD)/plugins/$(basename $@).$(EXT) \
-		$(PLUGINSDEP)  libs/$(basename $@)/*.c.o
 
 
 clean: sclean pclean
@@ -97,9 +53,9 @@ sclean:
 	-rm *.$(EXT)
 pclean:
 	-rm -rf $(BUILDIRD)/plugins/* libs/*.o
-	-for file in libs/* ;do \
+	-for file in plugins/* ;do \
 		if [ -d "$$file" ]; then \
-			rm "$$file"/*.o; \
+			make -C  "$$file" clean; \
 		fi \
 	done
 .PRECIOUS: %.o

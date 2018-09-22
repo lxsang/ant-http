@@ -12,3 +12,23 @@ A lightweight and portable HTTP/HTTPs web server written in standard C:
 * PHP extension [https://github.com/lxsang/antd-ph7-plugin](https://github.com/lxsang/antd-ph7-plugin): using PHP as serverside script
 * Web terminal [https://github.com/lxsang/antd-wterm-plugin](https://github.com/lxsang/antd-wterm-plugin): plugin for using Unix termninal from the web via websocket
 * Web VNC [https://github.com/lxsang/antd-wvnc-plugin](https://github.com/lxsang/antd-wvnc-plugin): Remote computer accessing using VNC protocol on the web (via websocket)
+
+### build dep
+* git
+* make
+* build-essential
+
+### server dependencies
+* libssl-dev
+* libsqlite3-dev
+
+### build
+When all dependencies are installed, the build can be done with a few single command lines:
+
+```bash
+mkdir antd
+cd antd
+# build with all plugins
+wget -O - https://apps.lxsang.me/script/antd | bash -s "lua ph7 wterm wvnc"
+```
+The script will ask you where you want to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.

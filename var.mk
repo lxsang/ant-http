@@ -2,7 +2,6 @@ USE_DB=TRUE
 USE_SSL = TRUE
 CC=gcc
 EXT=dylib
-BUILDIRD=build
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     BUILDIRD=/opt/www

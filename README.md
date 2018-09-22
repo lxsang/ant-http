@@ -5,7 +5,7 @@
 A lightweight and portable HTTP/HTTPs web server written in standard C: 
 - It can be configurable to work well on embedded Linux for server application. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
-- It is also extensible via its extensions mechanism that allows to extends the server capability. For example: [this extension](https://github.com/lxsang/ant-plugins) allows the server use embedded Lua as server side script for dynamic web.
+- It is also extensible via its extensions mechanism that allows to extends the server capability.
 
 # Plugins: 
 * Lua extension [https://github.com/lxsang/antd-lua-plugin](https://github.com/lxsang/antd-lua-plugin): using Lua as serverside script

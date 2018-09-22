@@ -7,12 +7,13 @@ A lightweight and portable HTTP/HTTPs web server written in standard C:
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
 - It is also extensible via its extensions mechanism that allows to extends the server capability.
 
-# Plugins: 
+## Plugins: 
 * Lua extension [https://github.com/lxsang/antd-lua-plugin](https://github.com/lxsang/antd-lua-plugin): using Lua as serverside script
 * PHP extension [https://github.com/lxsang/antd-ph7-plugin](https://github.com/lxsang/antd-ph7-plugin): using PHP as serverside script
 * Web terminal [https://github.com/lxsang/antd-wterm-plugin](https://github.com/lxsang/antd-wterm-plugin): plugin for using Unix termninal from the web via websocket
 * Web VNC [https://github.com/lxsang/antd-wvnc-plugin](https://github.com/lxsang/antd-wvnc-plugin): Remote computer accessing using VNC protocol on the web (via websocket)
 
+## Build from source
 ### build dep
 * git
 * make

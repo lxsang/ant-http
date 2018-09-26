@@ -134,6 +134,7 @@ int antd_close(void* src)
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->sock);
 	if(source->ip) free(source->ip);
+	// TODO remove this when using nonblocking
 	server_config.connection--; 
 	LOG("Remaining connection %d\n", server_config.connection);
 	free(src);

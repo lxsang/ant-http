@@ -2,7 +2,6 @@
 
 plugin_header __plugin__;
 // private function
-call __init__;
 void __init_plugin__(const char* pl,config_t* conf){
 	__plugin__.name = strdup(pl);
 	__plugin__.dbpath= strdup(conf->db_path);
@@ -12,7 +11,7 @@ void __init_plugin__(const char* pl,config_t* conf){
 #ifdef USE_OPENSSL
 	__plugin__.usessl = conf->usessl;
 #endif
-	if(__init__ != NULL) __init__();
+	init();
 }; 
 
 #ifdef USE_DB

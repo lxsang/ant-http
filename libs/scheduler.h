@@ -94,4 +94,5 @@ int antd_scheduler_status();
 void antd_execute_task(antd_task_item_t);
 
 int antd_scheduler_busy();
+void antd_attach_task(antd_worker_t* worker);
 #endif

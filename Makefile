@@ -33,7 +33,7 @@ httpd: lib $(SERVER_O)
 
 relay: lib $(SERVER_O)
 	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/relay relay.c $(SERVERLIB)
-	cp relayd $(BUILDIRD)
+	cp forward $(BUILDIRD)
 lib: $(LIBOBJS)
 	$(CC) $(CFLAGS)  $(DB_LIB) $(SSL_LIB)  -shared -o $(LIB_NAME).$(EXT) $(LIBOBJS)
 	cp $(LIB_NAME).$(EXT) $(LIB_PATH$)/

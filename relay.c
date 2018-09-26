@@ -1,5 +1,6 @@
 #include "http_server.h"
 #include "libs/scheduler.h"
+#include <fcntl.h>
 /*
 this node is a relay from the http
 to https
@@ -65,7 +66,7 @@ void* antd_get_host(void * client)
     void** data = (void**)malloc(2*(sizeof *data));
     data[0] = client;
     data[1] = (void*)host;
-    LOG("Host is %s\n", host);
+    LOG("[%s] Request for: %s --> https://%s\n", ((antd_client_t*)client)->ip, host, host);
     return antd_create_task(antd_redirect,data, NULL);
 }
 
@@ -84,23 +85,28 @@ int main(int argc, char* argv[])
 	signal(SIGABRT, SIG_IGN);
 	signal(SIGINT, stop_serve);
 	server_sock = startup(&port);
-    // 1 worker is
-    antd_scheduler_init(1);
-	LOG("httpd running on port %d\n", port);
+    struct timeval timeout;      
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 500;
+    // 0 worker
+    antd_scheduler_init(0);
+    antd_worker_t worker;
+    worker.status = 0;
+    // set server socket to non blocking
+    fcntl(server_sock, F_SETFL, O_NONBLOCK); /* Change the socket into non-blocking state	*/
+	LOG("relayd running on port %d\n", port);
 
 	while (antd_scheduler_status())
 	{
+        // execute task
+        antd_attach_task(&worker);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
-			perror("Cannot accept client request\n");
 			continue;
 		}
         antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		// set timeout to socket
-		struct timeval timeout;      
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 500;
 
 		if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
 			perror("setsockopt failed\n");

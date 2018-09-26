@@ -80,28 +80,6 @@ static int available_workers()
     pthread_mutex_unlock(&scheduler.server_lock);
     return n;
 }
-
-static void work(void* data)
-{
-    antd_task_item_t it;
-    antd_worker_t* worker = (antd_worker_t*)data;
-    while(working())
-    {
-        pthread_mutex_lock(&scheduler.server_lock);
-        worker->status = 0;
-        pthread_mutex_unlock(&scheduler.server_lock);
-        // fetch the next in queue
-        it = next_task();
-        if(!it) continue;
-        //LOG("worker processing \n");
-        pthread_mutex_lock(&scheduler.server_lock);
-        worker->status = 1;
-        pthread_mutex_unlock(&scheduler.server_lock);
-        // execute the task
-        antd_execute_task(it);
-    }
-}
-
 static antd_callback_t* callback_of( void* (*callback)(void*) )
 {
     antd_callback_t* cb = NULL;
@@ -151,33 +129,64 @@ static void execute_callback(antd_task_t* task)
         free(task);
     }
 }
-
+static void work(void* data)
+{
+    antd_worker_t* worker = (antd_worker_t*)data;
+    while(working())
+    {
+       antd_attach_task(worker);
+    }
+}
 
 /*
     Main API methods
     init the main scheduler
 */
+
+/*
+* assign task to a worker
+*/
+void antd_attach_task(antd_worker_t* worker)
+{
+    antd_task_item_t it;
+    pthread_mutex_lock(&scheduler.server_lock);
+    worker->status = 0;
+    pthread_mutex_unlock(&scheduler.server_lock);
+    // fetch the next in queue
+    it = next_task();
+    if(!it) return;
+    //LOG("worker processing \n");
+    pthread_mutex_lock(&scheduler.server_lock);
+    worker->status = 1;
+    pthread_mutex_unlock(&scheduler.server_lock);
+    // execute the task
+    antd_execute_task(it);
+}
+
 void antd_scheduler_init(int n)
 {
     time_t t;
     srand((unsigned) time(&t));
     scheduler.n_workers = n;
     scheduler.status = 1;
-    scheduler.workers = (antd_worker_t*)malloc(n*(sizeof(antd_worker_t)));
-    if(!scheduler.workers)
-    {
-        LOG("Cannot allocate memory for worker\n");
-        exit(-1);
-    }
     for(int i = 0; i < N_PRIORITY; i++) scheduler.task_queue[i] = NULL;
     // create scheduler.workers
-    for(int i = 0; i < scheduler.n_workers;i++)
+    if(n > 0)
     {
-        scheduler.workers[i].status = 0;
-        if (pthread_create(&scheduler.workers[i].pid , NULL,(void *(*)(void *))work, (void*)&scheduler.workers[i]) != 0)
+        scheduler.workers = (antd_worker_t*)malloc(n*(sizeof(antd_worker_t)));
+        if(!scheduler.workers)
         {
-            scheduler.workers[i].status = -1;
-            perror("pthread_create: cannot create worker\n");
+            LOG("Cannot allocate memory for worker\n");
+            exit(-1);
+        }
+        for(int i = 0; i < scheduler.n_workers;i++)
+        {
+            scheduler.workers[i].status = 0;
+            if (pthread_create(&scheduler.workers[i].pid , NULL,(void *(*)(void *))work, (void*)&scheduler.workers[i]) != 0)
+            {
+                scheduler.workers[i].status = -1;
+                perror("pthread_create: cannot create worker\n");
+            }
         }
     }
     LOG("Antd scheduler initialized with %d worker\n", scheduler.n_workers);
@@ -197,6 +206,7 @@ void antd_scheduler_destroy()
 {
     // free all the chains
     antd_task_item_t it, curr;
+    stop();
     for(int i=0; i < N_PRIORITY; i++)
     {
         it = scheduler.task_queue[i];
@@ -211,7 +221,6 @@ void antd_scheduler_destroy()
             free(curr);
         }
     }
-    stop();
 }
 
 /*

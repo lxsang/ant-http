@@ -9,6 +9,7 @@
 #define LOW_PRIORITY (N_PRIORITY - 1)
 #define HIGH_PRIORITY 0
 
+typedef enum { LIGHT, HEAVY } antd_task_type_t;
 // callback definition
 typedef struct __callback_t{
     void* (*handle)(void*);
@@ -37,8 +38,14 @@ typedef struct {
    /*
         user data if any
    */
-  void * data;
-
+    void * data;
+    /*
+    type of a task
+    light task is executed directly by
+    the leader
+    heavy tasks is delegated to workers
+    */
+   antd_task_type_t type;
 } antd_task_t;
 
 typedef struct {
@@ -55,9 +62,12 @@ typedef struct __task_item_t{
 typedef antd_task_item_t antd_task_queue_t;
 
 typedef struct {
-    pthread_mutex_t server_lock;
+    pthread_mutex_t queue_lock;
+    pthread_mutex_t scheduler_lock;
+    pthread_mutex_t worker_lock;
     pthread_mutex_t task_lock;
     antd_task_queue_t task_queue[N_PRIORITY];
+    antd_task_queue_t workers_queue;
     uint8_t status; // 0 stop, 1 working
     antd_worker_t* workers;
     int n_workers;
@@ -95,4 +105,7 @@ void antd_execute_task(antd_task_item_t);
 
 int antd_scheduler_busy();
 void antd_attach_task(antd_worker_t* worker);
+void antd_task_schedule();
+int antd_available_workers();
+int antd_has_pending_task();
 #endif

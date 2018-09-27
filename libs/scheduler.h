@@ -106,6 +106,4 @@ void antd_execute_task(antd_task_item_t);
 int antd_scheduler_busy();
 void antd_attach_task(antd_worker_t* worker);
 void antd_task_schedule();
-int antd_available_workers();
-int antd_has_pending_task();
 #endif

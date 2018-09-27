@@ -85,9 +85,9 @@ int main(int argc, char* argv[])
 	signal(SIGABRT, SIG_IGN);
 	signal(SIGINT, stop_serve);
 	server_sock = startup(&port);
-    struct timeval timeout;      
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 500;
+    //struct timeval timeout;      
+    //timeout.tv_sec = 0;
+    //timeout.tv_usec = 500;
     // 0 worker
     antd_scheduler_init(0);
     // set server socket to non blocking

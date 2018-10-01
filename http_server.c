@@ -834,8 +834,10 @@ void decode_multi_part_request(void* client,const char* ctype, dictionary dic)
 							totalsize += len;
 						}
 						//remove \r\n at the end
-						fseek(fp,-2, SEEK_CUR);
+						fseek(fp, 0, SEEK_SET);
+						//fseek(fp,-2, SEEK_CUR);
 						totalsize -= 2;
+						ftruncate(fileno(fp),totalsize); 
 						fclose(fp);
 						line = strdup(buf);
 

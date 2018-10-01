@@ -3,7 +3,7 @@
 
 #include "utils.h"
 #include <pthread.h>
-// thread pool of workers
+
 #define N_PRIORITY 10
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
 #define LOW_PRIORITY (N_PRIORITY - 1)
@@ -22,11 +22,7 @@ typedef struct {
     */
     unsigned long stamp;
     /*
-        unique id
-    */
-    int id;
-    /*
-        priority from 0 to 9
+        priority from 0 to N_PRIORITY - 1
         higher value is lower priority
     */
     uint8_t priority;
@@ -41,17 +37,11 @@ typedef struct {
     void * data;
     /*
     type of a task
-    light task is executed directly by
-    the leader
-    heavy tasks is delegated to workers
+    light tasks are executed directly
+    heavy tasks are delegated to workers
     */
    antd_task_type_t type;
 } antd_task_t;
-
-typedef struct {
-    pthread_t pid;
-    uint8_t status; // -1 quit, 0 available, 1 busy
-} antd_worker_t;
 
 
 typedef struct __task_item_t{
@@ -62,25 +52,25 @@ typedef struct __task_item_t{
 typedef antd_task_item_t antd_task_queue_t;
 
 typedef struct {
-    pthread_mutex_t queue_lock;
     pthread_mutex_t scheduler_lock;
     pthread_mutex_t worker_lock;
-    pthread_mutex_t task_lock;
+    pthread_mutex_t pending_lock;
     antd_task_queue_t task_queue[N_PRIORITY];
     antd_task_queue_t workers_queue;
     uint8_t status; // 0 stop, 1 working
-    antd_worker_t* workers;
+    pthread_t* workers;
     int n_workers;
+    int pending_task;
 } antd_scheduler_t;
 
 /*
     init the main scheduler
 */
-void antd_scheduler_init();
+void antd_scheduler_init(antd_scheduler_t*, int);
 /*
     destroy all pending task
 */
-void antd_scheduler_destroy();
+void antd_scheduler_destroy(antd_scheduler_t*);
 
 /*
     create a task
@@ -88,22 +78,19 @@ void antd_scheduler_destroy();
 antd_task_t* antd_create_task(void* (*handle)(void*), void *data, void* (*callback)(void*));
 
 /*
-    scheduling a task
+    add a task
 */
-void antd_add_task(antd_task_t*);
-
-void antd_task_lock();
-void antd_task_unlock();
-/*
-    Execute a task
-*/
-int antd_scheduler_status();
+void antd_add_task(antd_scheduler_t*, antd_task_t*);
 /*
     execute and free a task a task
 */
-void antd_execute_task(antd_task_item_t);
-
-int antd_scheduler_busy();
-void antd_attach_task(antd_worker_t* worker);
-void antd_task_schedule();
+void antd_execute_task(antd_scheduler_t*, antd_task_item_t);
+/*
+    scheduler status
+*/
+int antd_scheduler_busy(antd_scheduler_t*);
+/*
+    schedule a task
+*/
+void antd_task_schedule(antd_scheduler_t*);
 #endif

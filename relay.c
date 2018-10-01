@@ -1,6 +1,7 @@
 #include "http_server.h"
 #include "libs/scheduler.h"
 #include <fcntl.h>
+static  antd_scheduler_t scheduler;
 /*
 this node is a relay from the http
 to https
@@ -9,7 +10,7 @@ to https
 int server_sock = -1;
 void stop_serve(int dummy) {
     UNUSED(dummy);
-    antd_scheduler_destroy();
+    antd_scheduler_destroy(&scheduler);
 	close(server_sock);
 }
 /*
@@ -89,15 +90,15 @@ int main(int argc, char* argv[])
     //timeout.tv_sec = 0;
     //timeout.tv_usec = 500;
     // 0 worker
-    antd_scheduler_init(0);
+    antd_scheduler_init(&scheduler, 0);
     // set server socket to non blocking
     fcntl(server_sock, F_SETFL, O_NONBLOCK); /* Change the socket into non-blocking state	*/
 	LOG("relayd running on port %d\n", port);
 
-	while (antd_scheduler_status())
+	while (scheduler.status)
 	{
         // execute task
-        antd_task_schedule();
+        antd_task_schedule(&scheduler);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
@@ -120,7 +121,7 @@ int main(int argc, char* argv[])
 			client->ip = strdup(inet_ntoa(client_name.sin_addr));
         client->sock = client_sock;
 		//accept_request(&client);
-        antd_add_task(antd_create_task(antd_get_host,(void*)client, antd_free_client ));
+        antd_add_task(&scheduler, antd_create_task(antd_get_host,(void*)client, antd_free_client ));
 	}
 
 	return(0);

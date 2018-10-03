@@ -54,6 +54,11 @@ typedef struct{
     char* ip;
 } antd_client_t;
 
+typedef struct {
+    antd_client_t* client;
+    dictionary request;
+} antd_request_t;
+
 int response(void*, const char*);
 void ctype(void*,const char*);
 void redirect(void*,const char*);

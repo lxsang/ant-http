@@ -24,6 +24,7 @@
 extern config_t server_config;
 
 void accept_request(void*);
+void* finish_request(void*);
 void cat(void*, FILE *);
 void cannot_execute(void*);
 void error_die(const char *);

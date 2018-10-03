@@ -2,6 +2,9 @@
 #include <dirent.h>
 #include "http_server.h"
 #include "libs/ini.h"
+#include "libs/scheduler.h"
+#include <fcntl.h>
+static  antd_scheduler_t scheduler;
 
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 int server_sock = -1;
@@ -175,10 +178,12 @@ void load_config(const char* file)
 	init_file_system();
 }
 void stop_serve(int dummy) {
+	UNUSED(dummy);
 	list_free(&(server_config.rules));
 	freedict(server_config.handlers);
 	LOG("Unclosed connection: %d\n", server_config.connection);
     unload_all_plugin();
+	antd_scheduler_destroy(&scheduler);
 #ifdef USE_OPENSSL
 	SSL_CTX_free(ctx);
 #endif
@@ -216,21 +221,19 @@ int main(int argc, char* argv[])
 
 	server_sock = startup(&port);
 	LOG("httpd running on port %d\n", port);
-
-	while (1)
+	// default to 4 workers
+	antd_scheduler_init(&scheduler, 4);
+    fcntl(server_sock, F_SETFL, O_NONBLOCK);
+	while (scheduler.status)
 	{
-		if( server_config.connection >= server_config.maxcon )
-		{
-			LOG("Too many unclosed connection (%d). Wait for it\n", server_config.connection);
-			continue;
-		}
-		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+		antd_task_schedule(&scheduler);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
-			perror("Cannot accept client request\n");
+			//perror("Cannot accept client request\n");
 			continue;
 		}
+		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		/*
 			get the remote IP
 		*/
@@ -273,7 +276,9 @@ int main(int argc, char* argv[])
         	}
 		}
 #endif
-		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
+		// create callback for the server
+		antd_add_task(&scheduler, antd_create_task(accept_request,(void*)client, finish_request ));
+		/*if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
 		{
 			perror("pthread_create");
 			antd_close(client);
@@ -282,7 +287,7 @@ int main(int argc, char* argv[])
 		{
 			//reclaim the stack data when thread finish
 			pthread_detach(newthread) ;
-		}
+		}*/
 		//accept_request(&client);
 	}
 

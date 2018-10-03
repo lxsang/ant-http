@@ -162,6 +162,11 @@ end:
 	antd_close(client);
 }
 
+void* finish_request(void* data)
+{
+	return NULL;
+}
+
 int rule_check(const char*k, const char* v, const char* host, const char* _url, const char* _query, char* buf)
 {
 	// first perfom rule check on host, if not success, perform on url

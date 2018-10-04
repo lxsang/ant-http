@@ -2,7 +2,6 @@
 #include <dirent.h>
 #include "http_server.h"
 #include "libs/ini.h"
-#include "libs/scheduler.h"
 #include <fcntl.h>
 static  antd_scheduler_t scheduler;
 
@@ -179,11 +178,12 @@ void load_config(const char* file)
 }
 void stop_serve(int dummy) {
 	UNUSED(dummy);
+	LOG("Shuting down server \n");
+	antd_scheduler_destroy(&scheduler);
 	list_free(&(server_config.rules));
 	freedict(server_config.handlers);
 	LOG("Unclosed connection: %d\n", server_config.connection);
     unload_all_plugin();
-	antd_scheduler_destroy(&scheduler);
 #ifdef USE_OPENSSL
 	SSL_CTX_free(ctx);
 #endif
@@ -200,7 +200,6 @@ int main(int argc, char* argv[])
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	socklen_t client_name_len = sizeof(client_name);
-	pthread_t newthread;
 	char* client_ip = NULL;
 	// ignore the broken PIPE error when writing 
 	//or reading to/from a closed socked connection

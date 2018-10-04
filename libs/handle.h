@@ -80,6 +80,9 @@ void set_status(void*,int,const char*);
 void clear_cookie(void*, dictionary);
 /*Default function for plugin*/
 void unknow(void*);
+void badrequest(void* client);
+void unimplemented(void* client);
+void notfound(void* client);
 int ws_enable(dictionary);
 char* read_line(void* sock);
 int read_buf(void* sock,char* buf,int i);

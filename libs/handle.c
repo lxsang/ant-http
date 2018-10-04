@@ -300,8 +300,41 @@ void clear_cookie(void* client,  dictionary dic)
 }
 void unknow(void* client)
 {
-	html(client);
-	__t(client,"404 API not found");
+	set_status(client,520,"Unknown Error");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"520 Unknow request");
+}
+void notfound(void* client)
+{
+	set_status(client,404,"Not found");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"Resource not found");
+}
+void badrequest(void* client)
+{
+	set_status(client,400,"Bad request");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"400 Bad request");
+}
+void unimplemented(void* client)
+{
+	set_status(client,501,"Method Not Implemented");
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<HTML><HEAD><TITLE>Method Not Implemented");
+	__t(client, "</TITLE></HEAD>");
+	__t(client, "<BODY><P>HTTP request method not supported.");
+	__t(client, "</BODY></HTML>");
+}
+void cannot_execute(void* client)
+{
+	set_status(client,500,"Internal Server Error");
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<P>Error prohibited CGI execution.");
 }
 int ws_enable(dictionary dic)
 {

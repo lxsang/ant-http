@@ -80,7 +80,7 @@ char* config_dir()
 void __release__()
 {
 	destroy();
-	printf("Releasing plugin\n");
+	LOG("Releasing plugin\n");
 	if(__plugin__.name) free(__plugin__.name);
 	if(__plugin__.dbpath) free(__plugin__.dbpath);
 	if(__plugin__.htdocs) free(__plugin__.htdocs);

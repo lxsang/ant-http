@@ -251,7 +251,7 @@ void* resolve_request(void* data)
 					notfound(rq->client);
 					return task;
 				}
-				if(url) free(url);
+				//if(url) free(url); this is freed in the dput function
 				url = newurl;
 				dput(rq->request, "RESOURCE_PATH", url);
 			}

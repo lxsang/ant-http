@@ -52,18 +52,25 @@ association __put_el_with_key(dictionary dic, const char* key)
 	if(dic == NULL) return NULL;
     if ((np = dlookup(dic,key)) == NULL) { /* not found */
         np = (association) malloc(sizeof(*np));
+		np->value = NULL;
         if (np == NULL || (np->key = strdup(key)) == NULL)
           return NULL;
         hashval = hash(key, DHASHSIZE);
         np->next = dic[hashval];
         dic[hashval] = np;
     }
+	// found
     return np;
 }
 association dput(dictionary dic,const char* key, void* value)
 {
 	association np = __put_el_with_key(dic,key);
-	if(np == NULL) return NULL;
+	if(np == NULL)
+	{
+		if(value) free(value);
+		return NULL;
+	}
+	if(np->value && value) free(np->value);
 	np->value = value;
     return np;
 }

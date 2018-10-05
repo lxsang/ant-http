@@ -165,6 +165,7 @@ void antd_scheduler_destroy(antd_scheduler_t* scheduler)
 {
     // free all the chains
     stop(scheduler);
+    LOG("Destroy remaining queue\n");
     for(int i=0; i < N_PRIORITY; i++)
     {
         destroy_queue(scheduler->task_queue[i]);

@@ -5,6 +5,7 @@
 #include "dbhelper.h"
 #endif
 #include "ws.h"
+#include "scheduler.h"
 
 typedef struct  { 
     char *name; 
@@ -15,7 +16,7 @@ typedef struct  {
 #ifdef USE_OPENSSL
     int usessl;
 #endif
-} plugin_header;
+} plugin_header_t;
 
  
 
@@ -23,17 +24,6 @@ typedef struct  {
 #ifdef USE_DB
 typedef sqlite3* sqldb;
 #endif
-/*
-Two server,
-Two configuration different
-Does it work
-Replace this by a accessing function
-that execute the set value to 
-the header, instead of 
-exporting global variables
-*/
-extern plugin_header __plugin__;
-//extern call __init__;
 
 
 #ifdef USE_DB
@@ -47,6 +37,7 @@ char* config_dir();
 /*Default function for plugin*/
 // init the plugin
 void init();
-void handle(void*, const char*,const char*,dictionary);
-void __release();
+void destroy();
+void* handle(void*);
+plugin_header_t* meta();
 #endif

@@ -15,7 +15,7 @@
 #include "list.h"
 #include "ini.h"
 
-#define SERVER_NAME "antd"
+#define SERVER_NAME "Antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)
 #define IS_GET(method) (strcmp(method,"GET")== 0)
 #define R_STR(d,k) ((char*)dvalue(d,k))
@@ -28,6 +28,18 @@
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif
+//extern config_t server_config;
+typedef struct{
+    int sock;
+    void* ssl;
+    char* ip;
+} antd_client_t;
+
+typedef struct {
+    antd_client_t* client;
+    dictionary request;
+} antd_request_t;
+
 
 typedef struct  { 
 	int port;
@@ -41,23 +53,13 @@ typedef struct  {
     int backlog;
     int maxcon;
     int connection;
+    int n_workers;
 #ifdef USE_OPENSSL
     int usessl;
     char* sslcert;
     char* sslkey;
 #endif
 }config_t;
-//extern config_t server_config;
-typedef struct{
-    int sock;
-    void* ssl;
-    char* ip;
-} antd_client_t;
-
-typedef struct {
-    antd_client_t* client;
-    dictionary request;
-} antd_request_t;
 
 int response(void*, const char*);
 void ctype(void*,const char*);

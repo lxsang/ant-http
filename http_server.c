@@ -1,52 +1,202 @@
 #include "http_server.h"
 static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
+config_t server_config;
+config_t* config()
+{
+	return &server_config;
+}
 
-void* accept_request(void* client)
+void destroy_config()
+{
+	list_free(&(server_config.rules));
+	freedict(server_config.handlers);
+	if(server_config.plugins_dir) free(server_config.plugins_dir);
+	if(server_config.plugins_ext) free(server_config.plugins_ext);
+	if(server_config.db_path) free(server_config.db_path);
+	if(server_config.htdocs) free(server_config.htdocs);
+	if(server_config.tmpdir) free(server_config.tmpdir);
+	
+	LOG("Unclosed connection: %d\n", server_config.connection);
+}
+
+static int config_handler(void* conf, const char* section, const char* name,
+                   const char* value)
+{
+    config_t* pconfig = (config_t*)conf;
+	//char * ppath = NULL;
+    if (MATCH("SERVER", "port")) {
+        pconfig->port = atoi(value);
+    } else if (MATCH("SERVER", "plugins")) {
+        pconfig->plugins_dir = strdup(value);
+    } else if (MATCH("SERVER", "plugins_ext")) {
+        pconfig->plugins_ext = strdup(value);
+    } else if(MATCH("SERVER", "database")) {
+        pconfig->db_path = strdup(value);
+    } else if(MATCH("SERVER", "htdocs")) {
+        pconfig->htdocs = strdup(value);
+    } else if(MATCH("SERVER", "tmpdir")) {
+        pconfig->tmpdir = strdup(value);
+    }
+ 	else if(MATCH("SERVER", "maxcon")) {
+        pconfig->maxcon = atoi(value);
+    }
+	else if(MATCH("SERVER", "backlog")) {
+        pconfig->backlog = atoi(value);
+    }
+	else if(MATCH("SERVER", "workers")) {
+        pconfig->n_workers = atoi(value);
+    }
+#ifdef USE_OPENSSL
+	else if(MATCH("SERVER", "ssl.enable")) {
+        pconfig->usessl = atoi(value);
+    }
+	else if(MATCH("SERVER", "ssl.cert")) {
+        pconfig->sslcert = strdup(value);
+    }
+	else if(MATCH("SERVER", "ssl.key")) {
+        pconfig->sslkey = strdup(value);
+    }
+#endif
+	else if (strcmp(section, "RULES") == 0)
+	{
+		list_put_s(&pconfig->rules,  name);
+		list_put_s(&pconfig->rules,  value);
+    }
+	else if (strcmp(section, "FILEHANDLER") == 0)
+	{
+		dput( pconfig->handlers, name ,strdup(value));
+    }
+	else if(strcmp(section,"AUTOSTART")==0){
+		// The server section must be added before the autostart section
+		// auto start plugin
+		plugin_load(value);
+    } else {
+        return 0;  /* unknown section/name, error */
+    }
+    return 1;
+}
+void init_file_system()
+{
+	struct stat st;
+	if (stat(server_config.plugins_dir, &st) == -1)
+   		mkdir(server_config.plugins_dir, 0755);
+   	if (stat(server_config.db_path, &st) == -1)
+   		mkdir(server_config.db_path, 0755);
+   	if (stat(server_config.htdocs, &st) == -1)
+   		mkdir(server_config.htdocs, 0755);
+   	if (stat(server_config.tmpdir, &st) == -1)
+   		mkdir(server_config.tmpdir, 0755);
+   	else
+   	{
+   		removeAll(server_config.tmpdir,0);
+   	}
+
+}
+void load_config(const char* file)
+{
+	server_config.port = 8888;
+	server_config.plugins_dir = "plugins/";
+	server_config.plugins_ext = ".dylib";
+	server_config.db_path = "databases/";
+	server_config.htdocs = "htdocs/";
+	server_config.tmpdir = "tmp/";
+	server_config.n_workers = 4;
+	server_config.backlog = 100;
+	server_config.rules = list_init();
+	server_config.handlers = dict();
+	server_config.maxcon = 1000;
+	server_config.connection = 0;
+#ifdef USE_OPENSSL
+	server_config.usessl = 0;
+	server_config.sslcert = "cert.pem";
+	server_config.sslkey = "key.pem";
+#endif
+	if (ini_parse(file, config_handler, &server_config) < 0) {
+		LOG("Can't load '%s'\n. Used defaut configuration", file);
+	}
+	else
+	{
+		LOG("Using configuration : %s\n", file);
+#ifdef USE_OPENSSL
+		LOG("SSL enable %d\n", server_config.usessl);
+		LOG("SSL cert %s\n", server_config.sslcert);
+		LOG("SSL key %s\n", server_config.sslkey);
+#endif
+	}
+	init_file_system();
+} 
+void set_nonblock(int socket) {
+    int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    //assert(flags != -1);
+    fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+}
+
+void* accept_request(void* data)
 {
 	int count;
 	char buf[BUFFLEN];
-	antd_request_t* request;
-	antd_task_t* task;
 	char* token =  NULL;
 	char* line = NULL;
-	request = (antd_request_t*)malloc(sizeof(*request));
-	request->client = client;
-	request->request = dict();
-	count = read_buf(client, buf, sizeof(buf));
-	task = antd_create_task(NULL,(void*)request,NULL);
+	antd_task_t* task;
+	antd_request_t* rq = (antd_request_t*) data;
+	
+	task = antd_create_task(NULL,(void*)rq,NULL);
 	task->priority++;
-	if(count <= 0)
+	server_config.connection++;
+	fd_set read_flags;
+	// first verify if the socket is ready
+	antd_client_t* client = (antd_client_t*) rq->client;
+	FD_ZERO(&read_flags);
+    FD_SET(rq->client->sock, &read_flags);
+	struct timeval timeout;      
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 500;
+	// select
+	int sel = select(client->sock+1, &read_flags, NULL, (fd_set*)0, &timeout);
+	if(sel == -1)
 	{
-		unknow(client); 
+		unknow(rq->client);
 		return task;
 	}
+	if(sel == 0 || !FD_ISSET(client->sock, &read_flags) )
+	{
+		// retry it later
+		server_config.connection--;
+		task->handle = accept_request;
+		return task;
+	}
+	count = read_buf(rq->client, buf, sizeof(buf));
+	//LOG("count is %d\n", count);
 	line = buf;
 	// get the method string
 	token = strsep(&line," ");
 	if(!line)
 	{
-		unknow(client);
+		LOG("No method found\n");
+		unknow(rq->client);
 		return task;
 	}
 	trim(token,' ');
 	trim(line,' ');
-	dput(request->request, "METHOD", strdup(token));
+	dput(rq->request, "METHOD", strdup(token));
 	// get the request
 	token = strsep(&line, " ");
 	if(!line)
 	{
-		unknow(client);
+		LOG("No request found\n");
+		unknow(rq->client);
 		return task;
 	}
 	trim(token,' ');
 	trim(line,' ');
 	trim(line, '\n');
 	trim(line, '\r');
-	dput(request->request, "PROTOCOL", strdup(line));
-	dput(request->request, "REQUEST_QUERY", strdup(token));
+	dput(rq->request, "PROTOCOL", strdup(line));
+	dput(rq->request, "REQUEST_QUERY", strdup(token));
 	line = token;
 	token = strsep(&line, "?");
-	dput(request->request, "REQUEST_PATH", strdup(token));
+	dput(rq->request, "REQUEST_PATH", strdup(token));
 	// decode request
 	// now return the task
 	task->handle = decode_request_header;
@@ -69,9 +219,6 @@ void* resolve_request(void* data)
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
-		//if(execute_plugin(rq->client,rqp,method,rq) < 0)
-		//	not_found(client);
-		LOG("execute plugin \n");
 		free(task);
 		return execute_plugin(rq, rqp);
 	}
@@ -149,9 +296,23 @@ void* finish_request(void* data)
 	LOG("Close request\n");
 	antd_request_t* rq = (antd_request_t*)data;
 	// free all other thing
-	if(rq->request) freedict(rq->request);
+	if(rq->request)
+	{
+		dictionary tmp = dvalue(rq->request, "COOKIE");
+		if(tmp) freedict(tmp);
+		tmp =  dvalue(rq->request, "REQUEST_HEADER");
+		if(tmp) freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_DATA");
+		if(tmp) freedict(tmp);
+		dput(rq->request, "REQUEST_HEADER", NULL);
+		dput(rq->request, "REQUEST_DATA", NULL);
+		dput(rq->request, "COOKIE", NULL);
+		freedict(rq->request);
+	}
 	antd_close(rq->client);
 	free(rq);
+	server_config.connection--; 
+	LOG("Remaining connection %d\n", server_config.connection);
 	return NULL;
 }
 
@@ -225,12 +386,8 @@ int rule_check(const char*k, const char* v, const char* host, const char* _url, 
 	free(query);
 	return 1;
 }
-/**********************************************************************/
-/* Print out an error message with perror() (for system errors; based
-* on value of errno, which indicates system call errors) and exit the
-* program indicating an error. */
-/**********************************************************************/
-void error_die(const char *sc)
+
+static void error_die(const char *sc)
 {
 	perror(sc);
 	exit(1);
@@ -251,14 +408,6 @@ void* serve_file(void* data)
 	return task;
 }
 
-/**********************************************************************/
-/* This function starts the process of listening for web connections
-* on a specified port.  If the port is 0, then dynamically allocate a
-* port and modify the original port variable to reflect the actual
-* port.
-* Parameters: pointer to variable containing the port to connect on
-* Returns: the socket */
-/**********************************************************************/
 int startup(unsigned *port)
 {
 	int httpd = 0;
@@ -322,15 +471,7 @@ char* apply_rules(const char* host, char*url)
 	return strdup(query_string);
 }
 /**
- * Decode the HTTP request
- * Get the cookie values
- * if it is the GET request, decode the query string into a dictionary
- * if it is a POST, check the content type of the request
- * 		- if it is a POST request with URL encoded : decode the url encode
- * 		- if it is a POST request with multipart form data: de code the multipart
- * 		- if other - UNIMPLEMENTED
- * @param  	an antd_request_t structure
- * @return  a task
+ * Decode the HTTP request header
  */
 
 void* decode_request_header(void* data)
@@ -375,7 +516,6 @@ void* decode_request_header(void* data)
 	memset(buf, 0, sizeof(buf));
 	strcat(buf,url);
 	query = apply_rules(host, buf);
-	LOG("BUGFGGGG is %s\n", buf);
 	dput(rq->request,"RESOURCE_PATH",strdup(buf));
 	if(query)
 	{
@@ -384,7 +524,7 @@ void* decode_request_header(void* data)
 		free(query);
 	}
 	if(cookie)
-		dput(request,"cookie",cookie);
+		dput(rq->request,"COOKIE",cookie);
 	if(host) free(host);
 	// header ok, now checkmethod
 	antd_task_t* task = antd_create_task(decode_request,(void*)rq, NULL);
@@ -451,6 +591,7 @@ void* decode_post_request(void* data)
 	if(tmp)
 		clen = atoi(tmp);
 	task = antd_create_task(NULL,(void*)rq, NULL);
+	task->priority++;
 	if(ctype == NULL || clen == -1)
 	{
 		LOG("Bad request\n");
@@ -468,7 +609,8 @@ void* decode_post_request(void* data)
 	{
 		//printf("Multi part form : %s\n", ctype);
 		// TODO: split this to multiple task
-		decode_multi_part_request(rq->client,ctype,request);
+		free(task);
+		return decode_multi_part_request(rq,ctype,request);
 	} 
 	else
 	{
@@ -545,193 +687,207 @@ dictionary decode_cookie(const char* line)
 		token1 = strsep(&token,"=");
 		if(token1 && token && strlen(token) > 0)
 		{
-			if(dic == NULL)
-				dic = dict();
+			if(dic == NULL) dic = dict();
+			LOG("%s: %s\n", token1, token);
 			dput(dic,token1,strdup(token));
 		}
 	}
-		//}
 	free(orgcpy);
 	return dic;
 }
 /**
  * Decode the multi-part form data from the POST request
  * If it is a file upload, copy the file to tmp dir
- * and generate the metadata for the server-side
- * @param  client the socket client
- * @param  ctype  Content-Type of the request
- * @param  clen   Content length, but not used here
- * @return        a dictionary of key - value
  */
-void decode_multi_part_request(void* client,const char* ctype, dictionary dic)
+void* decode_multi_part_request(void* data,const char* ctype, dictionary dic)
 {
 	char * boundary;
-	char * boundend;
 	char * line;
-	char * orgline;
 	char * str_copy = strdup(ctype);
 	char* orgcpy = str_copy;
-	char* token;
-	char* keytoken ;
-	char* valtoken ;
-	char* part_name;
-	char* part_file;
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL);
+	task->priority++;
+	//dictionary dic = NULL;
+	FILE *fp = NULL;
+	boundary = strsep(&str_copy,"="); //discard first part
+	boundary = str_copy; 
+	if(boundary && strlen(boundary)>0)
+	{
+		//dic = dict();
+		trim(boundary,' ');
+		dput(rq->request, "MULTI_PART_BOUNDARY", strdup(boundary));
+		//find first boundary
+		while((line = read_line(rq->client))&&strstr(line,boundary) <= 0)
+		{
+			if(line) free(line);
+		}
+		if(line)
+		{
+			task->handle = decode_multi_part_request_data;
+			task->type  = HEAVY;
+			free(line);
+		}
+	}
+	free(orgcpy);
+	return task;
+}
+void* decode_multi_part_request_data(void* data)
+{
+	// loop through each part separated by the boundary
+	char* line;
+	char* orgline;
+	char* part_name = NULL;
+	char* part_file = NULL;
 	char* file_path;
 	char  buf[BUFFLEN];
 	char* field;
 	//dictionary dic = NULL;
 	FILE *fp = NULL;
-	boundary = strsep(&str_copy,"="); //discard first part
-	boundary = strsep(&str_copy,"="); 
-	if(boundary && strlen(boundary)>0)
+	char* token, *keytoken, *valtoken;
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL);
+	task->priority++;
+	char* boundary = (char*)dvalue(rq->request, "MULTI_PART_BOUNDARY");
+	dictionary dic = (dictionary)dvalue(rq->request, "REQUEST_DATA");
+	char* boundend = __s("%s--",boundary);
+	// search for content disposition:
+	while((line = read_line(rq->client)) &&
+			strstr(line,"Content-Disposition:") <= 0)
 	{
-		//dic = dict();
-		trim(boundary,' ');
-		boundend = __s("%s--",boundary);
-		//find first boundary
-		while((line = read_line(client))&&strstr(line,boundary) <= 0)
-		{
-			if(line) free(line);
-		}
-		// loop through each part separated by the boundary
-		while(line && strstr(line,boundary) > 0){
-			if(line)
-			{
-				free(line);
-				line = NULL;
-			}
-			// search for content disposition:
-			while((line = read_line(client)) &&
-					strstr(line,"Content-Disposition:") <= 0)
-			{
-				free(line);
-				line = NULL;
-			}
-			if(!line || strstr(line,"Content-Disposition:") <= 0)
-			{
-				if(line)
-					free(line);
-				free(orgcpy);
-				free(boundend);
-				return;
-			}
-			orgline = line;
-			// extract parameters from header
-			part_name = NULL;
-			part_file = NULL;
-			while((token = strsep(&line,";")))
-			{
-				keytoken = strsep(&token,"=");
-				if(keytoken && strlen(keytoken)>0)
-				{
-					trim(keytoken,' ');
-					valtoken = strsep(&token,"=");
-					if(valtoken)
-					{
-						trim(valtoken,' ');
-						trim(valtoken,'\n');
-						trim(valtoken,'\r');
-						trim(valtoken,'\"');
-						if(strcmp(keytoken,"name") == 0)
-						{
-							part_name = strdup(valtoken);
-						} else if(strcmp(keytoken,"filename") == 0)
-						{
-							part_file = strdup(valtoken);
-						}
-					}
-				}
-			}
-			free(orgline);
-			line = NULL;
-			// get the binary data
-			if(part_name != NULL)
-			{
-				// go to the beginer of data bock
-				while((line = read_line(client)) && strcmp(line,"\r\n") != 0)
-				{
-					free(line);
-					line = NULL;
-				}
-				if(line)
-				{
-					free(line);
-					line = NULL;
-				}
-				if(part_file == NULL)
-				{
-					/**
-					 * This allow only 1024 bytes of data (max),
-					 * out of this range, the data is cut out.
-					 * Need an efficient way to handle this
-					 */
-					line = read_line(client);
-					trim(line,'\n');
-					trim(line,'\r');
-					trim(line,' ');
-					dput(dic,part_name,line);
-					// find the next boundary
-					while((line = read_line(client)) && strstr(line,boundary) <= 0)
-					{
-						free(line);
-						line = NULL;
-					}
-				}
-				else
-				{
-					file_path = __s("%s%s.%u",server_config.tmpdir,part_file,(unsigned)time(NULL));
-					fp=fopen(file_path, "wb");
-					if(fp)
-					{
-						int totalsize=0,len=0;
-						//read until the next boundary
-						while((len = read_buf(client,buf,sizeof(buf))) > 0 && strstr(buf,boundary) <= 0)
-						{
-							fwrite(buf, len, 1, fp);
-							totalsize += len;
-						}
-						//remove \r\n at the end
-						fseek(fp,-2, SEEK_CUR);
-						totalsize -= 2;
-						fclose(fp);
-						line = strdup(buf);
-
-						field = __s("%s.file",part_name);
-						dput(dic,field, strdup(part_file));
-						free(field);
-						field = __s("%s.tmp",part_name);
-						dput(dic,field,strdup(file_path));
-						free(field);
-						field = __s("%s.size",part_name);
-						dput(dic,field,__s("%d",totalsize));
-						free(field);
-						field = __s("%s.ext",part_name);
-						dput(dic,field,ext(part_file));
-						free(field);
-
-					}
-					else
-					{
-						LOG("Cannot wirte file to :%s\n", file_path );
-					}
-					free(file_path);
-					free(part_file);
-				}
-				free(part_name);
-			}
-			//printf("[Lines]:%s\n",line);
-			// check if end of request
-			if(line&&strstr(line,boundend)>0)
-			{
-				LOG("End request %s\n", boundend);
-				free(line);
-				break;
-			}
-		}
-		free(boundend);
+		free(line);
+		line = NULL;
 	}
-	free(orgcpy);
-	//return dic;
+	if(!line || strstr(line,"Content-Disposition:") <= 0)
+	{
+		if(line)
+			free(line);
+		free(boundend);
+		return task;
+	}
+	orgline = line;
+	// extract parameters from header
+	while((token = strsep(&line,";")))
+	{
+		keytoken = strsep(&token,"=");
+		if(keytoken && strlen(keytoken)>0)
+		{
+			trim(keytoken,' ');
+			valtoken = strsep(&token,"=");
+			if(valtoken)
+			{
+				trim(valtoken,' ');
+				trim(valtoken,'\n');
+				trim(valtoken,'\r');
+				trim(valtoken,'\"');
+				if(strcmp(keytoken,"name") == 0)
+				{
+					part_name = strdup(valtoken);
+				} else if(strcmp(keytoken,"filename") == 0)
+				{
+					part_file = strdup(valtoken);
+				}
+			}
+		}
+	}
+	free(orgline);
+	line = NULL;
+	// get the binary data
+	if(part_name != NULL)
+	{
+		// go to the beginer of data bock
+		while((line = read_line(rq->client)) && strcmp(line,"\r\n") != 0)
+		{
+			free(line);
+			line = NULL;
+		}
+		if(line)
+		{
+			free(line);
+			line = NULL;
+		}
+		if(part_file == NULL)
+		{
+			/**
+			 * This allow only 1024 bytes of data (max),
+			 * out of this range, the data is cut out.
+			 * Need an efficient way to handle this
+			 */
+			line = read_line(rq->client);
+			trim(line,'\n');
+			trim(line,'\r');
+			trim(line,' ');
+			dput(dic,part_name,line);
+			// find the next boundary
+			while((line = read_line(rq->client)) && strstr(line,boundary) <= 0)
+			{
+				free(line);
+				line = NULL;
+			}
+		}
+		else
+		{
+			file_path = __s("%s%s.%u",server_config.tmpdir,part_file,(unsigned)time(NULL));
+			fp=fopen(file_path, "wb");
+			if(fp)
+			{
+				int totalsize=0,len=0;
+				//read until the next boundary
+				while((len = read_buf(rq->client,buf,sizeof(buf))) > 0 && strstr(buf,boundary) <= 0)
+				{
+					fwrite(buf, len, 1, fp);
+					totalsize += len;
+				}
+				//remove \r\n at the end
+				fseek(fp, 0, SEEK_SET);
+				//fseek(fp,-2, SEEK_CUR);
+				totalsize -= 2;
+				ftruncate(fileno(fp),totalsize); 
+				fclose(fp);
+				line = strdup(buf);
+
+				field = __s("%s.file",part_name);
+				dput(dic,field, strdup(part_file));
+				free(field);
+				field = __s("%s.tmp",part_name);
+				dput(dic,field,strdup(file_path));
+				free(field);
+				field = __s("%s.size",part_name);
+				dput(dic,field,__s("%d",totalsize));
+				free(field);
+				field = __s("%s.ext",part_name);
+				dput(dic,field,ext(part_file));
+				free(field);
+
+			}
+			else
+			{
+				LOG("Cannot wirte file to :%s\n", file_path );
+			}
+			free(file_path);
+			free(part_file);
+		}
+		free(part_name);
+	}
+	//printf("[Lines]:%s\n",line);
+	// check if end of request
+	if(line&&strstr(line,boundend)>0)
+	{
+		LOG("End request %s\n", boundend);
+		task->handle = resolve_request;
+		free(line);
+		free(boundend);
+		return task;
+	}
+	if(line && strstr(line,boundary) > 0)
+	{
+		// continue upload
+		task->type = HEAVY;
+		task->handle = decode_multi_part_request_data;
+	}
+	free(line);
+	free(boundend);
+	return task;
 }
 /**
  * Decode a query string (GET request or POST URL encoded) to  

@@ -7,6 +7,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <sys/select.h>
+#include <fcntl.h>
 #include "libs/handle.h"
 #include "libs/scheduler.h"
 #include "plugin_manager.h"
@@ -15,17 +17,16 @@
 #define FORM_MULTI_PART  "multipart/form-data"
 #define PLUGIN_HANDLER	 "handle"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-#define SERVER_STRING "Server: ant-httpd"
+#define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 
 #define CONFIG "config.ini"
-extern config_t server_config;
 
+config_t* config(); 
+void destroy_config();
 void* accept_request(void*);
 void* finish_request(void*);
 void cat(void*, FILE *);
 void cannot_execute(void*);
-void error_die(const char *);
 //int get_line(int, char *, int);
 void not_found(void*);
 void* serve_file(void*);
@@ -40,10 +41,11 @@ void* decode_request_header(void* data);
 void* decode_request(void* data);
 void* decode_post_request(void* data);
 void* resolve_request(void* data);
-void decode_multi_part_request(void*,const char*, dictionary);
+void* decode_multi_part_request(void*,const char*, dictionary);
+void* decode_multi_part_request_data(void* data);
 dictionary decode_cookie(const char*);
 char* post_data_decode(void*,int);
-
+void set_nonblock(int);
 void* execute_plugin(void* data, const char *path);
 
 #endif

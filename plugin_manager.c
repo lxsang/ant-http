@@ -31,10 +31,16 @@ struct plugin_entry *plugin_load(char *name)
     if ((np = plugin_lookup(name)) == NULL) { /* not found */
         np = (struct plugin_entry *) malloc(sizeof(*np));
         if (np == NULL || (np->pname = strdup(name)) == NULL)
-          return NULL;
+        {
+			if(np) free(np);
+			return NULL;
+		}
         if ((np->handle = plugin_from_file(name)) == NULL)
+		{
+			if(np) free(np);
        		return NULL;
-       	hashval = hash(name,HASHSIZE);
+		}
+		hashval = hash(name,HASHSIZE);
         np->next = plugin_table[hashval];
         plugin_table[hashval] = np;
     } else /* already there */
@@ -53,7 +59,7 @@ void * plugin_from_file(char* name)
 {
 	void *lib_handle;
   char* error;
-  char* path = __s("%s%s%s",server_config.plugins_dir,name,server_config.plugins_ext);
+  char* path = __s("%s%s%s",config()->plugins_dir,name,config()->plugins_ext);
   void (*fn)(const char*, config_t*);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 
@@ -68,7 +74,7 @@ void * plugin_from_file(char* name)
   if ((error = dlerror()) != NULL)  
   		LOG("Problem when setting data path for %s : %s \n", name,error);
   else
-	(*fn)(name,&server_config); 
+	(*fn)(name,config()); 
   if(path)
 	free(path);
    return lib_handle;
@@ -79,17 +85,7 @@ void unload_plugin(struct plugin_entry* np)
 	char* error;
 	void (*fn)() = NULL;
 	// find and execute the exit function
-    fn = (void (*)())dlsym(np->handle, "pexit");
- 	if ((error = dlerror()) != NULL)  
- 	{
-     	LOG("Cant not find exit method from %s : %s \n", np->pname,error);
-    }
-	else
-	{
-		// execute it
-		(*fn)();
-	}
-	fn = (void(*)()) dlsym(np->handle, "__release");
+	fn = (void(*)()) dlsym(np->handle, "__release__");
 	if ((error = dlerror()) != NULL)  
  	{
      	LOG("Cant not release plugin %s : %s \n", np->pname,error);

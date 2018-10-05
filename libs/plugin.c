@@ -1,6 +1,6 @@
 #include "plugin.h"
 
-plugin_header __plugin__;
+plugin_header_t __plugin__;
 // private function
 void __init_plugin__(const char* pl,config_t* conf){
 	__plugin__.name = strdup(pl);
@@ -40,7 +40,10 @@ int usessl()
 	 return __plugin__.usessl;
  }
  #endif*/
-
+plugin_header_t* meta()
+{
+	return &__plugin__;
+}
 char* route(const char* repath)
 {
 	int len = strlen(__plugin__.name) + 2;
@@ -74,8 +77,9 @@ char* config_dir()
 	return path;
 }
 
-void __release()
+void __release__()
 {
+	destroy();
 	printf("Releasing plugin\n");
 	if(__plugin__.name) free(__plugin__.name);
 	if(__plugin__.dbpath) free(__plugin__.dbpath);

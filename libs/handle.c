@@ -1,5 +1,4 @@
-#include "handle.h"
-config_t server_config; 
+#include "handle.h" 
 #ifdef USE_OPENSSL
 int usessl()
 {
@@ -133,10 +132,7 @@ int antd_close(void* src)
 #endif
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->sock);
-	if(source->ip) free(source->ip);
-	// TODO remove this when using nonblocking
-	server_config.connection--; 
-	LOG("Remaining connection %d\n", server_config.connection);
+	if(source->ip) free(source->ip);	
 	free(src);
 	src = NULL;
 	return ret;

@@ -554,11 +554,10 @@ void* decode_request(void* data)
 		if(ws && ws_key != NULL)
 		{
 			ws_confirm_request(rq->client, ws_key);
-			free(ws_key);
 			// insert wsocket flag to request
 			// plugin should handle this ugraded connection
 			// not the server
-			dput(request,"__web_socket__",strdup("1"));
+			dput(rq->request,"__web_socket__",strdup("1"));
 		}
 		// resolve task
 		task->handle = resolve_request;

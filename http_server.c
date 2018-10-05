@@ -688,7 +688,6 @@ dictionary decode_cookie(const char* line)
 		if(token1 && token && strlen(token) > 0)
 		{
 			if(dic == NULL) dic = dict();
-			LOG("%s: %s\n", token1, token);
 			dput(dic,token1,strdup(token));
 		}
 	}

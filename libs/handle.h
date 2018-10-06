@@ -11,6 +11,7 @@
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
+#include <fcntl.h>
 #include "dictionary.h"
 #include "list.h"
 #include "ini.h"
@@ -33,6 +34,9 @@ typedef struct{
     int sock;
     void* ssl;
     char* ip;
+#ifdef USE_OPENSSL
+    int status;
+#endif
 } antd_client_t;
 
 typedef struct {
@@ -60,7 +64,8 @@ typedef struct  {
     char* sslkey;
 #endif
 }config_t;
-
+void set_nonblock(int socket);
+void set_block(int socket);
 int response(void*, const char*);
 void ctype(void*,const char*);
 void redirect(void*,const char*);

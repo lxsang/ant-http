@@ -167,17 +167,19 @@ int main(int argc, char* argv[])
 		//LOG("Unclosed connection: %d\n", server_config->connection);
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
+		client->status = 0;
 		if(config()->usessl == 1)
 		{
 			client->ssl = (void*)SSL_new(ctx);
 			if(!client->ssl) continue;
-        	SSL_set_fd((SSL*)client->ssl, client_sock);
+        	SSL_set_fd((SSL*)client->ssl, client->sock);
 
-        	if (SSL_accept((SSL*)client->ssl) <= 0) {
+        	/*if (SSL_accept((SSL*)client->ssl) <= 0) {
+				LOG("EROOR accept\n");
             	ERR_print_errors_fp(stderr);
 				antd_close(client);
 				continue;
-        	}
+        	}*/
 		}
 #endif
 		// create callback for the server

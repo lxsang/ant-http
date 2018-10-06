@@ -8,7 +8,6 @@
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <fcntl.h>
 #include "libs/handle.h"
 #include "libs/scheduler.h"
 #include "plugin_manager.h"

@@ -100,8 +100,28 @@ int antd_recv(void *src,  void* data, int len)
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
-		//LOG("SSL READ\n");
+		// TODO: blocking is not good, need a workaround
+		set_nonblock(source->sock);
 		ret = SSL_read((SSL*) source->ssl, data, len);
+		set_nonblock(source->sock);
+		/*
+		int stat, r, st;
+		do{
+			ret = SSL_read((SSL*) source->ssl, data, len);
+			stat = SSL_get_error((SSL*)source->ssl, r);
+		} while(ret == -1 && 
+			(
+			stat == SSL_ERROR_WANT_READ || 
+			stat == SSL_ERROR_WANT_WRITE ||  
+			stat == SSL_ERROR_NONE ||  
+			(stat == SSL_ERROR_SYSCALL && r== 0 && !ERR_get_error()) 
+			));
+		if(ret == -1)
+		{
+			LOG("Problem reading %d %d %d\n", ret, stat, r);
+		}
+		//set_nonblock(source->sock);
+		*/
 	}
 	else
 	{
@@ -115,6 +135,19 @@ int antd_recv(void *src,  void* data, int len)
 		antd_close(src);
 	}*/
 	return ret;
+}
+void set_nonblock(int socket) {
+    int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    //assert(flags != -1);
+    fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+}
+void set_block()
+{
+	int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    //assert(flags != -1);
+    fcntl(socket, F_SETFL, flags & (~O_NONBLOCK));
 }
 int antd_close(void* src)
 {

@@ -125,12 +125,7 @@ void load_config(const char* file)
 	}
 	init_file_system();
 } 
-void set_nonblock(int socket) {
-    int flags;
-    flags = fcntl(socket,F_GETFL,0);
-    //assert(flags != -1);
-    fcntl(socket, F_SETFL, flags | O_NONBLOCK);
-}
+
 
 void* accept_request(void* data)
 {
@@ -144,28 +139,68 @@ void* accept_request(void* data)
 	task = antd_create_task(NULL,(void*)rq,NULL);
 	task->priority++;
 	server_config.connection++;
-	fd_set read_flags;
+	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t* client = (antd_client_t*) rq->client;
 	FD_ZERO(&read_flags);
     FD_SET(rq->client->sock, &read_flags);
+	FD_ZERO(&write_flags);
+    FD_SET(rq->client->sock, &write_flags);
 	struct timeval timeout;      
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 500;
 	// select
-	int sel = select(client->sock+1, &read_flags, NULL, (fd_set*)0, &timeout);
+	int sel = select(client->sock+1, &read_flags, &write_flags, (fd_set*)0, &timeout);
 	if(sel == -1)
 	{
 		unknow(rq->client);
 		return task;
 	}
-	if(sel == 0 || !FD_ISSET(client->sock, &read_flags) )
+	if(sel == 0 || (!FD_ISSET(client->sock, &read_flags) &&  !FD_ISSET(client->sock, &write_flags)))
 	{
 		// retry it later
 		server_config.connection--;
 		task->handle = accept_request;
 		return task;
 	}
+	// perform the ssl handshake if enabled
+#ifdef USE_OPENSSL
+	int ret,stat;
+	if(server_config.usessl == 1 && client->status == 0)
+	{
+		if (SSL_accept((SSL*)client->ssl) == -1) {
+			stat = SSL_get_error((SSL*)client->ssl, ret);
+			switch(stat)
+			{
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE:
+				case SSL_ERROR_NONE:
+					//LOG("RECALL %d\n", stat);
+					task->handle = accept_request;
+					task->priority = HIGH_PRIORITY;
+					server_config.connection--;
+					return task;
+				default:
+					LOG("ERRRRRRRRROR accept %d %d %d\n", stat, ret, ERR_get_error());
+					ERR_print_errors_fp(stderr);
+					return task;
+			}
+		}
+		client->status = 1;
+		server_config.connection--;
+		task->handle = accept_request;
+		return task;
+	}
+	else
+	{
+		if(!FD_ISSET(client->sock, &read_flags))
+		{
+			task->handle = accept_request;
+			server_config.connection--;
+			return task;
+		}
+	}
+#endif
 	count = read_buf(rq->client, buf, sizeof(buf));
 	//LOG("count is %d\n", count);
 	line = buf;
@@ -831,6 +866,8 @@ void* decode_multi_part_request_data(void* data)
 			{
 				int totalsize=0,len=0;
 				//read until the next boundary
+				// TODO: this is not efficient for big file
+				// need a solution
 				while((len = read_buf(rq->client,buf,sizeof(buf))) > 0 && strstr(buf,boundary) <= 0)
 				{
 					fwrite(buf, len, 1, fp);
@@ -927,12 +964,16 @@ void decode_url_request(const char* query, dictionary dic)
 char* post_data_decode(void* client,int len)
 {
 	char *query = (char*) malloc((len+1)*sizeof(char));
-    for (int i = 0; i < len; i++) {
-      antd_recv(client, (query+i), 1);
-    }
+	char* ptr = query;
+	int readlen = len > BUFFLEN?BUFFLEN:len;
+	int read = 0;
+	while(readlen > 0)
+	{
+		read += antd_recv(client, query+read, readlen);
+		LOG("READ %d/%d\n", read, len);
+		readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+	}
     query[len]='\0';
-    //query = url_decode(query);
-    //LOG("JSON Query %s\n", query);
     return query;
 }
 

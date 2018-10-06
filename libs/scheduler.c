@@ -195,6 +195,7 @@ void antd_add_task(antd_scheduler_t* scheduler, antd_task_t* task)
 {
     // check if task is exist
     int prio = task->priority>N_PRIORITY-1?N_PRIORITY-1:task->priority;
+    //LOG("Prio is %d\n", prio);
     pthread_mutex_lock(&scheduler->scheduler_lock);
     enqueue(&scheduler->task_queue[prio], task);
     pthread_mutex_unlock(&scheduler->scheduler_lock);

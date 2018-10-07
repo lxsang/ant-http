@@ -4,7 +4,7 @@
 
 A lightweight and portable HTTP/HTTPs web server written in  C:
 - New 1.0.0 version: Single thread server with configurable number of thread pool workers, good for scalability
-- Initial goal is for embedded Linux, but can use as general purpose web server. 
+- Initial goal is for embedded Linux, but can be used as general purpose web server. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
 - It is also extensible via its extensions mechanism that allows to extends the server capability.
 

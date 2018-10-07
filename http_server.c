@@ -243,7 +243,8 @@ void* resolve_request(void* data)
 	task->priority++;
 	char* url = (char*)dvalue(rq->request, "RESOURCE_PATH");
 	char* newurl = NULL;
-	char* rqp = (char*)dvalue(rq->request, "REQUEST_PATH");
+	char* rqp = NULL;
+	char* oldrqp = NULL;
 	strcpy(path, server_config.htdocs);
 	strcat(path, url);
 	LOG("Path is : %s \n", path);
@@ -251,7 +252,16 @@ void* resolve_request(void* data)
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
 		free(task);
-		return execute_plugin(rq, rqp);
+		rqp = strdup((char*)dvalue(rq->request, "REQUEST_PATH"));
+		oldrqp = rqp;
+		trim(rqp, '/');
+		newurl = strsep(&rqp, "/");
+		if(!rqp) rqp = strdup("/");
+		else	rqp = strdup(rqp);
+		dput(rq->request, "RESOURCE_PATH", rqp);
+		task = execute_plugin(rq, newurl);
+		free(oldrqp);
+		return task;
 	}
 	else
 	{
@@ -301,12 +311,12 @@ void* resolve_request(void* data)
 			if(ex) free(ex);
 			if(h)
 			{
-				sprintf(path,"/%s%s",h,url);
-				LOG("WARNING::::Access octetstream via handler %s\n", path);
+				//sprintf(path,"/%s%s",h,url);
+				LOG("WARNING::::Access octetstream via handler %s\n", h);
 				//if(execute_plugin(client,buf,method,rq) < 0)
 				//	cannot_execute(client);
 				free(task);
-				return execute_plugin(rq, path);
+				return execute_plugin(rq, h);
 			}
 			else
 				unknow(rq->client);
@@ -521,6 +531,7 @@ void* decode_request_header(void* data)
 	// this for check if web socket is enabled
 	// ip address
 	dput(xheader,"REMOTE_ADDR", (void*)strdup(((antd_client_t*)rq->client)->ip ));
+	dput(xheader, "SERVER_PORT", (void*)__s("%d",server_config.port ));
 	//while((line = read_line(client)) && strcmp("\r\n",line))
 	while((read_buf(rq->client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{
@@ -993,69 +1004,38 @@ char* post_data_decode(void* client,int len)
  * @return              -1 if failure
  *                      1 if sucess
  */
-void* execute_plugin(void* data, const char *path)
+void* execute_plugin(void* data, const char *pname)
 {
-	char pname[255];
- 	char pfunc[255];
  	void* (*fn)(void*);
  	struct plugin_entry *plugin ;
-	int plen = strlen(path);
-	char * rpath = (char*) malloc((plen+1)*sizeof(char));
-	char* orgs = rpath;
 	char *error;
-	memcpy(rpath,path+1,plen);
-	rpath[plen] = '\0';
-	trim(rpath,'/');
- 	char * delim = strchr(rpath,'/');
 	antd_request_t* rq = (antd_request_t*) data;
 	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL); 
 	task->priority++;
- 	if(delim == NULL)
- 	{
- 		strcpy(pname,rpath);
- 		strcpy(pfunc,"default");
-	} 
-	else
-	{
-		int npos,fpos;
-		npos = delim - rpath;
-		fpos = strlen(rpath) - npos ;
-		memcpy(pname,rpath,npos);
-		pname[npos] = '\0';
-		memcpy(pfunc,rpath+npos+1,fpos);
-		pfunc[fpos-1]='\0';
-	}
-	LOG("Client %d\n",((antd_client_t*)rq->client)->sock );
-	LOG("Path : '%s'\n", rpath);
 	LOG("Plugin name '%s'\n",pname);
-	LOG("Query path. '%s'\n", pfunc);
-	//LOG("query :%s\n", query_string);
 
 	//load the plugin
-	if((plugin = plugin_lookup(pname)) == NULL)
+	if((plugin = plugin_lookup((char*)pname)) == NULL)
 	{
 		pthread_mutex_lock(&server_mux);
-		plugin= plugin_load(pname);
+		plugin= plugin_load((char*)pname);
 		pthread_mutex_unlock(&server_mux);
 		if( plugin == NULL)
 		{
-			if(orgs) free(orgs);
 			unknow(rq->client);
-			return task;
+			return task; 
 		}
 	}
 	// load the function
    fn = (void* (*)(void*))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)  
 	{
-		if(orgs) free(orgs);
     	LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname,error);
     	unknow(rq->client);
 		return task;
    }
    task->type = HEAVY;
    task->handle = fn;
-   free(orgs);
    return task;
 }
 

@@ -145,7 +145,11 @@ char* ext(const char* file)
 	if(file == NULL) return NULL;
 	char* str_cpy = strdup(file);
     char* str_org = str_cpy;
-	if(strstr(str_cpy,".")<= 0) return strdup("");
+	if(strstr(str_cpy,".")<= 0)
+    {
+        free(str_org);
+        return NULL;
+    } 
 	if(*file == '.')
 		trim(str_cpy,'.');
 
@@ -184,6 +188,7 @@ mime_t mime_from_type(const char* type)
 char* mime(const char* file)
 {
 	char * ex = ext(file);
+    if(!ex) return "application/octet-stream";
 	mime_t m = mime_from_ext(ex);
     if(ex)
         free(ex);

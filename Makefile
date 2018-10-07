@@ -16,7 +16,8 @@ LIBOBJS = 	libs/ini.o \
 			libs/utils.o \
 			libs/ws.o \
 			libs/sha1.o \
-			libs/list.o 
+			libs/list.o \
+			libs/scheduler.o
 			
 PLUGINSDEP = libs/plugin.o
 
@@ -30,6 +31,9 @@ httpd: lib $(SERVER_O)
 	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/httpd httpd.c $(SERVERLIB)
 	cp antd $(BUILDIRD)
 
+relay: lib $(SERVER_O)
+	$(CC) $(CFLAGS)  $(SERVER_O)    -o $(BUILDIRD)/relay relay.c $(SERVERLIB)
+	cp forward $(BUILDIRD)
 lib: $(LIBOBJS)
 	$(CC) $(CFLAGS)  $(DB_LIB) $(SSL_LIB)  -shared -o $(LIB_NAME).$(EXT) $(LIBOBJS)
 	cp $(LIB_NAME).$(EXT) $(LIB_PATH$)/

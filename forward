@@ -1,0 +1,8 @@
+#!/bin/sh
+UNAME=`uname -s`
+
+if [ "$UNAME" = "Darwin" ]; then
+	DYLD_LIBRARY_PATH=$(dirname "$0")/plugins/ $(dirname "$0")/relay
+else
+	LD_LIBRARY_PATH=$(dirname "$0")/plugins/ $(dirname "$0")/relay
+fi

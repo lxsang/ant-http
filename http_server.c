@@ -1,120 +1,299 @@
 #include "http_server.h"
 static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
-/**********************************************************************/
-/* A request has caused a call to accept() on the server port to
-* return.  Process the request appropriately.
-* Parameters: the socket connected to the client */
-/**********************************************************************/
-void accept_request(void* client)
+config_t server_config;
+config_t* config()
 {
-	char buf[1024];
-	int numchars;
-	char method[255];
-	char url[4096]; 
-	char path[1024];
-	char* token;
-	char *line;
-	char* oldurl = NULL;
-	char* tmp = NULL;
-	dictionary rq = NULL;
-	size_t i, j;
-	struct stat st;
+	return &server_config;
+}
 
-	//char *query_string = NULL;
-	//LOG("SOCK IS %d\n", ((antd_client_t*)client)->sock);
-	numchars = read_buf(client, buf, sizeof(buf));
-	if(numchars <= 0)
-	{
-		unknow(client); 
-		goto end;
-	}
-	i = 0; j = 0;
-	while (j < numchars && !ISspace(buf[j]) && (i < sizeof(method) - 1))
-	{
-		method[i] = buf[j];
-		i++; j++;
-	}
-	method[i] = '\0';
-	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
-	{
-		LOG("METHOD NOT FOUND %s\n", method);
-		// unimplemented
-		//while(get_line(client, buf, sizeof(buf)) > 0) printf("%s\n",buf );
-		unimplemented(client);
-		//antd_close(client);
-		goto end;
-	}
-
-
-	i = 0;
-	while (ISspace(buf[j]) && (j < sizeof(buf)))
-		j++;
-	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
-	{
-		url[i] = buf[j];
-		i++; j++;
-	}
-	url[i] = '\0';
-
-
+void destroy_config()
+{
+	list_free(&(server_config.rules));
+	freedict(server_config.handlers);
+	if(server_config.plugins_dir) free(server_config.plugins_dir);
+	if(server_config.plugins_ext) free(server_config.plugins_ext);
+	if(server_config.db_path) free(server_config.db_path);
+	if(server_config.htdocs) free(server_config.htdocs);
+	if(server_config.tmpdir) free(server_config.tmpdir);
 	
-	oldurl = strdup(url);
-	tmp = strchr(oldurl,'?');
-	if(tmp)
-		*tmp = '\0';
+	LOG("Unclosed connection: %d\n", server_config.connection);
+}
 
-	rq = decode_request(client, method, url);
-	if(rq == NULL)
+static int config_handler(void* conf, const char* section, const char* name,
+                   const char* value)
+{
+    config_t* pconfig = (config_t*)conf;
+	//char * ppath = NULL;
+    if (MATCH("SERVER", "port")) {
+        pconfig->port = atoi(value);
+    } else if (MATCH("SERVER", "plugins")) {
+        pconfig->plugins_dir = strdup(value);
+    } else if (MATCH("SERVER", "plugins_ext")) {
+        pconfig->plugins_ext = strdup(value);
+    } else if(MATCH("SERVER", "database")) {
+        pconfig->db_path = strdup(value);
+    } else if(MATCH("SERVER", "htdocs")) {
+        pconfig->htdocs = strdup(value);
+    } else if(MATCH("SERVER", "tmpdir")) {
+        pconfig->tmpdir = strdup(value);
+    }
+ 	else if(MATCH("SERVER", "maxcon")) {
+        pconfig->maxcon = atoi(value);
+    }
+	else if(MATCH("SERVER", "backlog")) {
+        pconfig->backlog = atoi(value);
+    }
+	else if(MATCH("SERVER", "workers")) {
+        pconfig->n_workers = atoi(value);
+    }
+#ifdef USE_OPENSSL
+	else if(MATCH("SERVER", "ssl.enable")) {
+        pconfig->usessl = atoi(value);
+    }
+	else if(MATCH("SERVER", "ssl.cert")) {
+        pconfig->sslcert = strdup(value);
+    }
+	else if(MATCH("SERVER", "ssl.key")) {
+        pconfig->sslkey = strdup(value);
+    }
+#endif
+	else if (strcmp(section, "RULES") == 0)
 	{
-		badrequest(client);
-		goto end;
-	}	
+		list_put_s(&pconfig->rules,  name);
+		list_put_s(&pconfig->rules,  value);
+    }
+	else if (strcmp(section, "FILEHANDLER") == 0)
+	{
+		dput( pconfig->handlers, name ,strdup(value));
+    }
+	else if(strcmp(section,"AUTOSTART")==0){
+		// The server section must be added before the autostart section
+		// auto start plugin
+		plugin_load(value);
+    } else {
+        return 0;  /* unknown section/name, error */
+    }
+    return 1;
+}
+void init_file_system()
+{
+	struct stat st;
+	if (stat(server_config.plugins_dir, &st) == -1)
+   		mkdir(server_config.plugins_dir, 0755);
+   	if (stat(server_config.db_path, &st) == -1)
+   		mkdir(server_config.db_path, 0755);
+   	if (stat(server_config.htdocs, &st) == -1)
+   		mkdir(server_config.htdocs, 0755);
+   	if (stat(server_config.tmpdir, &st) == -1)
+   		mkdir(server_config.tmpdir, 0755);
+   	else
+   	{
+   		removeAll(server_config.tmpdir,0);
+   	}
+
+}
+void load_config(const char* file)
+{
+	server_config.port = 8888;
+	server_config.plugins_dir = "plugins/";
+	server_config.plugins_ext = ".dylib";
+	server_config.db_path = "databases/";
+	server_config.htdocs = "htdocs/";
+	server_config.tmpdir = "tmp/";
+	server_config.n_workers = 4;
+	server_config.backlog = 100;
+	server_config.rules = list_init();
+	server_config.handlers = dict();
+	server_config.maxcon = 1000;
+	server_config.connection = 0;
+#ifdef USE_OPENSSL
+	server_config.usessl = 0;
+	server_config.sslcert = "cert.pem";
+	server_config.sslkey = "key.pem";
+#endif
+	if (ini_parse(file, config_handler, &server_config) < 0) {
+		LOG("Can't load '%s'\n. Used defaut configuration", file);
+	}
+	else
+	{
+		LOG("Using configuration : %s\n", file);
+#ifdef USE_OPENSSL
+		LOG("SSL enable %d\n", server_config.usessl);
+		LOG("SSL cert %s\n", server_config.sslcert);
+		LOG("SSL key %s\n", server_config.sslkey);
+#endif
+	}
+	init_file_system();
+} 
+
+
+void* accept_request(void* data)
+{
+	int count;
+	char buf[BUFFLEN];
+	char* token =  NULL;
+	char* line = NULL;
+	antd_task_t* task;
+	antd_request_t* rq = (antd_request_t*) data;
+	
+	task = antd_create_task(NULL,(void*)rq,NULL);
+	task->priority++;
+	fd_set read_flags, write_flags;
+	// first verify if the socket is ready
+	antd_client_t* client = (antd_client_t*) rq->client;
+	FD_ZERO(&read_flags);
+    FD_SET(rq->client->sock, &read_flags);
+	FD_ZERO(&write_flags);
+    FD_SET(rq->client->sock, &write_flags);
+	struct timeval timeout;      
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 500;
+	// select
+	int sel = select(client->sock+1, &read_flags, &write_flags, (fd_set*)0, &timeout);
+	if(sel == -1)
+	{
+		unknow(rq->client);
+		return task;
+	}
+	if(sel == 0 || (!FD_ISSET(client->sock, &read_flags) &&  !FD_ISSET(client->sock, &write_flags)))
+	{
+		// retry it later
+		task->handle = accept_request;
+		return task;
+	}
+	// perform the ssl handshake if enabled
+#ifdef USE_OPENSSL
+	int ret,stat;
+	if(server_config.usessl == 1 && client->status == 0)
+	{
+		if (SSL_accept((SSL*)client->ssl) == -1) {
+			stat = SSL_get_error((SSL*)client->ssl, ret);
+			switch(stat)
+			{
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE:
+				case SSL_ERROR_NONE:
+					//LOG("RECALL %d\n", stat);
+					task->handle = accept_request;
+					task->priority = HIGH_PRIORITY;
+					return task;
+				default:
+					LOG("ERRRRRRRRROR accept %d %d %d\n", stat, ret, ERR_get_error());
+					ERR_print_errors_fp(stderr);
+					return task;
+			}
+		}
+		client->status = 1;
+		task->handle = accept_request;
+		return task;
+	}
+	else
+	{
+		if(!FD_ISSET(client->sock, &read_flags))
+		{
+			task->handle = accept_request;
+			return task;
+		}
+	}
+#endif
+	server_config.connection++;
+	count = read_buf(rq->client, buf, sizeof(buf));
+	//LOG("count is %d\n", count);
+	line = buf;
+	// get the method string
+	token = strsep(&line," ");
+	if(!line)
+	{
+		LOG("No method found\n");
+		unknow(rq->client);
+		return task;
+	}
+	trim(token,' ');
+	trim(line,' ');
+	dput(rq->request, "METHOD", strdup(token));
+	// get the request
+	token = strsep(&line, " ");
+	if(!line)
+	{
+		LOG("No request found\n");
+		unknow(rq->client);
+		return task;
+	}
+	trim(token,' ');
+	trim(line,' ');
+	trim(line, '\n');
+	trim(line, '\r');
+	dput(rq->request, "PROTOCOL", strdup(line));
+	dput(rq->request, "REQUEST_QUERY", strdup(token));
+	line = token;
+	token = strsep(&line, "?");
+	dput(rq->request, "REQUEST_PATH", strdup(token));
+	// decode request
+	// now return the task
+	task->handle = decode_request_header;
+	return task;
+}
+
+void* resolve_request(void* data)
+{
+	struct stat st;
+	char path[2*BUFFLEN];
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL,(void*)rq,NULL);
+	task->priority++;
+	char* url = (char*)dvalue(rq->request, "RESOURCE_PATH");
+	char* newurl = NULL;
+	char* rqp = (char*)dvalue(rq->request, "REQUEST_PATH");
 	sprintf(path, server_config.htdocs);
 	strcat(path, url);
 	LOG("Path is : %s \n", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1) {
-		if(execute_plugin(client,oldurl,method,rq) < 0)
-			not_found(client);
+		free(task);
+		return execute_plugin(rq, rqp);
 	}
 	else
 	{
 		if (S_ISDIR(st.st_mode))
 		{
-			int l = strlen(path);
-			int ul = strlen(url);
 			strcat(path, "/index.html");
 			if(stat(path, &st) == -1)
 			{
 				association it;
 				for_each_assoc(it, server_config.handlers)
 				{
-					path[l] = '\0';
-					url[ul] = '\0';
-					strcat(url,"/index.");
-					strcat(path, "/index.");
-					strcat(url,it->key);
-					strcat(path, it->key);
-					if(stat(path, &st) == 0)
+					newurl = __s("%s/index.%s", url, it->key);
+					memset(path, 0, sizeof(path));
+					strcat(path, server_config.htdocs);
+					strcat(path, newurl);
+					if(stat(path, &st) != 0)
 					{
-						l = -1;
-						i = HASHSIZE;
+						free(newurl);
+						newurl = NULL;
+					}
+					else
+					{
 						break;
 					}
 				}
-				if(l!= -1)
+				if(!newurl)
 				{
-					not_found(client);
-					goto end;
+					notfound(rq->client);
+					return task;
 				}
+				//if(url) free(url); this is freed in the dput function
+				url = newurl;
+				dput(rq->request, "RESOURCE_PATH", url);
 			}
 		}
+		dput(rq->request, "ABS_RESOURCE_PATH", strdup(path));
 		// check if the mime is supported
 		// if the mime is not supported
 		// find an handler plugin to process it
 		// if the plugin is not found, forbidden access to the file should be sent
 		char* mime_type = mime(path);
+		dput(rq->request, "RESOURCE_MIME", strdup(mime_type));
 		if(strcmp(mime_type,"application/octet-stream") == 0)
 		{
 			char * ex = ext(path);
@@ -122,44 +301,50 @@ void accept_request(void* client)
 			if(ex) free(ex);
 			if(h)
 			{
-				sprintf(buf,"/%s%s",h,url);
-				LOG("WARNING::::Access octetstream via handler %s\n", buf);
-				if(execute_plugin(client,buf,method,rq) < 0)
-					cannot_execute(client);
+				sprintf(path,"/%s%s",h,url);
+				LOG("WARNING::::Access octetstream via handler %s\n", path);
+				//if(execute_plugin(client,buf,method,rq) < 0)
+				//	cannot_execute(client);
+				free(task);
+				return execute_plugin(rq, path);
 			}
 			else
-				unknow(client);
+				unknow(rq->client);
 			
 		}
 		else
 		{
-			ctype(client,mime_type);
-			// if the mime is supported, send the file						
-			serve_file(client, path);
-			//response(client,"this is the file");
-		}		
+			task->type = HEAVY;
+			task->handle = serve_file;
+		}	
+		return task;
 	}
-end:
-	if(oldurl) free(oldurl);
-	if(rq)
-	{
-		dictionary subdict;
-		subdict = (dictionary)dvalue(rq, "__xheader__");
-		if(subdict)
-		{
-			freedict(subdict);
-			dput(rq, "__xheader__", NULL);
-		}
+}
 
-		subdict = (dictionary)dvalue(rq, "cookie");
-		if(subdict)
-		{
-			freedict(subdict);
-			dput(rq, "cookie", NULL);
-		}
-		freedict(rq);
+void* finish_request(void* data)
+{
+	if(!data) return NULL;
+	LOG("Close request\n");
+	antd_request_t* rq = (antd_request_t*)data;
+	// free all other thing
+	if(rq->request)
+	{
+		dictionary tmp = dvalue(rq->request, "COOKIE");
+		if(tmp) freedict(tmp);
+		tmp =  dvalue(rq->request, "REQUEST_HEADER");
+		if(tmp) freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_DATA");
+		if(tmp) freedict(tmp);
+		dput(rq->request, "REQUEST_HEADER", NULL);
+		dput(rq->request, "REQUEST_DATA", NULL);
+		dput(rq->request, "COOKIE", NULL);
+		freedict(rq->request);
 	}
-	antd_close(client);
+	antd_close(rq->client);
+	free(rq);
+	server_config.connection--; 
+	LOG("Remaining connection %d\n", server_config.connection);
+	return NULL;
 }
 
 int rule_check(const char*k, const char* v, const char* host, const char* _url, const char* _query, char* buf)
@@ -232,164 +417,28 @@ int rule_check(const char*k, const char* v, const char* host, const char* _url, 
 	free(query);
 	return 1;
 }
-/**********************************************************************/
-/* Put the entire contents of a file out on a socket.  This function
-* is named after the UNIX "cat" command, because it might have been
-* easier just to do something like pipe, fork, and exec("cat").
-* Parameters: the client socket descriptor
-*             FILE pointer for the file to cat */
-/**********************************************************************/
-void catb(void* client, FILE* ptr)
-{
-	unsigned char buffer[BUFFLEN];
-	size_t size;
-	while(!feof(ptr))
-	{
-		size = fread(buffer,1,BUFFLEN,ptr);
-		__b(client,buffer,size);
-		//if(!__b(client,buffer,size)) return;
-	}
-	//fclose(ptr);
-}
-void cat(void* client, FILE *resource)
-{
-	char buf[1024];
-	//fgets(buf, sizeof(buf), resource);
-	while (fgets(buf, sizeof(buf), resource) != NULL)
-	{
-		antd_send(client, buf, strlen(buf));
-		//fgets(buf, sizeof(buf), resource);
-	}
 
-
-}
-
-/**********************************************************************/
-/* Inform the client that a CGI script could not be executed.
-* Parameter: the client socket descriptor. */
-/**********************************************************************/
-void cannot_execute(void* client)
-{
-	set_status(client,500,"Internal Server Error");
-	__t(client,SERVER_STRING);
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client, "<P>Error prohibited CGI execution.");
-}
-
-/**********************************************************************/
-/* Print out an error message with perror() (for system errors; based
-* on value of errno, which indicates system call errors) and exit the
-* program indicating an error. */
-/**********************************************************************/
-void error_die(const char *sc)
+static void error_die(const char *sc)
 {
 	perror(sc);
 	exit(1);
 }
-
-/**********************************************************************/
-/* Get a line from a socket, whether the line ends in a newline,
-* carriage return, or a CRLF combination.  Terminates the string read
-* with a null character.  If no newline indicator is found before the
-* end of the buffer, the string is terminated with a null.  If any of
-* the above three line terminators is read, the last character of the
-* string will be a linefeed and the string will be terminated with a
-* null character.
-* Parameters: the socket descriptor
-*             the buffer to save the data in
-*             the size of the buffer
-* Returns: the number of bytes stored (excluding null) */
-/**********************************************************************/
-//This function is deprecate
-/*int get_line(int sock, char *buf, int size)
+void* serve_file(void* data)
 {
-	int i = 0;
-	char c = '\0';
-	int n;
-
-	while ((i < size - 1) && (c != '\n'))
-	{
-		n = recv(sock, &c, 1, 0);
-		
-		if (n > 0)
-		{
-			if (c == '\r')
-			{
-				n = recv(sock, &c, 1, MSG_PEEK);
-				
-				if ((n > 0) && (c == '\n'))
-					recv(sock, &c, 1, 0);
-				else
-					c = '\n';
-			}
-			buf[i] = c;
-			i++;
-		}
-		else
-			c = '\n';
-	}
-	buf[i] = '\0';
-
-	return(i);
-}*/
-
-
-/**********************************************************************/
-/* Give a client a 404 not found status message. */
-/**********************************************************************/
-void not_found(void* client)
-{
-	set_status(client,404,"NOT FOUND");
-	__t(client,SERVER_STRING);
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client, "<HTML><TITLE>Not Found</TITLE>");
-	__t(client, "<BODY><P>The server could not fulfill");
-	__t(client, "your request because the resource specified");
-	__t(client, "is unavailable or nonexistent.");
-	__t(client, "</BODY></HTML>");
-}
-
-/**********************************************************************/
-/* Send a regular file to the client.  Use headers, and report
-* errors to client if they occur.
-* Parameters: a pointer to a file structure produced from the socket
-*              file descriptor
-*             the name of the file to serve */
-/**********************************************************************/
-void serve_file(void* client, const char *filename)
-{
-	LOG("Serve file: %s\n", filename);
-	FILE *resource = NULL;
-	int numchars = 1;
-	//char buf[1024];
-
-	//buf[0] = 'A'; buf[1] = '\0';
-	//while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-	//	numchars = get_line(client, buf, sizeof(buf));
-
-	resource = fopen(filename, "rb");
-	if (resource == NULL)
-		not_found(client);
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL,(void*)rq,NULL);
+	task->priority++;
+	char* path = (char*)dvalue(rq->request, "ABS_RESOURCE_PATH");
+	char* newurl = NULL;
+	char* mime_type = (char*)dvalue(rq->request, "RESOURCE_MIME");
+	ctype(rq->client,mime_type);
+	if(is_bin(path))
+		__fb(rq->client, path);
 	else
-	{
-		if(is_bin(filename))
-			catb(client,resource);
-		else
-			cat(client, resource);
-	}
-	fclose(resource);
+		__f(rq->client, path);
+	return task;
 }
 
-/**********************************************************************/
-/* This function starts the process of listening for web connections
-* on a specified port.  If the port is 0, then dynamically allocate a
-* port and modify the original port variable to reflect the actual
-* port.
-* Parameters: pointer to variable containing the port to connect on
-* Returns: the socket */
-/**********************************************************************/
 int startup(unsigned *port)
 {
 	int httpd = 0;
@@ -415,32 +464,6 @@ int startup(unsigned *port)
 	if (listen(httpd, server_config.backlog) < 0)
 		error_die("listen");
 	return(httpd);
-}
-
-/**********************************************************************/
-/* Inform the client that the requested web method has not been
-* implemented.
-* Parameter: the client socket */
-/**********************************************************************/
-void unimplemented(void* client)
-{
-	set_status(client,501,"Method Not Implemented");
-	__t(client,SERVER_STRING);
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client, "<HTML><HEAD><TITLE>Method Not Implemented");
-	__t(client, "</TITLE></HEAD>");
-	__t(client, "<BODY><P>HTTP request method not supported.");
-	__t(client, "</BODY></HTML>");
-}
-
-void badrequest(void* client)
-{
-	set_status(client,400,"Bad Request");
-	__t(client,SERVER_STRING);
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client,"The request could not be understood by the server due to malformed syntax.");
 }
 
 char* apply_rules(const char* host, char*url)
@@ -479,39 +502,29 @@ char* apply_rules(const char* host, char*url)
 	return strdup(query_string);
 }
 /**
- * Decode the HTTP request
- * Get the cookie values
- * if it is the GET request, decode the query string into a dictionary
- * if it is a POST, check the content type of the request
- * 		- if it is a POST request with URL encoded : decode the url encode
- * 		- if it is a POST request with multipart form data: de code the multipart
- * 		- if other - UNIMPLEMENTED
- * @param  client socket client
- * @param  method HTTP method
- * @param  query  query string in case of GET
- * @return        a dictionary of key- value
+ * Decode the HTTP request header
  */
-dictionary decode_request(void* client,const char* method, char* url)
+
+void* decode_request_header(void* data)
 {
-	dictionary request = dict();
+	antd_request_t* rq = (antd_request_t*) data;
 	dictionary cookie = NULL;
-	dictionary xheader = dict();
 	char* line;
 	char * token;
 	char* query = NULL;
-	char* ctype = NULL;
 	char* host = NULL;
-	int clen = -1;
-
+	char buf[2*BUFFLEN];
+	char* url = (char*)dvalue(rq->request, "REQUEST_QUERY");
+	dictionary xheader = dict();
+	dictionary request = dict();
+	dput(rq->request,"REQUEST_HEADER",xheader);
+	dput(rq->request,"REQUEST_DATA",request);
 	// first real all header
 	// this for check if web socket is enabled
-	int ws= 0;
-	char* ws_key = NULL;
-	char buf[BUFFLEN];
 	// ip address
-	dput(xheader,"REMOTE_ADDR", (void*)strdup(((antd_client_t*)client)->ip ));
+	dput(xheader,"REMOTE_ADDR", (void*)strdup(((antd_client_t*)rq->client)->ip ));
 	//while((line = read_line(client)) && strcmp("\r\n",line))
-	while((read_buf(client,buf,sizeof(buf))) && strcmp("\r\n",buf))
+	while((read_buf(rq->client,buf,sizeof(buf))) && strcmp("\r\n",buf))
 	{
 		line = buf;
 		trim(line, '\n');
@@ -525,109 +538,125 @@ dictionary decode_request(void* client,const char* method, char* url)
 		{
 			if(!cookie) cookie = decode_cookie(line);
 		}
-		else if(token != NULL &&strcasecmp(token,"Content-Type") == 0)
-		{
-			ctype = strdup(line); //strsep(&line,":");
-			trim(ctype,' ');
-		} else if(token != NULL &&strcasecmp(token,"Content-Length") == 0)
-		{
-			token = line; //strsep(&line,":");
-			trim(token,' ');
-			clen = atoi(token);
-		}
-		else if(token != NULL && strcasecmp(token,"Upgrade") == 0)
-		{
-			// verify that the connection is upgrade to websocket
-			trim(line, ' ');
-			if(line != NULL && strcasecmp(line,"websocket") == 0)
-				ws = 1;
-		}else if(token != NULL && strcasecmp(token,"Host") == 0)
+		else if(token != NULL && strcasecmp(token,"Host") == 0)
 		{
 			host = strdup(line);
 		}
-			else if(token != NULL && strcasecmp(token,"Sec-WebSocket-Key") == 0)
-		{
-			// get the key from the client
-			trim(line, ' ');
-			ws_key = strdup(line);
-		}
 	}
 	//if(line) free(line);
-	query = apply_rules(host, url);
+	memset(buf, 0, sizeof(buf));
+	strcat(buf,url);
+	query = apply_rules(host, buf);
+	dput(rq->request,"RESOURCE_PATH",strdup(buf));
 	if(query)
 	{
 		LOG("Query: %s\n", query);
 		decode_url_request(query, request);
 		free(query);
 	}
+	if(cookie)
+		dput(rq->request,"COOKIE",cookie);
 	if(host) free(host);
-	if(strcmp(method,"GET") == 0)
+	// header ok, now checkmethod
+	antd_task_t* task = antd_create_task(decode_request,(void*)rq, NULL);
+	task->priority++;
+	return task;
+}
+
+void* decode_request(void* data)
+{
+	antd_request_t* rq = (antd_request_t*) data;
+	dictionary request = dvalue(rq->request, "REQUEST_DATA");
+	dictionary headers = dvalue(rq->request, "REQUEST_HEADER");
+	int ws = 0;
+	char*ws_key = NULL;
+	char* method = NULL;
+	char* tmp;
+	antd_task_t* task = NULL;
+	ws_key = (char*) dvalue(headers, "Sec-WebSocket-Key");
+	tmp = (char*)dvalue(headers, "Upgrade");
+	if(tmp && strcasecmp(tmp, "websocket") == 0) ws = 1;
+	method = (char*) dvalue(rq->request, "METHOD");
+	task = antd_create_task(NULL,(void*)rq, NULL);
+	task->priority++;
+	if(strcmp(method,"GET") == 0 || strcmp(method,"PUT") == 0)
 	{
 		//if(ctype) free(ctype); 
 		if(ws && ws_key != NULL)
 		{
-			ws_confirm_request(client, ws_key);
-			free(ws_key);
+			ws_confirm_request(rq->client, ws_key);
 			// insert wsocket flag to request
 			// plugin should handle this ugraded connection
 			// not the server
-			//if(!request) request = dict();
-			dput(request,"__web_socket__",strdup("1"));
+			dput(rq->request,"__web_socket__",strdup("1"));
 		}
+		// resolve task
+		task->handle = resolve_request;
+		return task;
+	}
+	else if(strcmp(method,"POST") == 0)
+	{
+		task->handle = decode_post_request;
+		task->type = HEAVY;
+		return task;
 	}
 	else
 	{
-		if(ws_key)
-			free(ws_key);
-		if(ctype == NULL || clen == -1)
-		{
-			LOG("Bad request\n");
-			if(ctype) free(ctype);
-			if(cookie) freedict(cookie);
-			freedict(request);
-			freedict(xheader);
-			return NULL;
-		}
-		LOG("ContentType %s\n", ctype);
-		// decide what to do with the data
-		if(strstr(ctype,FORM_URL_ENCODE) > 0)
-		{
-			char* pquery = post_data_decode(client,clen);
-			decode_url_request(pquery, request);
-			free(pquery);
-		} else if(strstr(ctype,FORM_MULTI_PART)> 0)
-		{
-			//printf("Multi part form : %s\n", ctype);
-			decode_multi_part_request(client,ctype,request);
-		} 
-		else
-		{
-			char* pquery = post_data_decode(client,clen);
-			char* key = strstr(ctype,"/");
-			if(key)
-				key++;
-			else
-				key = ctype;
-			dput(request,key, strdup(pquery));
-			free(pquery);
-		}
+		unimplemented(rq->client);
+		return task;
 	}
-	if(ctype) free(ctype);
-	//if(cookie->key == NULL) {free(cookie);cookie= NULL;}
-	//if(!request)
-	//		request = dict();
-	if(cookie)
-		dput(request,"cookie",cookie);
-	dput(request,"__xheader__",xheader);
-	return request;
 }
-void __px(const char* data,int size)
+
+void* decode_post_request(void* data)
 {
-	for (int i = 0; i < size; ++i)
-			printf(" %02x", data[i]);
-			
-	printf("\n");
+	antd_request_t* rq = (antd_request_t*) data;
+	dictionary request = dvalue(rq->request, "REQUEST_DATA");
+	dictionary headers = dvalue(rq->request, "REQUEST_HEADER");
+	char* ctype  = NULL;
+	int clen = -1;
+	char* tmp;
+	antd_task_t* task = NULL;
+	ctype = (char*) dvalue(headers, "Content-Type");
+	tmp = (char*)dvalue(headers, "Content-Length");
+	if(tmp)
+		clen = atoi(tmp);
+	task = antd_create_task(NULL,(void*)rq, NULL);
+	task->priority++;
+	if(ctype == NULL || clen == -1)
+	{
+		LOG("Bad request\n");
+		badrequest(rq->client);
+		return task;
+	}
+	LOG("ContentType %s\n", ctype);
+	// decide what to do with the data
+	if(strstr(ctype,FORM_URL_ENCODE) > 0)
+	{
+		char* pquery = post_data_decode(rq->client,clen);
+		decode_url_request(pquery, request);
+		free(pquery);
+	} else if(strstr(ctype,FORM_MULTI_PART)> 0)
+	{
+		//printf("Multi part form : %s\n", ctype);
+		// TODO: split this to multiple task
+		free(task);
+		return decode_multi_part_request(rq,ctype,request);
+	} 
+	else
+	{
+		char* pquery = post_data_decode(rq->client,clen);
+		char* key = strstr(ctype,"/");
+		if(key)
+			key++;
+		else
+			key = ctype;
+		dput(request,key, strdup(pquery));
+		free(pquery);
+	}
+	task->handle = resolve_request;
+	return task;
 }
+
 /**
 * Send header to the client to confirm 
 * that the websocket is accepted by
@@ -688,195 +717,208 @@ dictionary decode_cookie(const char* line)
 		token1 = strsep(&token,"=");
 		if(token1 && token && strlen(token) > 0)
 		{
-			if(dic == NULL)
-				dic = dict();
+			if(dic == NULL) dic = dict();
 			dput(dic,token1,strdup(token));
 		}
 	}
-		//}
 	free(orgcpy);
 	return dic;
 }
 /**
  * Decode the multi-part form data from the POST request
  * If it is a file upload, copy the file to tmp dir
- * and generate the metadata for the server-side
- * @param  client the socket client
- * @param  ctype  Content-Type of the request
- * @param  clen   Content length, but not used here
- * @return        a dictionary of key - value
  */
-void decode_multi_part_request(void* client,const char* ctype, dictionary dic)
+void* decode_multi_part_request(void* data,const char* ctype, dictionary dic)
 {
 	char * boundary;
-	char * boundend;
 	char * line;
-	char * orgline;
 	char * str_copy = strdup(ctype);
 	char* orgcpy = str_copy;
-	char* token;
-	char* keytoken ;
-	char* valtoken ;
-	char* part_name;
-	char* part_file;
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL);
+	task->priority++;
+	//dictionary dic = NULL;
+	FILE *fp = NULL;
+	boundary = strsep(&str_copy,"="); //discard first part
+	boundary = str_copy; 
+	if(boundary && strlen(boundary)>0)
+	{
+		//dic = dict();
+		trim(boundary,' ');
+		dput(rq->request, "MULTI_PART_BOUNDARY", strdup(boundary));
+		//find first boundary
+		while((line = read_line(rq->client))&&strstr(line,boundary) <= 0)
+		{
+			if(line) free(line);
+		}
+		if(line)
+		{
+			task->handle = decode_multi_part_request_data;
+			task->type  = HEAVY;
+			free(line);
+		}
+	}
+	free(orgcpy);
+	return task;
+}
+void* decode_multi_part_request_data(void* data)
+{
+	// loop through each part separated by the boundary
+	char* line;
+	char* orgline;
+	char* part_name = NULL;
+	char* part_file = NULL;
 	char* file_path;
 	char  buf[BUFFLEN];
 	char* field;
 	//dictionary dic = NULL;
 	FILE *fp = NULL;
-	boundary = strsep(&str_copy,"="); //discard first part
-	boundary = strsep(&str_copy,"="); 
-	if(boundary && strlen(boundary)>0)
+	char* token, *keytoken, *valtoken;
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL);
+	task->priority++;
+	char* boundary = (char*)dvalue(rq->request, "MULTI_PART_BOUNDARY");
+	dictionary dic = (dictionary)dvalue(rq->request, "REQUEST_DATA");
+	char* boundend = __s("%s--",boundary);
+	// search for content disposition:
+	while((line = read_line(rq->client)) &&
+			strstr(line,"Content-Disposition:") <= 0)
 	{
-		//dic = dict();
-		trim(boundary,' ');
-		boundend = __s("%s--",boundary);
-		//find first boundary
-		while((line = read_line(client))&&strstr(line,boundary) <= 0)
-		{
-			if(line) free(line);
-		}
-		// loop through each part separated by the boundary
-		while(line && strstr(line,boundary) > 0){
-			if(line)
-			{
-				free(line);
-				line = NULL;
-			}
-			// search for content disposition:
-			while((line = read_line(client)) &&
-					strstr(line,"Content-Disposition:") <= 0)
-			{
-				free(line);
-				line = NULL;
-			}
-			if(!line || strstr(line,"Content-Disposition:") <= 0)
-			{
-				if(line)
-					free(line);
-				free(orgcpy);
-				free(boundend);
-				return;
-			}
-			orgline = line;
-			// extract parameters from header
-			part_name = NULL;
-			part_file = NULL;
-			while((token = strsep(&line,";")))
-			{
-				keytoken = strsep(&token,"=");
-				if(keytoken && strlen(keytoken)>0)
-				{
-					trim(keytoken,' ');
-					valtoken = strsep(&token,"=");
-					if(valtoken)
-					{
-						trim(valtoken,' ');
-						trim(valtoken,'\n');
-						trim(valtoken,'\r');
-						trim(valtoken,'\"');
-						if(strcmp(keytoken,"name") == 0)
-						{
-							part_name = strdup(valtoken);
-						} else if(strcmp(keytoken,"filename") == 0)
-						{
-							part_file = strdup(valtoken);
-						}
-					}
-				}
-			}
-			free(orgline);
-			line = NULL;
-			// get the binary data
-			if(part_name != NULL)
-			{
-				// go to the beginer of data bock
-				while((line = read_line(client)) && strcmp(line,"\r\n") != 0)
-				{
-					free(line);
-					line = NULL;
-				}
-				if(line)
-				{
-					free(line);
-					line = NULL;
-				}
-				if(part_file == NULL)
-				{
-					/**
-					 * This allow only 1024 bytes of data (max),
-					 * out of this range, the data is cut out.
-					 * Need an efficient way to handle this
-					 */
-					line = read_line(client);
-					trim(line,'\n');
-					trim(line,'\r');
-					trim(line,' ');
-					dput(dic,part_name,line);
-					// find the next boundary
-					while((line = read_line(client)) && strstr(line,boundary) <= 0)
-					{
-						free(line);
-						line = NULL;
-					}
-				}
-				else
-				{
-					file_path = __s("%s%s.%u",server_config.tmpdir,part_file,(unsigned)time(NULL));
-					fp=fopen(file_path, "wb");
-					if(fp)
-					{
-						int totalsize=0,len=0;
-						//read until the next boundary
-						while((len = read_buf(client,buf,sizeof(buf))) > 0 && strstr(buf,boundary) <= 0)
-						{
-							fwrite(buf, len, 1, fp);
-							totalsize += len;
-						}
-						//remove \r\n at the end
-						fseek(fp, 0, SEEK_SET);
-						//fseek(fp,-2, SEEK_CUR);
-						totalsize -= 2;
-						ftruncate(fileno(fp),totalsize); 
-						fclose(fp);
-						line = strdup(buf);
-
-						field = __s("%s.file",part_name);
-						dput(dic,field, strdup(part_file));
-						free(field);
-						field = __s("%s.tmp",part_name);
-						dput(dic,field,strdup(file_path));
-						free(field);
-						field = __s("%s.size",part_name);
-						dput(dic,field,__s("%d",totalsize));
-						free(field);
-						field = __s("%s.ext",part_name);
-						dput(dic,field,ext(part_file));
-						free(field);
-
-					}
-					else
-					{
-						LOG("Cannot wirte file to :%s\n", file_path );
-					}
-					free(file_path);
-					free(part_file);
-				}
-				free(part_name);
-			}
-			//printf("[Lines]:%s\n",line);
-			// check if end of request
-			if(line&&strstr(line,boundend)>0)
-			{
-				LOG("End request %s\n", boundend);
-				free(line);
-				break;
-			}
-		}
-		free(boundend);
+		free(line);
+		line = NULL;
 	}
-	free(orgcpy);
-	//return dic;
+	if(!line || strstr(line,"Content-Disposition:") <= 0)
+	{
+		if(line)
+			free(line);
+		free(boundend);
+		return task;
+	}
+	orgline = line;
+	// extract parameters from header
+	while((token = strsep(&line,";")))
+	{
+		keytoken = strsep(&token,"=");
+		if(keytoken && strlen(keytoken)>0)
+		{
+			trim(keytoken,' ');
+			valtoken = strsep(&token,"=");
+			if(valtoken)
+			{
+				trim(valtoken,' ');
+				trim(valtoken,'\n');
+				trim(valtoken,'\r');
+				trim(valtoken,'\"');
+				if(strcmp(keytoken,"name") == 0)
+				{
+					part_name = strdup(valtoken);
+				} else if(strcmp(keytoken,"filename") == 0)
+				{
+					part_file = strdup(valtoken);
+				}
+			}
+		}
+	}
+	free(orgline);
+	line = NULL;
+	// get the binary data
+	if(part_name != NULL)
+	{
+		// go to the beginer of data bock
+		while((line = read_line(rq->client)) && strcmp(line,"\r\n") != 0)
+		{
+			free(line);
+			line = NULL;
+		}
+		if(line)
+		{
+			free(line);
+			line = NULL;
+		}
+		if(part_file == NULL)
+		{
+			/**
+			 * This allow only 1024 bytes of data (max),
+			 * out of this range, the data is cut out.
+			 * Need an efficient way to handle this
+			 */
+			line = read_line(rq->client);
+			trim(line,'\n');
+			trim(line,'\r');
+			trim(line,' ');
+			dput(dic,part_name,line);
+			// find the next boundary
+			while((line = read_line(rq->client)) && strstr(line,boundary) <= 0)
+			{
+				free(line);
+				line = NULL;
+			}
+		}
+		else
+		{
+			file_path = __s("%s%s.%u",server_config.tmpdir,part_file,(unsigned)time(NULL));
+			fp=fopen(file_path, "wb");
+			if(fp)
+			{
+				int totalsize=0,len=0;
+				//read until the next boundary
+				// TODO: this is not efficient for big file
+				// need a solution
+				while((len = read_buf(rq->client,buf,sizeof(buf))) > 0 && strstr(buf,boundary) <= 0)
+				{
+					fwrite(buf, len, 1, fp);
+					totalsize += len;
+				}
+				//remove \r\n at the end
+				fseek(fp, 0, SEEK_SET);
+				//fseek(fp,-2, SEEK_CUR);
+				totalsize -= 2;
+				ftruncate(fileno(fp),totalsize); 
+				fclose(fp);
+				line = strdup(buf);
+
+				field = __s("%s.file",part_name);
+				dput(dic,field, strdup(part_file));
+				free(field);
+				field = __s("%s.tmp",part_name);
+				dput(dic,field,strdup(file_path));
+				free(field);
+				field = __s("%s.size",part_name);
+				dput(dic,field,__s("%d",totalsize));
+				free(field);
+				field = __s("%s.ext",part_name);
+				dput(dic,field,ext(part_file));
+				free(field);
+
+			}
+			else
+			{
+				LOG("Cannot wirte file to :%s\n", file_path );
+			}
+			free(file_path);
+			free(part_file);
+		}
+		free(part_name);
+	}
+	//printf("[Lines]:%s\n",line);
+	// check if end of request
+	if(line&&strstr(line,boundend)>0)
+	{
+		LOG("End request %s\n", boundend);
+		task->handle = resolve_request;
+		free(line);
+		free(boundend);
+		return task;
+	}
+	if(line && strstr(line,boundary) > 0)
+	{
+		// continue upload
+		task->type = HEAVY;
+		task->handle = decode_multi_part_request_data;
+	}
+	free(line);
+	free(boundend);
+	return task;
 }
 /**
  * Decode a query string (GET request or POST URL encoded) to  
@@ -918,12 +960,26 @@ void decode_url_request(const char* query, dictionary dic)
 char* post_data_decode(void* client,int len)
 {
 	char *query = (char*) malloc((len+1)*sizeof(char));
-    for (int i = 0; i < len; i++) {
-      antd_recv(client, (query+i), 1);
-    }
-    query[len]='\0';
-    //query = url_decode(query);
-    //LOG("JSON Query %s\n", query);
+	char* ptr = query;
+	int readlen = len > BUFFLEN?BUFFLEN:len;
+	int read = 0, stat = 1;
+	while(readlen > 0 && stat > 0)
+	{
+		stat = antd_recv(client, ptr+read, readlen);
+		if(stat > 0)
+		{
+			read += stat;
+			readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+		}
+	}
+	
+	if(read > 0)
+    	query[read]='\0';
+	else
+	{
+		free(query);
+		query = NULL;
+	}
     return query;
 }
 
@@ -941,11 +997,11 @@ char* post_data_decode(void* client,int len)
  * @return              -1 if failure
  *                      1 if sucess
  */
-int execute_plugin(void* client, const char *path, const char *method, dictionary dic)
+void* execute_plugin(void* data, const char *path)
 {
 	char pname[255];
  	char pfunc[255];
- 	void (*fn)(void*, const char*,const char*, dictionary);
+ 	void* (*fn)(void*);
  	struct plugin_entry *plugin ;
 	int plen = strlen(path);
 	char * rpath = (char*) malloc((plen+1)*sizeof(char));
@@ -955,6 +1011,9 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
 	rpath[plen] = '\0';
 	trim(rpath,'/');
  	char * delim = strchr(rpath,'/');
+	antd_request_t* rq = (antd_request_t*) data;
+	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL); 
+	task->priority++;
  	if(delim == NULL)
  	{
  		strcpy(pname,rpath);
@@ -970,9 +1029,8 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
 		memcpy(pfunc,rpath+npos+1,fpos);
 		pfunc[fpos-1]='\0';
 	}
-	LOG("Client %d\n",((antd_client_t*)client)->sock );
+	LOG("Client %d\n",((antd_client_t*)rq->client)->sock );
 	LOG("Path : '%s'\n", rpath);
-	LOG("Method:%s\n", method);
 	LOG("Plugin name '%s'\n",pname);
 	LOG("Query path. '%s'\n", pfunc);
 	//LOG("query :%s\n", query_string);
@@ -986,22 +1044,23 @@ int execute_plugin(void* client, const char *path, const char *method, dictionar
 		if( plugin == NULL)
 		{
 			if(orgs) free(orgs);
-			return -1;
+			unknow(rq->client);
+			return task;
 		}
 	}
 	// load the function
-   fn = (void (*)(void*, const char *, const char*, dictionary))dlsym(plugin->handle, PLUGIN_HANDLER);
+   fn = (void* (*)(void*))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)  
 	{
 		if(orgs) free(orgs);
     	LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname,error);
-    	return -1;
+    	unknow(rq->client);
+		return task;
    }
-   //dictionary dic = decode_request(client,method,query_string);
-   	(*fn)(client,method,pfunc,dic);
-   //free(dic);
+   task->type = HEAVY;
+   task->handle = fn;
    free(orgs);
-   return 1;
+   return task;
 }
 
  #ifdef USE_OPENSSL

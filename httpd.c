@@ -2,9 +2,9 @@
 #include <dirent.h>
 #include "http_server.h"
 #include "libs/ini.h"
+static  antd_scheduler_t scheduler;
+static int server_sock = -1;
 
-#define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
-int server_sock = -1;
 #ifdef USE_OPENSSL
 static int ssl_session_ctx_id = 1;
 SSL_CTX *ctx;
@@ -53,13 +53,13 @@ void configure_context(SSL_CTX *ctx)
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     /* Set the key and cert */
 	/* use the full chain bundle of certificate */
-    //if (SSL_CTX_use_certificate_file(ctx, server_config.sslcert, SSL_FILETYPE_PEM) <= 0) {
-	if (SSL_CTX_use_certificate_chain_file(ctx, server_config.sslcert) <= 0) {
+    //if (SSL_CTX_use_certificate_file(ctx, server_config->sslcert, SSL_FILETYPE_PEM) <= 0) {
+	if (SSL_CTX_use_certificate_chain_file(ctx, config()->sslcert) <= 0) {
 	    ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, server_config.sslkey, SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, config()->sslkey, SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
@@ -72,117 +72,23 @@ void configure_context(SSL_CTX *ctx)
 
 #endif
 
-static int config_handler(void* conf, const char* section, const char* name,
-                   const char* value)
-{
-    config_t* pconfig = (config_t*)conf;
-	//char * ppath = NULL;
-    if (MATCH("SERVER", "port")) {
-        pconfig->port = atoi(value);
-    } else if (MATCH("SERVER", "plugins")) {
-        pconfig->plugins_dir = strdup(value);
-    } else if (MATCH("SERVER", "plugins_ext")) {
-        pconfig->plugins_ext = strdup(value);
-    } else if(MATCH("SERVER", "database")) {
-        pconfig->db_path = strdup(value);
-    } else if(MATCH("SERVER", "htdocs")) {
-        pconfig->htdocs = strdup(value);
-    } else if(MATCH("SERVER", "tmpdir")) {
-        pconfig->tmpdir = strdup(value);
-    }
- 	else if(MATCH("SERVER", "maxcon")) {
-        pconfig->maxcon = atoi(value);
-    }
-	else if(MATCH("SERVER", "backlog")) {
-        pconfig->backlog = atoi(value);
-    }
-#ifdef USE_OPENSSL
-	else if(MATCH("SERVER", "ssl.enable")) {
-        pconfig->usessl = atoi(value);
-    }
-	else if(MATCH("SERVER", "ssl.cert")) {
-        pconfig->sslcert = strdup(value);
-    }
-	else if(MATCH("SERVER", "ssl.key")) {
-        pconfig->sslkey = strdup(value);
-    }
-#endif
-	else if (strcmp(section, "RULES") == 0)
-	{
-		list_put_s(&pconfig->rules,  name);
-		list_put_s(&pconfig->rules,  value);
-    }
-	else if (strcmp(section, "FILEHANDLER") == 0)
-	{
-		dput( pconfig->handlers, name ,strdup(value));
-    }
-	else if(strcmp(section,"AUTOSTART")==0){
-		// The server section must be added before the autostart section
-		// auto start plugin
-		plugin_load(value);
-    } else {
-        return 0;  /* unknown section/name, error */
-    }
-    return 1;
-}
-void init_file_system()
-{
-	struct stat st;
-	if (stat(server_config.plugins_dir, &st) == -1)
-   		mkdir(server_config.plugins_dir, 0755);
-   	if (stat(server_config.db_path, &st) == -1)
-   		mkdir(server_config.db_path, 0755);
-   	if (stat(server_config.htdocs, &st) == -1)
-   		mkdir(server_config.htdocs, 0755);
-   	if (stat(server_config.tmpdir, &st) == -1)
-   		mkdir(server_config.tmpdir, 0755);
-   	else
-   	{
-   		removeAll(server_config.tmpdir,0);
-   	}
-
-}
-void load_config(const char* file)
-{
-	server_config.port = 8888;
-	server_config.plugins_dir = "plugins/";
-	server_config.plugins_ext = ".dylib";
-	server_config.db_path = "databases/";
-	server_config.htdocs = "htdocs";
-	server_config.tmpdir = "tmp";
-	server_config.backlog = 100;
-	server_config.rules = list_init();
-	server_config.handlers = dict();
-	server_config.maxcon = 1000;
-	server_config.connection = 0;
-#ifdef USE_OPENSSL
-	server_config.usessl = 0;
-	server_config.sslcert = "cert.pem";
-	server_config.sslkey = "key.pem";
-#endif
-	if (ini_parse(file, config_handler, &server_config) < 0) {
-		LOG("Can't load '%s'\n. Used defaut configuration", file);
-	}
-	else
-	{
-		LOG("Using configuration : %s\n", file);
-#ifdef USE_OPENSSL
-		LOG("SSL enable %d\n", server_config.usessl);
-		LOG("SSL cert %s\n", server_config.sslcert);
-		LOG("SSL key %s\n", server_config.sslkey);
-#endif
-	}
-	init_file_system();
-}
 void stop_serve(int dummy) {
-	list_free(&(server_config.rules));
-	freedict(server_config.handlers);
-	LOG("Unclosed connection: %d\n", server_config.connection);
-    unload_all_plugin();
+	UNUSED(dummy);
+	sigset_t mask;
+	sigemptyset(&mask);	
+	//Blocks the SIG_IGN signal (by adding SIG_IGN to newMask)
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGPIPE);
+	sigaddset(&mask, SIGABRT);
+	sigprocmask(SIG_BLOCK, &mask, NULL);
+	antd_scheduler_destroy(&scheduler);
+	unload_all_plugin();
+	destroy_config(); 
 #ifdef USE_OPENSSL
 	SSL_CTX_free(ctx);
 #endif
 	close(server_sock);
+	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
 int main(int argc, char* argv[])
 {
@@ -191,11 +97,10 @@ int main(int argc, char* argv[])
 		load_config(CONFIG);
 	else
 		load_config(argv[1]);
-	unsigned port = server_config.port;
+	unsigned port = config()->port;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	socklen_t client_name_len = sizeof(client_name);
-	pthread_t newthread;
 	char* client_ip = NULL;
 	// ignore the broken PIPE error when writing 
 	//or reading to/from a closed socked connection
@@ -204,7 +109,7 @@ int main(int argc, char* argv[])
 	signal(SIGINT, stop_serve);
 
 #ifdef USE_OPENSSL
-	if( server_config.usessl == 1 )
+	if( config()->usessl == 1 )
 	{
 		init_openssl();
     	ctx = create_context();
@@ -213,24 +118,24 @@ int main(int argc, char* argv[])
 	}
     
 #endif
-
 	server_sock = startup(&port);
 	LOG("httpd running on port %d\n", port);
-
-	while (1)
+	// default to 4 workers
+	antd_scheduler_init(&scheduler, config()->n_workers);
+    set_nonblock(server_sock);
+	while (scheduler.status)
 	{
-		if( server_config.connection >= server_config.maxcon )
-		{
-			LOG("Too many unclosed connection (%d). Wait for it\n", server_config.connection);
-			continue;
-		}
-		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+		antd_task_schedule(&scheduler);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
-			perror("Cannot accept client request\n");
+			//perror("Cannot accept client request\n");
 			continue;
 		}
+		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+		antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
+		request->client = client;
+		request->request = dict();
 		/*
 			get the remote IP
 		*/
@@ -240,40 +145,46 @@ int main(int argc, char* argv[])
 			client_ip =  inet_ntoa(client_name.sin_addr);
 			client->ip = strdup(client_ip);
 			LOG("Client IP: %s\n", client_ip);
+			LOG("socket: %d\n", client_sock);
 		}
 		//return &(((struct sockaddr_in6*)sa)->sin6_addr);
 		/* accept_request(client_sock); */
 
 		// set timeout to socket
-		struct timeval timeout;      
-		timeout.tv_sec = 20;
-		timeout.tv_usec = 0;
+		set_nonblock(client_sock);
+		/*struct timeval timeout;      
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 5000;
 
 		if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
 			perror("setsockopt failed\n");
 
 		if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
 			perror("setsockopt failed\n");
-
+		*/
 		client->sock = client_sock;
-		server_config.connection++;
-		//LOG("Unclosed connection: %d\n", server_config.connection);
+		// 100 times retry connection before abort
+		//LOG("Unclosed connection: %d\n", server_config->connection);
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
-		if(server_config.usessl == 1)
+		client->status = 0;
+		if(config()->usessl == 1)
 		{
 			client->ssl = (void*)SSL_new(ctx);
 			if(!client->ssl) continue;
-        	SSL_set_fd((SSL*)client->ssl, client_sock);
+        	SSL_set_fd((SSL*)client->ssl, client->sock);
 
-        	if (SSL_accept((SSL*)client->ssl) <= 0) {
+        	/*if (SSL_accept((SSL*)client->ssl) <= 0) {
+				LOG("EROOR accept\n");
             	ERR_print_errors_fp(stderr);
 				antd_close(client);
 				continue;
-        	}
+        	}*/
 		}
 #endif
-		if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
+		// create callback for the server
+		antd_add_task(&scheduler, antd_create_task(accept_request,(void*)request, finish_request ));
+		/*if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
 		{
 			perror("pthread_create");
 			antd_close(client);
@@ -282,7 +193,7 @@ int main(int argc, char* argv[])
 		{
 			//reclaim the stack data when thread finish
 			pthread_detach(newthread) ;
-		}
+		}*/
 		//accept_request(&client);
 	}
 

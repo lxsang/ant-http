@@ -11,11 +11,12 @@
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
+#include <fcntl.h>
 #include "dictionary.h"
 #include "list.h"
 #include "ini.h"
 
-#define SERVER_NAME "antd"
+#define SERVER_NAME "Antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)
 #define IS_GET(method) (strcmp(method,"GET")== 0)
 #define R_STR(d,k) ((char*)dvalue(d,k))
@@ -28,6 +29,21 @@
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif
+//extern config_t server_config;
+typedef struct{
+    int sock;
+    void* ssl;
+    char* ip;
+#ifdef USE_OPENSSL
+    int status;
+#endif
+} antd_client_t;
+
+typedef struct {
+    antd_client_t* client;
+    dictionary request;
+} antd_request_t;
+
 
 typedef struct  { 
 	int port;
@@ -41,19 +57,15 @@ typedef struct  {
     int backlog;
     int maxcon;
     int connection;
+    int n_workers;
 #ifdef USE_OPENSSL
     int usessl;
     char* sslcert;
     char* sslkey;
 #endif
 }config_t;
-//extern config_t server_config;
-typedef struct{
-    int sock;
-    void* ssl;
-    char* ip;
-} antd_client_t;
-
+void set_nonblock(int socket);
+void set_block(int socket);
 int response(void*, const char*);
 void ctype(void*,const char*);
 void redirect(void*,const char*);
@@ -75,6 +87,9 @@ void set_status(void*,int,const char*);
 void clear_cookie(void*, dictionary);
 /*Default function for plugin*/
 void unknow(void*);
+void badrequest(void* client);
+void unimplemented(void* client);
+void notfound(void* client);
 int ws_enable(dictionary);
 char* read_line(void* sock);
 int read_buf(void* sock,char* buf,int i);

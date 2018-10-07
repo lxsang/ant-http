@@ -3,13 +3,12 @@
 #include <dlfcn.h>
 #include "libs/utils.h"
 #include "libs/handle.h"
-
+#include "http_server.h"
 struct plugin_entry { 
     struct plugin_entry *next; 
     char *pname; 
     void *handle;
 };
-extern config_t server_config;
 /* lookup: look for s in hashtab */
 struct plugin_entry *plugin_lookup(char *s);
 /* install: put (name, defn) in hashtab */

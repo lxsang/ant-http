@@ -1,5 +1,4 @@
-#include "handle.h"
-config_t server_config; 
+#include "handle.h" 
 #ifdef USE_OPENSSL
 int usessl()
 {
@@ -96,18 +95,112 @@ int antd_send(void *src, const void* data, int len)
 int antd_recv(void *src,  void* data, int len)
 {
 	if(!src) return -1;
-	int ret;
+	int read;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
-		//LOG("SSL READ\n");
-		ret = SSL_read((SSL*) source->ssl, data, len);
+		int  received;
+		char* ptr = (char* )data;
+		int readlen = len > BUFFLEN?BUFFLEN:len;
+		read = 0;
+		fd_set fds;
+    	struct timeval timeout;
+		while (readlen > 0)
+        {
+            received = SSL_read (source->ssl, ptr+read, readlen);
+            if (received > 0)
+            {
+                read += received;
+				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+            }
+            else 
+            {
+                //printf(" received equal to or less than 0\n")
+                int err = SSL_get_error(source->ssl, received);
+                switch (err)
+                {
+                    case SSL_ERROR_NONE:
+                    {
+                        // no real error, just try again...
+                        //LOG("SSL_ERROR_NONE \n");
+                        continue;
+                    }   
+
+                    case SSL_ERROR_ZERO_RETURN: 
+                    {
+                        // peer disconnected...
+                        //printf("SSL_ERROR_ZERO_RETURN \n");
+                        break;
+                    }   
+
+                    case SSL_ERROR_WANT_READ: 
+                    {
+                        // no data available right now, wait a few seconds in case new data arrives...
+                        //printf("SSL_ERROR_WANT_READ\n");
+
+                        int sock = SSL_get_rfd(source->ssl);
+                        FD_ZERO(&fds);
+                        FD_SET(sock, &fds);
+
+                        timeout.tv_sec = 0;
+                        timeout.tv_usec = 500;
+                        err = select(sock+1, &fds, NULL, NULL, &timeout);
+                        if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                            continue; // more data to read...
+                        break;
+                    }
+
+                    case SSL_ERROR_WANT_WRITE: 
+                    {
+                        // socket not writable right now, wait a few seconds and try again...
+                        //printf("SSL_ERROR_WANT_WRITE \n");
+                        int sock = SSL_get_wfd(source->ssl);
+                        FD_ZERO(&fds);
+                        FD_SET(sock, &fds);
+
+                        timeout.tv_sec = 0;
+                        timeout.tv_usec = 500;
+
+                        err = select(sock+1, NULL, &fds, NULL, &timeout);
+                        if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                            continue; // can write more data now...
+                        break;
+                    }
+
+                    default:
+                    {
+                        // other error 
+                        break;
+                    }
+                }     
+
+                break;
+            }
+        }
+		/*
+		int stat, r, st;
+		do{
+			ret = SSL_read((SSL*) source->ssl, data, len);
+			stat = SSL_get_error((SSL*)source->ssl, r);
+		} while(ret == -1 && 
+			(
+			stat == SSL_ERROR_WANT_READ || 
+			stat == SSL_ERROR_WANT_WRITE ||  
+			stat == SSL_ERROR_NONE ||  
+			(stat == SSL_ERROR_SYSCALL && r== 0 && !ERR_get_error()) 
+			));
+		if(ret == -1)
+		{
+			LOG("Problem reading %d %d %d\n", ret, stat, r);
+		}
+		//set_nonblock(source->sock);
+		*/
 	}
 	else
 	{
 #endif
-		ret = recv(((int) source->sock), data, len, 0);
+		read = recv(((int) source->sock), data, len, 0);
 #ifdef USE_OPENSSL
 	}
 #endif
@@ -115,7 +208,20 @@ int antd_recv(void *src,  void* data, int len)
 	{
 		antd_close(src);
 	}*/
-	return ret;
+	return read;
+}
+void set_nonblock(int socket) {
+    int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    //assert(flags != -1);
+    fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+}
+void set_block()
+{
+	int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    //assert(flags != -1);
+    fcntl(socket, F_SETFL, flags & (~O_NONBLOCK));
 }
 int antd_close(void* src)
 {
@@ -133,9 +239,7 @@ int antd_close(void* src)
 #endif
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->sock);
-	if(source->ip) free(source->ip);
-	server_config.connection--; 
-	LOG("Remaining connection %d\n", server_config.connection);
+	if(source->ip) free(source->ip);	
 	free(src);
 	src = NULL;
 	return ret;
@@ -299,8 +403,41 @@ void clear_cookie(void* client,  dictionary dic)
 }
 void unknow(void* client)
 {
-	html(client);
-	__t(client,"404 API not found");
+	set_status(client,520,"Unknown Error");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"520 Unknow request");
+}
+void notfound(void* client)
+{
+	set_status(client,404,"Not found");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"Resource not found");
+}
+void badrequest(void* client)
+{
+	set_status(client,400,"Bad request");
+	__t(client,"Content-Type: text/html; charset=utf-8");
+	response(client,"");
+	__t(client,"400 Bad request");
+}
+void unimplemented(void* client)
+{
+	set_status(client,501,"Method Not Implemented");
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<HTML><HEAD><TITLE>Method Not Implemented");
+	__t(client, "</TITLE></HEAD>");
+	__t(client, "<BODY><P>HTTP request method not supported.");
+	__t(client, "</BODY></HTML>");
+}
+void cannot_execute(void* client)
+{
+	set_status(client,500,"Internal Server Error");
+	__t(client,"Content-Type: text/html");
+	response(client,"");
+	__t(client, "<P>Error prohibited CGI execution.");
 }
 int ws_enable(dictionary dic)
 {

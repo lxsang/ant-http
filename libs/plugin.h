@@ -5,6 +5,7 @@
 #include "dbhelper.h"
 #endif
 #include "ws.h"
+#include "scheduler.h"
 
 typedef struct  { 
     char *name; 
@@ -15,16 +16,14 @@ typedef struct  {
 #ifdef USE_OPENSSL
     int usessl;
 #endif
-} plugin_header;
+} plugin_header_t;
 
  
 
-typedef void(*call)();
+//typedef void(*call)();
 #ifdef USE_DB
 typedef sqlite3* sqldb;
 #endif
-extern plugin_header __plugin__;
-extern call __init__;
 
 
 #ifdef USE_DB
@@ -36,6 +35,9 @@ char* route(const char*);
 char* htdocs(const char*);
 char* config_dir();
 /*Default function for plugin*/
-void handle(void*, const char*,const char*,dictionary);
-void __release();
+// init the plugin
+void init();
+void destroy();
+void* handle(void*);
+plugin_header_t* meta();
 #endif

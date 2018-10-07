@@ -58,6 +58,9 @@ THE SOFTWARE.
 #else
     #define LOG(a,...) do{}while(0)
 #endif
+// add this to the utils
+#define UNUSED(x) (void)(x)
+
 #define	BUFFLEN 	1024
 #define HASHSIZE 	1024
 #define DHASHSIZE 	50

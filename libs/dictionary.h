@@ -46,6 +46,5 @@ void* dvalue(dictionary, const char*);
 association dput(dictionary,const char*, void*);
 int dremove(dictionary, const char*);
 void freedict(dictionary);
-void stest(const char* );
 
 #endif

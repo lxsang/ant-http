@@ -2,7 +2,8 @@
 # ant-http
 [![Build Status](https://travis-ci.org/lxsang/ant-http.svg?branch=master)](https://travis-ci.org/lxsang/ant-http)
 
-A lightweight and portable HTTP/HTTPs web server written in standard C: 
+A lightweight and portable HTTP/HTTPs web server written in standard C:
+- New 1.0.0 version: Single thread server with configurable number of thread pool workers, good for scalability
 - It can be configurable to work well on embedded Linux for server application. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
 - It is also extensible via its extensions mechanism that allows to extends the server capability.

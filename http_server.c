@@ -178,7 +178,7 @@ void* accept_request(void* data)
 					task->priority = HIGH_PRIORITY;
 					return task;
 				default:
-					LOG("ERRRRRRRRROR accept %d %d %d\n", stat, ret, ERR_get_error());
+					LOG("Error performing SSL handshake %d %d %d\n", stat, ret, ERR_get_error());
 					ERR_print_errors_fp(stderr);
 					return task;
 			}

@@ -216,13 +216,13 @@ void set_nonblock(int socket) {
     //assert(flags != -1);
     fcntl(socket, F_SETFL, flags | O_NONBLOCK);
 }
-void set_block()
+/*void set_block()
 {
 	int flags;
     flags = fcntl(socket,F_GETFL,0);
     //assert(flags != -1);
     fcntl(socket, F_SETFL, flags & (~O_NONBLOCK));
-}
+}*/
 int antd_close(void* src)
 {
 	if(!src) return -1;

@@ -65,7 +65,7 @@ typedef struct  {
 #endif
 }config_t;
 void set_nonblock(int socket);
-void set_block(int socket);
+//void set_block(int socket);
 int response(void*, const char*);
 void ctype(void*,const char*);
 void redirect(void*,const char*);

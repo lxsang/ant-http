@@ -81,6 +81,7 @@ int list_remove(list l,int idx)
 	if(np == NULL) return 0;
 	if(np->next == NULL) return 1;
 	np->next = np->next->next;
+	return 1;
 }
 int list_size(list l)
 {

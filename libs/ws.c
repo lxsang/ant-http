@@ -95,7 +95,7 @@ int ws_read_data(void* client, ws_msg_header_t* header, int len, uint8_t* data)
 {
 	// if len  == -1 ==> read all remaining data to 'data';
 	if(header->plen == 0) return 0;
-	int dlen = (len==-1 || len > header->plen)?header->plen:len;
+	int dlen = (len==-1 || len > (int)header->plen)?header->plen:len;
 	if((dlen = antd_recv(client,data, dlen)) <0) return -1;
 	header->plen = header->plen - dlen;
 	// unmask received data
@@ -158,7 +158,7 @@ void ws_send_frame(void* client, uint8_t* data, ws_msg_header_t header)
 	{
 		ws_gen_mask_key(&header);
 		masked = (uint8_t*) malloc(header.plen);
-		for(int i = 0; i < header.plen; ++i)
+		for(int i = 0; i < (int)header.plen; ++i)
 			masked[i] = data[i]^ header.mask_key[i%4];
 	}
 	_send_header(client, header);
@@ -181,7 +181,7 @@ void ws_send_text(void* client, const char* data,int mask)
 	header.plen = strlen(data);
 	//_send_header(client,header);
 	//send(client, data, header.plen,0);
-	ws_send_frame(client,data,header);
+	ws_send_frame(client,(uint8_t*)data,header);
 }
 /**
 * send a single binary data fram to client
@@ -311,7 +311,7 @@ send a request
 */
 int request_socket(const char* ip, int port)
 {
-	int sockfd, bytes_read;
+	int sockfd;
 	struct sockaddr_in dest;
 	
 	// time out setting
@@ -335,7 +335,7 @@ int request_socket(const char* ip, int port)
     bzero(&dest, sizeof(dest));
     dest.sin_family = AF_INET;
     dest.sin_port = htons(port);
-    if ( inet_aton(ip, &dest.sin_addr.s_addr) == 0 )
+    if ( inet_aton(ip, &dest.sin_addr) == 0 )
     {
 		perror(ip);
 		close(sockfd);
@@ -351,6 +351,8 @@ int request_socket(const char* ip, int port)
 }
 
 //TODO: The ping request
+/*
+this is for the client side, not use for now
 int ws_open_hand_shake(const char* host, int port, const char* resource)
 {
     char ip[100];
@@ -405,7 +407,7 @@ int ws_open_hand_shake(const char* host, int port, const char* resource)
     if(done) return sock;
     //printf("No server key found \n");
     return -1;
-}
+}*/
 char* get_ip_address()
 {
 	struct ifaddrs* addrs;

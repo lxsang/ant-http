@@ -130,7 +130,7 @@ int dbinsert(sqlite3* db,const char* table, const dbfield fields)
 }
 dbrecord dball(sqlite3* db,const char* table)
 {
-	return dbselect(db,table,"1=%d",1);
+	return dbselect(db,table,"1=%s","1");
 }
 dbrecord dbselect(sqlite3* db, const char* table, const char* fname,const char* fstring,...)
 {
@@ -160,7 +160,7 @@ dbrecord dbselect(sqlite3* db, const char* table, const char* fname,const char* 
             dbfield fields = __field();
             for(int col = 0; col < cols; col++)
             {
-                const char *value = sqlite3_column_text(statement, col);
+                const char *value = (const char*)sqlite3_column_text(statement, col);
                	const char *name = sqlite3_column_name(statement, col);
                 add_field(&fields,name,(value!=0)?value:"");
             }

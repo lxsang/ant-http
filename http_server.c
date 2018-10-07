@@ -69,7 +69,7 @@ static int config_handler(void* conf, const char* section, const char* name,
 	else if(strcmp(section,"AUTOSTART")==0){
 		// The server section must be added before the autostart section
 		// auto start plugin
-		plugin_load(value);
+		plugin_load((char*)value);
     } else {
         return 0;  /* unknown section/name, error */
     }
@@ -163,7 +163,7 @@ void* accept_request(void* data)
 	}
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
-	int ret,stat;
+	int ret=-1,stat;
 	if(server_config.usessl == 1 && client->status == 0)
 	{
 		if (SSL_accept((SSL*)client->ssl) == -1) {
@@ -178,7 +178,7 @@ void* accept_request(void* data)
 					task->priority = HIGH_PRIORITY;
 					return task;
 				default:
-					LOG("Error performing SSL handshake %d %d %d\n", stat, ret, ERR_get_error());
+					LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());
 					ERR_print_errors_fp(stderr);
 					return task;
 			}
@@ -244,7 +244,7 @@ void* resolve_request(void* data)
 	char* url = (char*)dvalue(rq->request, "RESOURCE_PATH");
 	char* newurl = NULL;
 	char* rqp = (char*)dvalue(rq->request, "REQUEST_PATH");
-	sprintf(path, server_config.htdocs);
+	strcpy(path, server_config.htdocs);
 	strcat(path, url);
 	LOG("Path is : %s \n", path);
 	//if (path[strlen(path) - 1] == '/')
@@ -366,7 +366,7 @@ int rule_check(const char*k, const char* v, const char* host, const char* _url, 
 		ret = regex_match(k,url, 10, key_matches);
 	}
 	else
-		target = host;
+		target = (char*)host;
 
 	if(!ret) 
 	{
@@ -429,7 +429,6 @@ void* serve_file(void* data)
 	antd_task_t* task = antd_create_task(NULL,(void*)rq,NULL);
 	task->priority++;
 	char* path = (char*)dvalue(rq->request, "ABS_RESOURCE_PATH");
-	char* newurl = NULL;
 	char* mime_type = (char*)dvalue(rq->request, "RESOURCE_MIME");
 	ctype(rq->client,mime_type);
 	if(is_bin(path))
@@ -468,7 +467,6 @@ int startup(unsigned *port)
 
 char* apply_rules(const char* host, char*url)
 {
-	association it;
 	// rule check
 	char* query_string = url;
 	while ((*query_string != '?') && (*query_string != '\0'))
@@ -566,7 +564,6 @@ void* decode_request_header(void* data)
 void* decode_request(void* data)
 {
 	antd_request_t* rq = (antd_request_t*) data;
-	dictionary request = dvalue(rq->request, "REQUEST_DATA");
 	dictionary headers = dvalue(rq->request, "REQUEST_HEADER");
 	int ws = 0;
 	char*ws_key = NULL;
@@ -640,7 +637,7 @@ void* decode_post_request(void* data)
 		//printf("Multi part form : %s\n", ctype);
 		// TODO: split this to multiple task
 		free(task);
-		return decode_multi_part_request(rq,ctype,request);
+		return decode_multi_part_request(rq,ctype);
 	} 
 	else
 	{
@@ -679,7 +676,7 @@ void ws_confirm_request(void* client, const char* key)
 	
     SHA1_Init(&context);
     SHA1_Update(&context, rkey, strlen(rkey));
-    SHA1_Final(sha_d, &context); 
+    SHA1_Final((uint8_t*)sha_d, &context); 
 	Base64encode(base64, sha_d, 20);
 	//printf("Base 64 '%s'\n", base64);
 	// send accept to client
@@ -728,7 +725,7 @@ dictionary decode_cookie(const char* line)
  * Decode the multi-part form data from the POST request
  * If it is a file upload, copy the file to tmp dir
  */
-void* decode_multi_part_request(void* data,const char* ctype, dictionary dic)
+void* decode_multi_part_request(void* data,const char* ctype)
 {
 	char * boundary;
 	char * line;
@@ -738,7 +735,6 @@ void* decode_multi_part_request(void* data,const char* ctype, dictionary dic)
 	antd_task_t* task = antd_create_task(NULL, (void*)rq, NULL);
 	task->priority++;
 	//dictionary dic = NULL;
-	FILE *fp = NULL;
 	boundary = strsep(&str_copy,"="); //discard first part
 	boundary = str_copy; 
 	if(boundary && strlen(boundary)>0)

@@ -114,7 +114,7 @@ void unload_plugin_by_name(const char* name)
 	}
 	else
 	{
-	    for (np; np != NULL; np = np->next)
+	    for (; np != NULL; np = np->next)
 	        if (np->next != NULL  && strcmp(name, np->next->pname) == 0)
 				break;
 		if(np == NULL) return; // the plugin is is not loaded

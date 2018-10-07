@@ -168,7 +168,7 @@ mime_t mime_from_ext(const char* ex)
 			if(IEQU(ex,_mimes[i].ext[j])) return _mimes[i];
 		}
 	
-	return (mime_t){"application/octet-stream",(const char *[]){ext,NULL},1};
+	return (mime_t){"application/octet-stream",(const char *[]){(char*)ext,NULL},1};
 }
 /*get mime file info from type*/
 mime_t mime_from_type(const char* type)
@@ -192,7 +192,7 @@ char* mime(const char* file)
 	mime_t m = mime_from_ext(ex);
     if(ex)
         free(ex);
-	return m.type;
+	return (char*)m.type;
 }
 
 int is_bin(const char* file)
@@ -257,7 +257,7 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
 char *url_decode(const char *str) {
     if(!str)
         return NULL;
-	char *pstr = str, *buf = malloc(strlen(str) + 1), *pbuf = buf;
+	char *pstr = (char*)str, *buf = malloc(strlen(str) + 1), *pbuf = buf;
 
 	while (*pstr) {
 		if (*pstr == '%') {
@@ -278,7 +278,7 @@ char *url_decode(const char *str) {
 }
 
 char *url_encode(const char *str) {
-  char *pstr = str, *buf = malloc(strlen(str) * 3 + 1), *pbuf = buf;
+  char *pstr = (char*)str, *buf = malloc(strlen(str) * 3 + 1), *pbuf = buf;
   while (*pstr) {
     if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' || *pstr == '~') 
       *pbuf++ = *pstr;
@@ -441,16 +441,16 @@ void md5(uint8_t *initial_msg, size_t initial_len, char* buff) {
     }
 	uint8_t *p;
 	p=(uint8_t *)&h0;
-	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h0);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3]);//, h0
 	strcpy(buff, tmp);
 	p=(uint8_t *)&h1;
-	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h1);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3]); //, h1)
 	strcat(buff,tmp);
 	p=(uint8_t *)&h2;
-	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h2);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3]); // , h2
     strcat(buff,tmp);
 	p=(uint8_t *)&h3;
-	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3], h3);
+	sprintf(tmp,"%02x%02x%02x%02x", p[0], p[1], p[2], p[3]); // , h3
 	strcat(buff,tmp);
     // cleanup
     free(msg);

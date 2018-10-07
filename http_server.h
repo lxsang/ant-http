@@ -22,6 +22,7 @@
 
 config_t* config(); 
 void destroy_config();
+void load_config(const char* file);
 void* accept_request(void*);
 void* finish_request(void*);
 void cat(void*, FILE *);
@@ -40,7 +41,7 @@ void* decode_request_header(void* data);
 void* decode_request(void* data);
 void* decode_post_request(void* data);
 void* resolve_request(void* data);
-void* decode_multi_part_request(void*,const char*, dictionary);
+void* decode_multi_part_request(void*,const char*);
 void* decode_multi_part_request_data(void* data);
 dictionary decode_cookie(const char*);
 char* post_data_decode(void*,int);

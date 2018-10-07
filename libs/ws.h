@@ -50,6 +50,6 @@ int ws_read_data(void* , ws_msg_header_t*, int, uint8_t*);
 int request_socket(const char* ip, int port);
 int ip_from_hostname(const char * hostname , char* ip);
 int sock_read_buf(void* sock, char*buf,int size);
-int ws_open_hand_shake(const char* host, int port, const char* resource);
+//int ws_open_hand_shake(const char* host, int port, const char* resource);
 char* get_ip_address();
 #endif

@@ -356,7 +356,7 @@ int __fb(void* client, const char* file)
 }
 int __f(void* client, const char* file)
 {
-	unsigned char buf[BUFFLEN];
+	char buf[BUFFLEN];
 	FILE *ptr;
 	int nbytes;
 	ptr = fopen(file,"r");

@@ -32,4 +32,4 @@ cd antd
 # build with all plugins
 wget -O - https://apps.lxsang.me/script/antd | bash -s "lua ph7 wterm wvnc"
 ```
-The script will ask you where you want to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.
+The script will ask for a place to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.

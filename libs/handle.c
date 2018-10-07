@@ -95,15 +95,89 @@ int antd_send(void *src, const void* data, int len)
 int antd_recv(void *src,  void* data, int len)
 {
 	if(!src) return -1;
-	int ret;
+	int read;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
-		// TODO: blocking is not good, need a workaround
-		set_nonblock(source->sock);
-		ret = SSL_read((SSL*) source->ssl, data, len);
-		set_nonblock(source->sock);
+		int  received;
+		char* ptr = (char* )data;
+		int readlen = len > BUFFLEN?BUFFLEN:len;
+		read = 0;
+		fd_set fds;
+    	struct timeval timeout;
+		while (readlen > 0)
+        {
+            received = SSL_read (source->ssl, ptr+read, readlen);
+            if (received > 0)
+            {
+                read += received;
+				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+            }
+            else 
+            {
+                //printf(" received equal to or less than 0\n")
+                int err = SSL_get_error(source->ssl, received);
+                switch (err)
+                {
+                    case SSL_ERROR_NONE:
+                    {
+                        // no real error, just try again...
+                        //LOG("SSL_ERROR_NONE \n");
+                        continue;
+                    }   
+
+                    case SSL_ERROR_ZERO_RETURN: 
+                    {
+                        // peer disconnected...
+                        //printf("SSL_ERROR_ZERO_RETURN \n");
+                        break;
+                    }   
+
+                    case SSL_ERROR_WANT_READ: 
+                    {
+                        // no data available right now, wait a few seconds in case new data arrives...
+                        //printf("SSL_ERROR_WANT_READ\n");
+
+                        int sock = SSL_get_rfd(source->ssl);
+                        FD_ZERO(&fds);
+                        FD_SET(sock, &fds);
+
+                        timeout.tv_sec = 0;
+                        timeout.tv_usec = 500;
+                        err = select(sock+1, &fds, NULL, NULL, &timeout);
+                        if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                            continue; // more data to read...
+                        break;
+                    }
+
+                    case SSL_ERROR_WANT_WRITE: 
+                    {
+                        // socket not writable right now, wait a few seconds and try again...
+                        //printf("SSL_ERROR_WANT_WRITE \n");
+                        int sock = SSL_get_wfd(source->ssl);
+                        FD_ZERO(&fds);
+                        FD_SET(sock, &fds);
+
+                        timeout.tv_sec = 0;
+                        timeout.tv_usec = 500;
+
+                        err = select(sock+1, NULL, &fds, NULL, &timeout);
+                        if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                            continue; // can write more data now...
+                        break;
+                    }
+
+                    default:
+                    {
+                        // other error 
+                        break;
+                    }
+                }     
+
+                break;
+            }
+        }
 		/*
 		int stat, r, st;
 		do{
@@ -126,7 +200,7 @@ int antd_recv(void *src,  void* data, int len)
 	else
 	{
 #endif
-		ret = recv(((int) source->sock), data, len, 0);
+		read = recv(((int) source->sock), data, len, 0);
 #ifdef USE_OPENSSL
 	}
 #endif
@@ -134,7 +208,7 @@ int antd_recv(void *src,  void* data, int len)
 	{
 		antd_close(src);
 	}*/
-	return ret;
+	return read;
 }
 void set_nonblock(int socket) {
     int flags;

@@ -138,7 +138,6 @@ void* accept_request(void* data)
 	
 	task = antd_create_task(NULL,(void*)rq,NULL);
 	task->priority++;
-	server_config.connection++;
 	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t* client = (antd_client_t*) rq->client;
@@ -159,7 +158,6 @@ void* accept_request(void* data)
 	if(sel == 0 || (!FD_ISSET(client->sock, &read_flags) &&  !FD_ISSET(client->sock, &write_flags)))
 	{
 		// retry it later
-		server_config.connection--;
 		task->handle = accept_request;
 		return task;
 	}
@@ -178,7 +176,6 @@ void* accept_request(void* data)
 					//LOG("RECALL %d\n", stat);
 					task->handle = accept_request;
 					task->priority = HIGH_PRIORITY;
-					server_config.connection--;
 					return task;
 				default:
 					LOG("ERRRRRRRRROR accept %d %d %d\n", stat, ret, ERR_get_error());
@@ -187,7 +184,6 @@ void* accept_request(void* data)
 			}
 		}
 		client->status = 1;
-		server_config.connection--;
 		task->handle = accept_request;
 		return task;
 	}
@@ -196,11 +192,11 @@ void* accept_request(void* data)
 		if(!FD_ISSET(client->sock, &read_flags))
 		{
 			task->handle = accept_request;
-			server_config.connection--;
 			return task;
 		}
 	}
 #endif
+	server_config.connection++;
 	count = read_buf(rq->client, buf, sizeof(buf));
 	//LOG("count is %d\n", count);
 	line = buf;
@@ -966,14 +962,24 @@ char* post_data_decode(void* client,int len)
 	char *query = (char*) malloc((len+1)*sizeof(char));
 	char* ptr = query;
 	int readlen = len > BUFFLEN?BUFFLEN:len;
-	int read = 0;
-	while(readlen > 0)
+	int read = 0, stat = 1;
+	while(readlen > 0 && stat > 0)
 	{
-		read += antd_recv(client, query+read, readlen);
-		LOG("READ %d/%d\n", read, len);
-		readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+		stat = antd_recv(client, ptr+read, readlen);
+		if(stat > 0)
+		{
+			read += stat;
+			readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+		}
 	}
-    query[len]='\0';
+	
+	if(read > 0)
+    	query[read]='\0';
+	else
+	{
+		free(query);
+		query = NULL;
+	}
     return query;
 }
 

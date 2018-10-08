@@ -250,7 +250,7 @@ void *accept_request(void *data)
 	dput(rq->request, "REQUEST_QUERY", strdup(token));
 	line = token;
 	token = strsep(&line, "?");
-	dput(rq->request, "REQUEST_PATH", strdup(token));
+	dput(rq->request, "REQUEST_PATH", url_decode(token));
 	// decode request
 	// now return the task
 	task->handle = decode_request_header;
@@ -592,7 +592,7 @@ void *decode_request_header(void *data)
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
 	query = apply_rules(host, buf);
-	dput(rq->request, "RESOURCE_PATH", strdup(buf));
+	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{
 		decode_url_request(query, request);

@@ -88,7 +88,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		dput(pconfig->handlers, name, strdup(value));
 	}
-	else if (strcmp(section, "AUTOSTART") == 0)
+	else if (strcmp(section, "AUTOSTART") == 0 || strcmp(section, "AUTOLOAD") == 0)
 	{
 		// The server section must be added before the autostart section
 		// auto start plugin

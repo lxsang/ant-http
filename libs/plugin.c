@@ -11,9 +11,13 @@ void __init_plugin__(const char* pl,config_t* conf){
 #ifdef USE_OPENSSL
 	__plugin__.usessl = conf->usessl;
 #endif
+	__plugin__.raw_body = 0;
 	init();
 }; 
-
+void  use_raw_body()
+{
+	__plugin__.raw_body = 1;
+}
 #ifdef USE_DB
 sqldb __getdb(char *name)
 {

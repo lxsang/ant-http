@@ -28,9 +28,9 @@ SSL_CTX *create_context()
 
     ctx = SSL_CTX_new(method);
     if (!ctx) {
-	perror("Unable to create SSL context");
-	ERR_print_errors_fp(stderr);
-	exit(EXIT_FAILURE);
+		perror("Unable to create SSL context");
+		ERR_print_errors_fp(stderr);
+		exit(EXIT_FAILURE);
     }
 
     return ctx;
@@ -145,10 +145,8 @@ int main(int argc, char* argv[])
 			client_ip =  inet_ntoa(client_name.sin_addr);
 			client->ip = strdup(client_ip);
 			LOG("Client IP: %s\n", client_ip);
-			LOG("socket: %d\n", client_sock);
+			//LOG("socket: %d\n", client_sock);
 		}
-		//return &(((struct sockaddr_in6*)sa)->sin6_addr);
-		/* accept_request(client_sock); */
 
 		// set timeout to socket
 		set_nonblock(client_sock);
@@ -163,8 +161,6 @@ int main(int argc, char* argv[])
 			perror("setsockopt failed\n");
 		*/
 		client->sock = client_sock;
-		// 100 times retry connection before abort
-		//LOG("Unclosed connection: %d\n", server_config->connection);
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
 		client->status = 0;
@@ -184,17 +180,6 @@ int main(int argc, char* argv[])
 #endif
 		// create callback for the server
 		antd_add_task(&scheduler, antd_create_task(accept_request,(void*)request, finish_request ));
-		/*if (pthread_create(&newthread , NULL,(void *(*)(void *))accept_request, (void *)client) != 0)
-		{
-			perror("pthread_create");
-			antd_close(client);
-		}
-		else
-		{
-			//reclaim the stack data when thread finish
-			pthread_detach(newthread) ;
-		}*/
-		//accept_request(&client);
 	}
 
 	close(server_sock);

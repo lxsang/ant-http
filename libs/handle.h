@@ -24,7 +24,8 @@
 #define R_FLOAT(d,k) ((double)atof(dvalue(d,k)))
 #define R_PTR(d,k) (dvalue(d,k))
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
-
+#define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
+#define FORM_MULTI_PART  "multipart/form-data"
 
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
@@ -64,6 +65,19 @@ typedef struct  {
     char* sslkey;
 #endif
 }config_t;
+
+typedef struct  { 
+    char *name; 
+    char *dbpath;
+    char * htdocs;
+    char*pdir;
+	int sport;
+    int raw_body;
+#ifdef USE_OPENSSL
+    int usessl;
+#endif
+} plugin_header_t;
+
 void set_nonblock(int socket);
 //void set_block(int socket);
 int response(void*, const char*);

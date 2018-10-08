@@ -12,8 +12,6 @@
 #include "libs/scheduler.h"
 #include "plugin_manager.h"
 
-#define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
-#define FORM_MULTI_PART  "multipart/form-data"
 #define PLUGIN_HANDLER	 "handle"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0

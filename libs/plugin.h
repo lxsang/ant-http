@@ -7,17 +7,6 @@
 #include "ws.h"
 #include "scheduler.h"
 
-typedef struct  { 
-    char *name; 
-    char *dbpath;
-    char * htdocs;
-    char*pdir;
-	int sport;
-#ifdef USE_OPENSSL
-    int usessl;
-#endif
-} plugin_header_t;
-
  
 
 //typedef void(*call)();
@@ -40,4 +29,5 @@ void init();
 void destroy();
 void* handle(void*);
 plugin_header_t* meta();
+void use_raw_body();
 #endif

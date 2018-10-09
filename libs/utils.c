@@ -145,7 +145,7 @@ char* ext(const char* file)
 	if(file == NULL) return NULL;
 	char* str_cpy = strdup(file);
     char* str_org = str_cpy;
-	if(strstr(str_cpy,".")<= 0)
+	if(!strstr(str_cpy,"."))
     {
         free(str_org);
         return NULL;

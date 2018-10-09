@@ -95,7 +95,7 @@ int ws_read_data(void* client, ws_msg_header_t* header, int len, uint8_t* data)
 {
 	// if len  == -1 ==> read all remaining data to 'data';
 	if(header->plen == 0) return 0;
-	int dlen = (len==-1 || len > (int)header->plen)?header->plen:len;
+	int dlen = (len==-1 || len > (int)header->plen)?(int)header->plen:len;
 	if((dlen = antd_recv(client,data, dlen)) <0) return -1;
 	header->plen = header->plen - dlen;
 	// unmask received data
@@ -220,24 +220,21 @@ void ws_send_file(void* client, const char* file, int mask)
 	while(!feof(ptr))
 	{
 		size = fread(buff,1,1024,ptr);
-		if(size >= 0)
+		if(feof(ptr))
+			header.fin = 1;
+		else
+			header.fin = 0;
+		// clear opcode
+		if(first_frame)
 		{
-			if(feof(ptr))
-				header.fin = 1;
-			else
-				header.fin = 0;
-			// clear opcode
-			if(first_frame)
-			{
-				header.opcode = WS_BIN;
-				first_frame = 0;
-			}
-			else
-				header.opcode = 0;
-			header.plen = size;
-			//printf("FIN: %d OC:%d\n", header.fin, header.opcode);
-			ws_send_frame(client,buff,header);
-		} 
+			header.opcode = WS_BIN;
+			first_frame = 0;
+		}
+		else
+			header.opcode = 0;
+		header.plen = size;
+		//printf("FIN: %d OC:%d\n", header.fin, header.opcode);
+		ws_send_frame(client,buff,header);
 	}
 	fclose(ptr);
 }

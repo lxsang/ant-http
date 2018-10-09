@@ -234,6 +234,13 @@ int antd_close(void* src)
 		SSL_set_shutdown((SSL*) source->ssl, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
 		//printf("SSL:Free ssl\n");
 		SSL_free((SSL*) source->ssl);
+		
+		//EVP_cleanup();
+		//ENGINE_cleanup();
+		CRYPTO_cleanup_all_ex_data();
+		ERR_remove_state(0);
+		ERR_free_strings();
+		source->ssl = NULL;
 		//LOG("Freeing SSL\n");
 	}
 #endif

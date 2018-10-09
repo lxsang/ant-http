@@ -203,6 +203,7 @@ void *accept_request(void *data)
 				return task;
 			default:
 				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());
+				server_config.connection++;
 				ERR_print_errors_fp(stderr);
 				return task;
 			}
@@ -339,7 +340,7 @@ void *resolve_request(void *data)
 			if (h)
 			{
 				//sprintf(path,"/%s%s",h,url);
-				LOG("WARNING::::Access octetstream via handler %s\n", h);
+				LOG("WARNING::::Access octetstream via handle %s\n", h);
 				//if(execute_plugin(client,buf,method,rq) < 0)
 				//	cannot_execute(client);
 				free(task);
@@ -941,7 +942,7 @@ void *decode_multi_part_request_data(void *data)
 			}
 			else
 			{
-				LOG("Cannot wirte file to :%s\n", file_path);
+				LOG("Cannot write file to :%s\n", file_path);
 			}
 			free(file_path);
 			free(part_file);

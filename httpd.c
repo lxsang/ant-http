@@ -85,7 +85,15 @@ void stop_serve(int dummy) {
 	unload_all_plugin();
 	destroy_config(); 
 #ifdef USE_OPENSSL
+	FIPS_mode_set(0);
 	SSL_CTX_free(ctx);
+	FIPS_mode_set(0);
+	CONF_modules_unload(1);
+	EVP_cleanup();
+	ENGINE_cleanup();
+	CRYPTO_cleanup_all_ex_data();
+	ERR_remove_state(0);
+	ERR_free_strings();
 #endif
 	close(server_sock);
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 

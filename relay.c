@@ -24,11 +24,11 @@ void* antd_redirect(void* user_data)
     void** data = (void**)user_data;
     void* client = data[0];
     char* host = (char*)data[1];
-    __t(client,"%s", "HTTP/1.1 301 Moved Permanently");
+    set_status(client, 301,"Moved Permanently");
     __t(client, "Location: https://%s", host);
     __t(client, "%s", "Content-Type: text/html");
-    __t(client, "");
-    __t(client, "This page has moved to https://%s", host);
+    response(client, "");
+    __t(client, "This page has been moved to https://%s", host);
     free(host);
     free(user_data);
     return antd_create_task(NULL,client, NULL);
@@ -60,7 +60,7 @@ void* antd_get_host(void * client)
             if(line)
             {
                 host = strdup(line);
-                break;
+                //break;
             }
     }
     if(!host) host = strdup("lxsang.me");
@@ -92,18 +92,28 @@ int main(int argc, char* argv[])
     // 0 worker
     antd_scheduler_init(&scheduler, 0);
     // set server socket to non blocking
-    fcntl(server_sock, F_SETFL, O_NONBLOCK); /* Change the socket into non-blocking state	*/
+    set_nonblock(server_sock);
 	LOG("relayd running on port %d\n", port);
-
+    struct timespec ts_sleep;
 	while (scheduler.status)
 	{
         // execute task
-        antd_task_schedule(&scheduler);
+        int stat = antd_task_schedule(&scheduler);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
+            // sleep for 500usec if 
+            // there is nothing todo
+            if(!stat)
+            {
+                ts_sleep.tv_sec = 0;
+                ts_sleep.tv_nsec = 5000000;
+                nanosleep(&ts_sleep, NULL);
+            }
+            
 			continue;
 		}
+        set_nonblock(client_sock);
         antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		// set timeout to socket
 

@@ -118,6 +118,15 @@ static void work(antd_scheduler_t* scheduler)
         pthread_mutex_unlock(&scheduler->worker_lock);
         // execute the task
         //LOG("task executed by worker %d\n", worker->pid);
+        // no task to execute, just sleep for 500usec
+        if(!it)
+        {
+            struct timespec ts_sleep;
+            ts_sleep.tv_sec = 0;
+            ts_sleep.tv_nsec = 500000;
+            nanosleep(&ts_sleep, NULL);
+            continue;
+        }
         antd_execute_task(scheduler, it);
     }
 }
@@ -256,7 +265,7 @@ int antd_scheduler_busy(antd_scheduler_t* scheduler)
     return scheduler->pending_task != 0;
 }
 
-void antd_task_schedule(antd_scheduler_t* scheduler)
+int antd_task_schedule(antd_scheduler_t* scheduler)
 {
     // fetch next task from the task_queue
     antd_task_item_t it = NULL;
@@ -271,7 +280,7 @@ void antd_task_schedule(antd_scheduler_t* scheduler)
     pthread_mutex_unlock(&scheduler->scheduler_lock);
     if(!it)
     {
-        return;
+        return 0;
     }
     // has the task now
     // check the type of tas
@@ -289,4 +298,5 @@ void antd_task_schedule(antd_scheduler_t* scheduler)
         pthread_mutex_unlock(&scheduler->worker_lock);
         free(it);
     }
+    return 1;
 }

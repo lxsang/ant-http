@@ -669,9 +669,9 @@ void *decode_post_request(void *data)
 	char *method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL);
 	task->priority++;
+	task->type = HEAVY;
 	if (!method || strcmp(method, "POST") != 0)
 		return task;
- 
 	if (ctype == NULL || clen == -1)
 	{
 		LOG("Bad request\n");
@@ -803,11 +803,11 @@ void *decode_multi_part_request(void *data, const char *ctype)
 		if (line)
 		{
 			task->handle = decode_multi_part_request_data;
-			task->type = HEAVY;
 			free(line);
 		}
 	}
 	free(orgcpy);
+	task->type = HEAVY;
 	return task;
 }
 void *decode_multi_part_request_data(void *data)
@@ -1089,6 +1089,7 @@ void *execute_plugin(void *data, const char *pname)
 	if (meta && meta->raw_body == 1)
 	{
 		task->handle = fn;
+		task->type = HEAVY;
 	}
 	else
 	{
@@ -1096,7 +1097,6 @@ void *execute_plugin(void *data, const char *pname)
 		task = antd_create_task(decode_post_request, (void *)rq, fn);
 		task->priority++;
 	}
-	task->type = HEAVY;
 	return task;
 }
 

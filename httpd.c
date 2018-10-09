@@ -131,13 +131,22 @@ int main(int argc, char* argv[])
 	// default to 4 workers
 	antd_scheduler_init(&scheduler, config()->n_workers);
     set_nonblock(server_sock);
+	int stat = 0;
+	struct timespec ts_sleep;
 	while (scheduler.status)
 	{
-		antd_task_schedule(&scheduler);
+		stat = antd_task_schedule(&scheduler);
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
 		if (client_sock == -1)
 		{
-			//perror("Cannot accept client request\n");
+			if(!stat)
+			{
+				// sleep for 500usec if 
+				// there is nothing todo
+            	ts_sleep.tv_sec = 0;
+            	ts_sleep.tv_nsec = 500000;
+            	nanosleep(&ts_sleep, NULL);
+			}
 			continue;
 		}
 		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));

@@ -92,5 +92,5 @@ int antd_scheduler_busy(antd_scheduler_t*);
 /*
     schedule a task
 */
-void antd_task_schedule(antd_scheduler_t*);
+int antd_task_schedule(antd_scheduler_t*);
 #endif

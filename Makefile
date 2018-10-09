@@ -45,7 +45,8 @@ antd_plugins:
 	-for file in plugins/* ; do\
 		echo $$file;\
 		if [ -d "$$file" ]; then \
-			make -C  "$$file"; \
+			make -C  "$$file" clean; \
+			make -C  "$$file" main; \
 		fi \
 	done
 

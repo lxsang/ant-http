@@ -3,6 +3,7 @@
 
 #include "utils.h"
 #include <pthread.h>
+#include <semaphore.h>
 
 #define N_PRIORITY 10
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
@@ -52,13 +53,24 @@ typedef struct __task_item_t{
 typedef antd_task_item_t antd_task_queue_t;
 
 typedef struct {
+    int id;
+    pthread_t tid;
+    void* manager;
+} antd_worker_t;
+
+typedef struct {
+    // data lock
     pthread_mutex_t scheduler_lock;
     pthread_mutex_t worker_lock;
     pthread_mutex_t pending_lock;
+    // event handle
+    sem_t scheduler_sem;
+    sem_t worker_sem;
+    // worker and data
     antd_task_queue_t task_queue[N_PRIORITY];
     antd_task_queue_t workers_queue;
     uint8_t status; // 0 stop, 1 working
-    pthread_t* workers;
+    antd_worker_t* workers;
     int n_workers;
     int pending_task;
 } antd_scheduler_t;
@@ -93,4 +105,8 @@ int antd_scheduler_busy(antd_scheduler_t*);
     schedule a task
 */
 int antd_task_schedule(antd_scheduler_t*);
+/*
+wait for event
+*/
+void antd_wait(antd_scheduler_t*);
 #endif

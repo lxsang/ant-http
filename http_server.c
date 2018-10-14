@@ -185,6 +185,7 @@ void *accept_request(void *data)
 		{
 			LOG("Too much attempt, give up on %d\n", client->sock);
 			server_config.connection++;
+			unknow(rq->client);
 			return task;
 		}
 		client->attempt++;

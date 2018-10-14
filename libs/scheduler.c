@@ -153,13 +153,13 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
     scheduler->workers_queue = NULL;
     scheduler->pending_task = 0 ;
     // init semaphore
-    scheduler->scheduler_sem = sem_open("scheduler", O_RDWR | O_CREAT, S_IRWXU);
-    if (!scheduler->scheduler_sem)
+    scheduler->scheduler_sem = sem_open("scheduler", O_CREAT, 0600, 0);
+    if (scheduler->scheduler_sem == SEM_FAILED)
     {
         LOG("Cannot open semaphore for scheduler\n");
         exit(-1);
     }
-    scheduler->worker_sem = sem_open("worker", O_RDWR | O_CREAT, S_IRWXU);
+    scheduler->worker_sem = sem_open("worker", O_CREAT, 0600, 0);
     if (!scheduler->worker_sem)
     {
         LOG("Cannot open semaphore for workers\n");

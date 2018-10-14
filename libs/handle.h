@@ -26,7 +26,7 @@
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-#define MAX_ATTEMPT 500
+#define MAX_ATTEMPT 5000
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif

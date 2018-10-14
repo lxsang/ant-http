@@ -181,6 +181,13 @@ void *accept_request(void *data)
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
 	{
 		// retry it later
+		if(client->attempt > MAX_ATTEMPT)
+		{
+			LOG("Too much attempt, give up on %d\n", client->sock);
+			server_config.connection++;
+			return task;
+		}
+		client->attempt++;
 		task->handle = accept_request;
 		return task;
 	}
@@ -189,11 +196,9 @@ void *accept_request(void *data)
 	int ret = -1, stat;
 	if (server_config.usessl == 1 && client->status == 0)
 	{
-		//if(client->attempt > MAX_ATTEMPT) return task;
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
 		{
-			client->attempt++;
 			stat = SSL_get_error((SSL *)client->ssl, ret);
 			switch (stat)
 			{

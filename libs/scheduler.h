@@ -4,7 +4,7 @@
 #include "utils.h"
 #include <pthread.h>
 #include <semaphore.h>
-
+#include <fcntl.h>
 #define N_PRIORITY 10
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
 #define LOW_PRIORITY (N_PRIORITY - 1)

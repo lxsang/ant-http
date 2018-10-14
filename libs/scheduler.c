@@ -34,6 +34,8 @@ static void stop(antd_scheduler_t* scheduler)
     pthread_mutex_destroy(&scheduler->scheduler_lock);
     pthread_mutex_destroy(&scheduler->worker_lock);
     pthread_mutex_destroy(&scheduler->pending_lock);
+    sem_unlink("scheduler");
+    sem_unlink("worker");
     sem_close(scheduler->scheduler_sem);
     sem_close(scheduler->worker_sem);
 }

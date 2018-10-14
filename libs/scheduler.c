@@ -24,8 +24,8 @@ static void stop(antd_scheduler_t* scheduler)
     scheduler->status = 0;
     // unlock all idle workers if any
     for (int i = 0; i < scheduler->n_workers; i++)
-        sem_post(&scheduler->worker_sem);
-    sem_post(&scheduler->scheduler_sem);
+        sem_post(scheduler->worker_sem);
+    sem_post(scheduler->scheduler_sem);
     for (int i = 0; i < scheduler->n_workers; i++)
         if(scheduler->workers[i].id != -1)
             pthread_join(scheduler->workers[i].tid, NULL);
@@ -34,8 +34,8 @@ static void stop(antd_scheduler_t* scheduler)
     pthread_mutex_destroy(&scheduler->scheduler_lock);
     pthread_mutex_destroy(&scheduler->worker_lock);
     pthread_mutex_destroy(&scheduler->pending_lock);
-    sem_destroy(&scheduler->scheduler_sem);
-    sem_destroy(&scheduler->worker_sem);
+    sem_close(scheduler->scheduler_sem);
+    sem_close(scheduler->worker_sem);
 }
 
 static antd_task_item_t dequeue(antd_task_queue_t* q)
@@ -130,7 +130,7 @@ static void work(antd_worker_t* worker)
         if(!it)
         {
             //LOG("Worker %d goes to idle state\n", worker->id);
-            sem_wait(&scheduler->worker_sem);
+            sem_wait(scheduler->worker_sem);
         }
         else
         {
@@ -153,14 +153,16 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
     scheduler->workers_queue = NULL;
     scheduler->pending_task = 0 ;
     // init semaphore
-    if (sem_init(&scheduler->scheduler_sem, 0, 0) == -1)
+    scheduler->scheduler_sem = shm_open("scheduler", O_RDWR | O_CREAT, S_IRWXU);
+    if (!scheduler->scheduler_sem)
     {
-        LOG("Cannot init semaphore for scheduler\n");
+        LOG("Cannot open semaphore for scheduler\n");
         exit(-1);
     }
-    if (sem_init(&scheduler->worker_sem, 0, 0) == -1)
+    scheduler->worker_sem = shm_open("worker", O_RDWR | O_CREAT, S_IRWXU);
+    if (!scheduler->worker_sem)
     {
-        LOG("Cannot init semaphore for workers\n");
+        LOG("Cannot open semaphore for workers\n");
         exit(-1);
     }
     // init lock 
@@ -239,7 +241,7 @@ void antd_add_task(antd_scheduler_t* scheduler, antd_task_t* task)
     scheduler->pending_task++;
     pthread_mutex_unlock(&scheduler->pending_lock);
     // wake up the scheduler if idle
-    sem_post(&scheduler->scheduler_sem);
+    sem_post(scheduler->scheduler_sem);
 }
 
 
@@ -326,7 +328,7 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
         enqueue(&scheduler->workers_queue, it->task);
         pthread_mutex_unlock(&scheduler->worker_lock);
         // wake up idle worker
-        sem_post(&scheduler->worker_sem);
+        sem_post(scheduler->worker_sem);
         free(it);
     }
     return 1;
@@ -340,7 +342,7 @@ void antd_wait(antd_scheduler_t* scheduler)
         if(!stat)
         {
             // no task found, go to idle state
-            sem_wait(&scheduler->scheduler_sem);
+            sem_wait(scheduler->scheduler_sem);
         }
     }
 }

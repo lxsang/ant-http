@@ -84,7 +84,7 @@ int antd_send(void *src, const void* data, int len)
 		written = 0;
 		fd_set fds;
     	struct timeval timeout;
-		while (writelen > 0)
+		while (writelen > 0 && source->attempt < MAX_ATTEMPT)
         {
             count = SSL_write (source->ssl, ptr+written, writelen);
             if (count > 0)
@@ -102,6 +102,7 @@ int antd_send(void *src, const void* data, int len)
                     {
                         // no real error, just try again...
                         //LOG("SSL_ERROR_NONE \n");
+						source->attempt++;
                         continue;
                     }   
 
@@ -125,8 +126,11 @@ int antd_send(void *src, const void* data, int len)
                         timeout.tv_usec = 500;
                         err = select(sock+1, &fds, NULL, NULL, &timeout);
                         if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+						{
+							source->attempt++;
                             continue; // more data to read...
-                        break;
+						}
+						break;
                     }
 
                     case SSL_ERROR_WANT_WRITE: 
@@ -142,8 +146,11 @@ int antd_send(void *src, const void* data, int len)
 
                         err = select(sock+1, NULL, &fds, NULL, &timeout);
                         if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+						{
+							source->attempt++;
                             continue; // can write more data now...
-                        break;
+						}
+					    break;
                     }
 
                     default:
@@ -156,6 +163,7 @@ int antd_send(void *src, const void* data, int len)
                 break;
             }
 		}
+		source->attempt = 0;
 	}
 	else
 	{
@@ -184,7 +192,7 @@ int antd_recv(void *src,  void* data, int len)
 		read = 0;
 		fd_set fds;
     	struct timeval timeout;
-		while (readlen > 0)
+		while (readlen > 0 && source->attempt < MAX_ATTEMPT)
         {
             received = SSL_read (source->ssl, ptr+read, readlen);
             if (received > 0)
@@ -202,6 +210,7 @@ int antd_recv(void *src,  void* data, int len)
                     {
                         // no real error, just try again...
                         //LOG("SSL_ERROR_NONE \n");
+						source->attempt++;
                         continue;
                     }   
 
@@ -225,8 +234,11 @@ int antd_recv(void *src,  void* data, int len)
                         timeout.tv_usec = 500;
                         err = select(sock+1, &fds, NULL, NULL, &timeout);
                         if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+						{
+							source->attempt++;
                             continue; // more data to read...
-                        break;
+						}
+						break;
                     }
 
                     case SSL_ERROR_WANT_WRITE: 
@@ -242,8 +254,11 @@ int antd_recv(void *src,  void* data, int len)
 
                         err = select(sock+1, NULL, &fds, NULL, &timeout);
                         if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+						{
+							source->attempt++;
                             continue; // can write more data now...
-                        break;
+						}
+						break;
                     }
 
                     default:
@@ -256,6 +271,7 @@ int antd_recv(void *src,  void* data, int len)
                 break;
             }
         }
+		source->attempt = 0;
 		/*
 		int stat, r, st;
 		do{

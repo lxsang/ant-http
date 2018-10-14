@@ -64,8 +64,8 @@ typedef struct {
     pthread_mutex_t worker_lock;
     pthread_mutex_t pending_lock;
     // event handle
-    sem_t scheduler_sem;
-    sem_t worker_sem;
+    sem_t *scheduler_sem;
+    sem_t *worker_sem;
     // worker and data
     antd_task_queue_t task_queue[N_PRIORITY];
     antd_task_queue_t workers_queue;

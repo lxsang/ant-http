@@ -189,8 +189,10 @@ void *accept_request(void *data)
 	int ret = -1, stat;
 	if (server_config.usessl == 1 && client->status == 0)
 	{
+		if(client->attempt > MAX_ATTEMPT) return task;
 		if (SSL_accept((SSL *)client->ssl) == -1)
 		{
+			client->attempt++;
 			stat = SSL_get_error((SSL *)client->ssl, ret);
 			switch (stat)
 			{
@@ -208,6 +210,7 @@ void *accept_request(void *data)
 				return task;
 			}
 		}
+		client->attempt = 0;
 		client->status = 1;
 		task->handle = accept_request;
 		return task;

@@ -26,7 +26,7 @@
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-
+#define MAX_ATTEMPT 500
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif
@@ -37,6 +37,7 @@ typedef struct{
     char* ip;
 #ifdef USE_OPENSSL
     int status;
+    int attempt;
 #endif
 } antd_client_t;
 

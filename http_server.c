@@ -190,7 +190,7 @@ void *accept_request(void *data)
 	if (server_config.usessl == 1 && client->status == 0)
 	{
 		if(client->attempt > MAX_ATTEMPT) return task;
-		LOG("Atttempt %d\n", client->attempt);
+		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
 		{
 			client->attempt++;

@@ -215,6 +215,7 @@ void *accept_request(void *data)
 				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());
 				server_config.connection++;
 				ERR_print_errors_fp(stderr);
+				unknow(rq->client);
 				return task;
 			}
 		}

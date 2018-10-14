@@ -148,6 +148,7 @@ int main(int argc, char* argv[])
 		// reclaim data when exit
 		pthread_detach(scheduler_th);
 	}
+	antd_task_t* task = NULL;
 	while (scheduler.status)
 	{
 		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
@@ -203,7 +204,9 @@ int main(int argc, char* argv[])
 		}
 #endif
 		// create callback for the server
-		antd_add_task(&scheduler, antd_create_task(accept_request,(void*)request, finish_request ));
+		task = antd_create_task(accept_request,(void*)request, finish_request );
+		task->type = LIGHT;
+		antd_add_task(&scheduler, task);
 	}
 
 	close(server_sock);

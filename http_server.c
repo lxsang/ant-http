@@ -189,7 +189,7 @@ void *accept_request(void *data)
 	int ret = -1, stat;
 	if (server_config.usessl == 1 && client->status == 0)
 	{
-		if(client->attempt > MAX_ATTEMPT) return task;
+		//if(client->attempt > MAX_ATTEMPT) return task;
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
 		{
@@ -203,6 +203,7 @@ void *accept_request(void *data)
 				//LOG("RECALL %d\n", stat);
 				task->handle = accept_request;
 				task->priority = HIGH_PRIORITY;
+				task->type = LIGHT;
 				return task;
 			default:
 				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());

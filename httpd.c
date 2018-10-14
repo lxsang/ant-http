@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 #endif
 		// create callback for the server
 		task = antd_create_task(accept_request,(void*)request, finish_request );
-		task->type = LIGHT;
+		//task->type = LIGHT;
 		antd_add_task(&scheduler, task);
 	}
 

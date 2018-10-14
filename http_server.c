@@ -209,7 +209,7 @@ void *accept_request(void *data)
 				//LOG("RECALL %d\n", stat);
 				task->handle = accept_request;
 				task->priority = HIGH_PRIORITY;
-				task->type = LIGHT;
+				//task->type = LIGHT;
 				return task;
 			default:
 				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());

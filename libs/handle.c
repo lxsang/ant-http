@@ -163,7 +163,7 @@ int antd_send(void *src, const void* data, int len)
                 break;
             }
 		}
-		source->attempt = 0;
+		//source->attempt = 0;
 	}
 	else
 	{
@@ -271,7 +271,7 @@ int antd_recv(void *src,  void* data, int len)
                 break;
             }
         }
-		source->attempt = 0;
+		//source->attempt = 0;
 		/*
 		int stat, r, st;
 		do{

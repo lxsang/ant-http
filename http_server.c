@@ -223,22 +223,14 @@ void *accept_request(void *data)
 		task->handle = accept_request;
 		return task;
 	}
-	/*else
+	else
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
-			if(client->attempt > MAX_ATTEMPT)
-			{
-				LOG("Too much attempt for read, give up on %d\n", client->sock);
-				server_config.connection++;
-				unknow(rq->client);
-				return task;
-			}
-			client->attempt++;
 			task->handle = accept_request;
 			return task;
 		}
-	}*/
+	}
 #endif
 	client->attempt = 0;
 	server_config.connection++;

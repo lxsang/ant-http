@@ -219,7 +219,6 @@ void *accept_request(void *data)
 				return task;
 			}
 		}
-		client->attempt = 0;
 		client->status = 1;
 		task->handle = accept_request;
 		return task;
@@ -233,6 +232,7 @@ void *accept_request(void *data)
 		}
 	}
 #endif
+	client->attempt = 0;
 	server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;

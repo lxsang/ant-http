@@ -183,7 +183,7 @@ void *accept_request(void *data)
 		// retry it later
 		if(client->attempt > MAX_ATTEMPT)
 		{
-			LOG("Too much attempt, give up on %d\n", client->sock);
+			LOG("Too much attempt for read and write, give up on %d\n", client->sock);
 			server_config.connection++;
 			unknow(rq->client);
 			return task;
@@ -206,7 +206,7 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_READ:
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
-				//LOG("RECALL %d\n", stat);
+				//LOG("RETRY SSL %d\n", client->sock);
 				task->handle = accept_request;
 				task->priority = HIGH_PRIORITY;
 				//task->type = LIGHT;
@@ -219,20 +219,28 @@ void *accept_request(void *data)
 				return task;
 			}
 		}
-		client->attempt = 0;
 		client->status = 1;
 		task->handle = accept_request;
 		return task;
 	}
-	else
+	/*else
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
+			if(client->attempt > MAX_ATTEMPT)
+			{
+				LOG("Too much attempt for read, give up on %d\n", client->sock);
+				server_config.connection++;
+				unknow(rq->client);
+				return task;
+			}
+			client->attempt++;
 			task->handle = accept_request;
 			return task;
 		}
-	}
+	}*/
 #endif
+	client->attempt = 0;
 	server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;

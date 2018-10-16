@@ -180,15 +180,15 @@ void *accept_request(void *data)
 	}
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
 	{
+		if(client->last_wait == 0) client->last_wait = time(NULL);
 		// retry it later
-		if(client->attempt > MAX_ATTEMPT)
+		if(time(NULL) - client->last_wait > MAX_WAIT_S)
 		{
-			LOG("Too much attempt for read and write, give up on %d\n", client->sock);
+			LOG("Read and write timeout, give up on %d\n", client->sock);
 			server_config.connection++;
 			unknow(rq->client);
 			return task;
 		}
-		client->attempt++;
 		task->handle = accept_request;
 		return task;
 	}
@@ -208,7 +208,7 @@ void *accept_request(void *data)
 			case SSL_ERROR_NONE:
 				//LOG("RETRY SSL %d\n", client->sock);
 				task->handle = accept_request;
-				task->priority = HIGH_PRIORITY;
+				//task->priority = HIGH_PRIORITY;
 				//task->type = LIGHT;
 				return task;
 			default:
@@ -220,19 +220,31 @@ void *accept_request(void *data)
 			}
 		}
 		client->status = 1;
+		// reset the waiting
+		client->last_wait = 0;
 		task->handle = accept_request;
+		LOG("Handshake finish for %d\n", client->sock);
 		return task;
 	}
 	else
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
+			if(client->last_wait == 0) client->last_wait = time(NULL);
+			if(time(NULL) - client->last_wait > MAX_WAIT_S)
+			{
+				server_config.connection++;
+				unknow(rq->client);
+				LOG("Read timeout, give up on %d\n", client->sock);
+				return task;
+			}
 			task->handle = accept_request;
 			return task;
 		}
 	}
 #endif
-	client->attempt = 0;
+	LOG("Ready for reading %d\n", client->sock);
+	client->last_wait = time(NULL);
 	server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
@@ -516,7 +528,7 @@ int startup(unsigned *port)
 			error_die("getsockname");
 		*port = ntohs(name.sin_port);
 	}
-	printf("back log is %d\n", server_config.backlog);
+	LOG("back log is %d\n", server_config.backlog);
 	if (listen(httpd, server_config.backlog) < 0)
 		error_die("listen");
 	return (httpd);
@@ -604,7 +616,9 @@ void *decode_request_header(void *data)
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
+	LOG("Original query: %s\n", url);
 	query = apply_rules(host, buf);
+	LOG("Processed query: %s\n", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{

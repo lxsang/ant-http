@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
 		client->status = 0;
-		client->attempt = 0;
+		client->last_wait = 0;
 		if(config()->usessl == 1)
 		{
 			client->ssl = (void*)SSL_new(ctx);

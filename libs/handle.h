@@ -26,7 +26,7 @@
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-#define MAX_ATTEMPT 1000
+#define MAX_WAIT_S 20 // 1/3 minute
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif
@@ -38,7 +38,7 @@ typedef struct{
 #ifdef USE_OPENSSL
     int status;
 #endif
-    int attempt;
+    time_t last_wait;
 } antd_client_t;
 
 typedef struct {

@@ -335,6 +335,7 @@ void *resolve_request(void *data)
 					}
 					else
 					{
+						i = HASHSIZE;
 						break;
 					}
 				}

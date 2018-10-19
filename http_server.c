@@ -385,29 +385,7 @@ void *resolve_request(void *data)
 
 void *finish_request(void *data)
 {
-	if (!data)
-		return NULL;
-	LOG("Close request\n");
-	antd_request_t *rq = (antd_request_t *)data;
-	// free all other thing
-	if (rq->request)
-	{
-		dictionary tmp = dvalue(rq->request, "COOKIE");
-		if (tmp)
-			freedict(tmp);
-		tmp = dvalue(rq->request, "REQUEST_HEADER");
-		if (tmp)
-			freedict(tmp);
-		tmp = dvalue(rq->request, "REQUEST_DATA");
-		if (tmp)
-			freedict(tmp);
-		dput(rq->request, "REQUEST_HEADER", NULL);
-		dput(rq->request, "REQUEST_DATA", NULL);
-		dput(rq->request, "COOKIE", NULL);
-		freedict(rq->request);
-	}
-	antd_close(rq->client);
-	free(rq);
+	destroy_request(data);
 	server_config.connection--;
 	LOG("Remaining connection %d\n", server_config.connection);
 	return NULL;

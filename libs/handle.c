@@ -586,3 +586,35 @@ int read_buf(void* sock, char*buf,int size)
 	buf[i] = '\0';
 	return i;
 }
+/*
+	We put it here since we want the plugin is able
+	to destroy the request if it want to
+	in this case, the plugin should return an empty
+	with no data
+*/
+void destroy_request(void *data)
+{
+	if (!data)
+		return;
+	LOG("Close request\n");
+	antd_request_t *rq = (antd_request_t *)data;
+	// free all other thing
+	if (rq->request)
+	{
+		dictionary tmp = dvalue(rq->request, "COOKIE");
+		if (tmp)
+			freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_HEADER");
+		if (tmp)
+			freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_DATA");
+		if (tmp)
+			freedict(tmp);
+		dput(rq->request, "REQUEST_HEADER", NULL);
+		dput(rq->request, "REQUEST_DATA", NULL);
+		dput(rq->request, "COOKIE", NULL);
+		freedict(rq->request);
+	}
+	antd_close(rq->client);
+	free(rq);
+}

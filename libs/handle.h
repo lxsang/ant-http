@@ -111,4 +111,5 @@ int read_buf(void* sock,char* buf,int i);
 int antd_send( void *source, const void* data, int len);
 int antd_recv( void *source,  void* data, int len);
 int antd_close(void* source);
+void destroy_request(void *data);
 #endif

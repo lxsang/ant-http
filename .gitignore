@@ -3,6 +3,7 @@ plugins
 build
 *._*
 *.d
+*.deb
 .vscode
 # Object files
 *.o

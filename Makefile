@@ -56,6 +56,27 @@ plugin:
 
 clean: sclean pclean
 
+deb:
+	-rm -r package
+	-rm *.deb
+	mkdir -p package/opt/www/htdocs
+	mkdir    package/opt/www/plugins
+	mkdir	 package/opt/www/database package/opt/www/tmp
+	mkdir package/DEBIAN
+	cp $(BUILDIRD)/httpd package/opt/www
+	chmod a+x package/opt/www/httpd
+	cp -rf $(BUILDIRD)/plugins/* package/opt/www/plugins
+	cp antd package/opt/www
+	chmod a+x package/opt/www/antd
+	cp config.ini.tpl package/opt/www/config.ini
+	echo "Package: antd" > package/DEBIAN/control
+	echo "Version: 1.0.0" >> package/DEBIAN/control
+	echo "Maintainer: Xuan Sang LE" >> package/DEBIAN/control
+	echo "Architecture: all" >> package/DEBIAN/control
+	echo "Description: Lighweight HTTP/HTTPs server" >> package/DEBIAN/control
+	dpkg-deb --build package
+	-rm -r package
+
 sclean:
 	-rm -f *.o $(BUILDIRD)/httpd
 	-rm *.$(EXT)

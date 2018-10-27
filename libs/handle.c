@@ -170,19 +170,20 @@ int antd_send(void *src, const void* data, int len)
 	else
 	{
 #endif
+		ptr = (char* )data;
 		writelen = len > BUFFLEN?BUFFLEN:len;
 		written = 0;
 		while (writelen > 0)
         {
-            count = send(source->sock, data, len, 0);
+            count = send(source->sock, ptr+written, writelen, 0);
             if (count > 0)
             {
                 written += count;
 				writelen = (len - written) > BUFFLEN?BUFFLEN:(len-written);
             }
-			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			else if(count == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
 			{
-				return -1;
+				return written;
 			}
 		}
 #ifdef USE_OPENSSL
@@ -197,10 +198,10 @@ int antd_send(void *src, const void* data, int len)
 int antd_recv(void *src,  void* data, int len)
 {
 	if(!src) return -1;
-	int read;
-	char* ptr;
-	int  received;
-	int readlen;
+	int read=0;
+	char* ptr = NULL;
+	int  received=0;
+	int readlen=0;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
@@ -317,20 +318,24 @@ int antd_recv(void *src,  void* data, int len)
 		read = 0;
 		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
         {
-            received = recv(((int) source->sock), data, len, 0);
+            received = recv(((int) source->sock), ptr+read, readlen, 0);
+			LOG("Read : %c\n", *ptr);
             if (received > 0)
             {
                 read += received;
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+				LOG("Read len is %d\n", readlen);
             }
 			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
-				return -1;
+				break;
 			}
 		}
+		//read = recv(((int) source->sock), data, len, 0);
 #ifdef USE_OPENSSL
 	}
 #endif
+	//LOG("Received %d bytes\n", read);
 	/*if(ret == 0)
 	{
 		antd_close(src);
@@ -610,6 +615,7 @@ int read_buf(void* sock, char*buf,int size)
 		n = antd_recv(sock, &c, 1);
 		if (n > 0)
 		{
+			//LOG("Data : %c\n", c);
 			buf[i] = c;
 			i++;
 		}

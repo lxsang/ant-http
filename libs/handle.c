@@ -73,14 +73,16 @@ int antd_send(void *src, const void* data, int len)
 	if(!src || !data) return -1;
 	int written;
 	antd_client_t * source = (antd_client_t *) src;
+	char* ptr;
+	int writelen;
+	int  count;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
 		//LOG("SSL WRITE\n");
 		//ret = SSL_write((SSL*) source->ssl, data, len);
-		int  count;
-		char* ptr = (char* )data;
-		int writelen = len > BUFFLEN?BUFFLEN:len;
+		ptr = (char* )data;
+		writelen = len > BUFFLEN?BUFFLEN:len;
 		written = 0;
 		fd_set fds;
     	struct timeval timeout;
@@ -168,7 +170,21 @@ int antd_send(void *src, const void* data, int len)
 	else
 	{
 #endif
-		written = send(source->sock, data, len, 0);
+		writelen = len > BUFFLEN?BUFFLEN:len;
+		written = 0;
+		while (writelen > 0)
+        {
+            count = send(source->sock, data, len, 0);
+            if (count > 0)
+            {
+                written += count;
+				writelen = (len - written) > BUFFLEN?BUFFLEN:(len-written);
+            }
+			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			{
+				return -1;
+			}
+		}
 #ifdef USE_OPENSSL
 	}
 #endif
@@ -182,13 +198,15 @@ int antd_recv(void *src,  void* data, int len)
 {
 	if(!src) return -1;
 	int read;
+	char* ptr;
+	int  received;
+	int readlen;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
 	if(usessl())
 	{
-		int  received;
-		char* ptr = (char* )data;
-		int readlen = len > BUFFLEN?BUFFLEN:len;
+		ptr = (char* )data;
+		readlen = len > BUFFLEN?BUFFLEN:len;
 		read = 0;
 		fd_set fds;
     	struct timeval timeout;
@@ -294,7 +312,22 @@ int antd_recv(void *src,  void* data, int len)
 	else
 	{
 #endif
-		read = recv(((int) source->sock), data, len, 0);
+		ptr = (char* )data;
+		readlen = len > BUFFLEN?BUFFLEN:len;
+		read = 0;
+		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
+        {
+            received = recv(((int) source->sock), data, len, 0);
+            if (received > 0)
+            {
+                read += received;
+				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+            }
+			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			{
+				return -1;
+			}
+		}
 #ifdef USE_OPENSSL
 	}
 #endif

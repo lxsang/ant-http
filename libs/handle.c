@@ -319,12 +319,12 @@ int antd_recv(void *src,  void* data, int len)
 		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
         {
             received = recv(((int) source->sock), ptr+read, readlen, 0);
-			LOG("Read : %c\n", *ptr);
+			//LOG("Read : %c\n", *ptr);
             if (received > 0)
             {
                 read += received;
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
-				LOG("Read len is %d\n", readlen);
+				//LOG("Read len is %d\n", readlen);
             }
 			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{

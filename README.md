@@ -6,7 +6,7 @@ A lightweight and portable HTTP/HTTPs web server written in  C:
 - New 1.0.0 version (BETA feature): Nonblocking event driven base server with configurable number of thread pool workers, good for scalability
 - Initial goal is for embedded Linux, but can be used as general purpose web server. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
-- It is also extensible via its extensions mechanism that allows to extends the server capability.
+- It is also extensible via its extension mechanism that allows to extends the server capability.
 
 ## Plugins:
 * CGI interface for external scripting language (e.g. PHP): [https://github.com/lxsang/antd-cgi-plugin](https://github.com/lxsang/antd-cgi-plugin)

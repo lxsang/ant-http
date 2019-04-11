@@ -9,7 +9,7 @@
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
 #define LOW_PRIORITY (N_PRIORITY - 1)
 #define HIGH_PRIORITY 0
-
+#define NOSTATUS 0x00
 typedef enum { LIGHT, HEAVY } antd_task_type_t;
 // callback definition
 typedef struct __callback_t{
@@ -27,6 +27,13 @@ typedef struct {
         higher value is lower priority
     */
     uint8_t priority;
+    /*
+        The status of a task
+        should be set by the application
+        default value 0x00 means that
+        there is no status set
+    */
+    uint8_t status;
     /*
         the callback
     */
@@ -109,4 +116,5 @@ int antd_task_schedule(antd_scheduler_t*);
 wait for event
 */
 void antd_wait(antd_scheduler_t*);
+
 #endif

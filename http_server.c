@@ -190,6 +190,7 @@ void *accept_request(void *data)
 			return task;
 		}
 		task->handle = accept_request;
+		task->status = TASK_ACCEPT;
 		return task;
 	}
 	// perform the ssl handshake if enabled
@@ -207,6 +208,7 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
 				//LOG("RETRY SSL %d\n", client->sock);
+				task->status = TASK_ACCEPT;
 				task->handle = accept_request;
 				//task->priority = HIGH_PRIORITY;
 				//task->type = LIGHT;
@@ -223,6 +225,7 @@ void *accept_request(void *data)
 		// reset the waiting
 		client->last_wait = 0;
 		task->handle = accept_request;
+		task->status = TASK_ACCEPT;
 		LOG("Handshake finish for %d\n", client->sock);
 		return task;
 	}
@@ -239,6 +242,7 @@ void *accept_request(void *data)
 				return task;
 			}
 			task->handle = accept_request;
+			task->status = TASK_ACCEPT;
 			return task;
 		}
 	}
@@ -279,6 +283,7 @@ void *accept_request(void *data)
 	// decode request
 	// now return the task
 	task->handle = decode_request_header;
+	task->status = TASK_DECODE_HEADER;
 	return task;
 }
 
@@ -378,6 +383,7 @@ void *resolve_request(void *data)
 		{
 			task->type = HEAVY;
 			task->handle = serve_file;
+			task->status = TASK_SERVE_FILE;
 		}
 		return task;
 	}
@@ -610,6 +616,8 @@ void *decode_request_header(void *data)
 		free(host);
 	// header ok, now checkmethod
 	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL);
+	task->status = TASK_DECODE_RQ;
+
 	task->priority++;
 	return task;
 }
@@ -643,11 +651,13 @@ void *decode_request(void *data)
 		}
 		// resolve task
 		task->handle = resolve_request;
+		task->status = TASK_RESOLVE_RQ;
 		return task;
 	}
 	else if (strcmp(method, "POST") == 0)
 	{
 		task->handle = resolve_request;
+		task->status = TASK_RESOLVE_RQ;
 		//task->type = HEAVY;
 		return task;
 	}
@@ -791,6 +801,7 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
 	task->priority++;
+	task->status = TASK_DECODE_MP_DATA;
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -968,6 +979,7 @@ void *decode_multi_part_request_data(void *data)
 		// continue upload
 		task->type = HEAVY;
 		task->handle = decode_multi_part_request_data;
+		task->status = TASK_DECODE_MP_DATA;
 	}
 	free(line);
 	free(boundend);
@@ -1095,12 +1107,14 @@ void *execute_plugin(void *data, const char *pname)
 	{
 		task->handle = fn;
 		task->type = HEAVY;
+		task->status = TASK_EXEC_PLUGIN_RAW;
 	}
 	else
 	{
 		free(task);
 		task = antd_create_task(decode_post_request, (void *)rq, fn);
 		task->priority++;
+		task->status = TASK_EXEC_PLUGIN_COOK;
 	}
 	return task;
 }

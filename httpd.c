@@ -99,6 +99,25 @@ void stop_serve(int dummy) {
 		close(server_sock);
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
+void antd_scheduler_dump(antd_scheduler_t* scheduler)
+{
+	antd_task_queue_t queue = NULL;
+	antd_task_item_t it = NULL;
+    LOG("[[[[SCHEDULER]]]] : dumping all value:\n");
+	pthread_mutex_lock(&scheduler->scheduler_lock);
+	for(int i = 0; i < N_PRIORITY; i++)
+    {
+        queue = scheduler->task_queue[i];
+		for(it = queue; it != NULL && it->next != NULL; it = it->next)
+		{
+			antd_request_t* request = it->task->data;
+			LOG("From: %s [%d]\n", request->client->ip, request->client->sock);
+			LOG("\tStamp: %ul\n", it->task->stamp);
+			LOG("\tstatus: %x\n", it->task->status);
+		}
+    }
+	 pthread_mutex_unlock(&scheduler->scheduler_lock);
+}
 int main(int argc, char* argv[])
 {
 // load the config first
@@ -156,6 +175,7 @@ int main(int argc, char* argv[])
 		{
 			continue;
 		}
+		// just dump the scheduler when we have a connection
 		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
 		antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
 		request->client = client;
@@ -169,6 +189,10 @@ int main(int argc, char* argv[])
 			client_ip =  inet_ntoa(client_name.sin_addr);
 			client->ip = strdup(client_ip);
 			LOG("Client IP: %s\n", client_ip);
+			if(strcmp(client->ip, "193.48.235.2") == 0)
+			{
+				antd_scheduler_dump(&scheduler);
+			}
 			//LOG("socket: %d\n", client_sock);
 		}
 
@@ -205,6 +229,7 @@ int main(int argc, char* argv[])
 #endif
 		// create callback for the server
 		task = antd_create_task(accept_request,(void*)request, finish_request );
+		task->status = TASK_ACCEPT;
 		//task->type = LIGHT;
 		antd_add_task(&scheduler, task);
 	}

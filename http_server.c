@@ -190,7 +190,7 @@ void *accept_request(void *data)
 			return task;
 		}
 		task->handle = accept_request;
-		task->status = TASK_ACCEPT;
+		task->status = TASK_ACCEPT_PEND;
 		return task;
 	}
 	// perform the ssl handshake if enabled
@@ -208,7 +208,7 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
 				//LOG("RETRY SSL %d\n", client->sock);
-				task->status = TASK_ACCEPT;
+				task->status = TASK_ACCEPT_SSL_CONT;
 				task->handle = accept_request;
 				//task->priority = HIGH_PRIORITY;
 				//task->type = LIGHT;
@@ -225,7 +225,7 @@ void *accept_request(void *data)
 		// reset the waiting
 		client->last_wait = 0;
 		task->handle = accept_request;
-		task->status = TASK_ACCEPT;
+		task->status = TASK_ACCEPT_HS_DONE;
 		LOG("Handshake finish for %d\n", client->sock);
 		return task;
 	}
@@ -242,7 +242,7 @@ void *accept_request(void *data)
 				return task;
 			}
 			task->handle = accept_request;
-			task->status = TASK_ACCEPT;
+			task->status = TASK_ACCEPT_READWAIT;
 			return task;
 		}
 	}

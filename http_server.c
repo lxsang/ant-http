@@ -159,7 +159,7 @@ void *accept_request(void *data)
 	antd_task_t *task;
 	antd_request_t *rq = (antd_request_t *)data;
 
-	task = antd_create_task(NULL, (void *)rq, NULL);
+	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
@@ -180,7 +180,7 @@ void *accept_request(void *data)
 	}
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
 	{
-		if(client->last_wait == 0) client->last_wait = time(NULL);
+		/*if(client->last_wait == 0) client->last_wait = time(NULL);
 		// retry it later
 		if(time(NULL) - client->last_wait > MAX_WAIT_S)
 		{
@@ -188,9 +188,8 @@ void *accept_request(void *data)
 			server_config.connection++;
 			unknow(rq->client);
 			return task;
-		}
+		}*/
 		task->handle = accept_request;
-		task->status = TASK_ACCEPT_PEND;
 		return task;
 	}
 	// perform the ssl handshake if enabled
@@ -208,48 +207,49 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
 				//LOG("RETRY SSL %d\n", client->sock);
-				task->status = TASK_ACCEPT_SSL_CONT;
+				/*if(client->last_wait == 0) client->last_wait = time(NULL);
+				if(time(NULL) - client->last_wait > MAX_WAIT_S)
+				{
+					server_config.connection++;
+					unknow(rq->client);
+					LOG("SSL timeout, give up on %d\n", client->sock);
+					return task;
+				}
+				task->status = TASK_ACCEPT_SSL_CONT;*/
 				task->handle = accept_request;
-				//task->priority = HIGH_PRIORITY;
-				//task->type = LIGHT;
 				return task;
 			default:
 				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());
-				server_config.connection++;
+				//server_config.connection++;
 				ERR_print_errors_fp(stderr);
 				unknow(rq->client);
 				return task;
 			}
 		}
 		client->status = 1;
-		// reset the waiting
-		client->last_wait = 0;
 		task->handle = accept_request;
-		task->status = TASK_ACCEPT_HS_DONE;
-		LOG("Handshake finish for %d\n", client->sock);
+		//LOG("Handshake finish for %d\n", client->sock);
 		return task;
 	}
 	else
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
-			if(client->last_wait == 0) client->last_wait = time(NULL);
+			/*if(client->last_wait == 0) client->last_wait = time(NULL);
 			if(time(NULL) - client->last_wait > MAX_WAIT_S)
 			{
 				server_config.connection++;
 				unknow(rq->client);
 				LOG("Read timeout, give up on %d\n", client->sock);
 				return task;
-			}
+			}*/
 			task->handle = accept_request;
-			task->status = TASK_ACCEPT_READWAIT;
 			return task;
 		}
 	}
 #endif
 	LOG("Ready for reading %d\n", client->sock);
-	client->last_wait = time(NULL);
-	server_config.connection++;
+	//server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
 	// get the method string
@@ -283,7 +283,6 @@ void *accept_request(void *data)
 	// decode request
 	// now return the task
 	task->handle = decode_request_header;
-	task->status = TASK_DECODE_HEADER;
 	return task;
 }
 
@@ -292,7 +291,7 @@ void *resolve_request(void *data)
 	struct stat st;
 	char path[2 * BUFFLEN];
 	antd_request_t *rq = (antd_request_t *)data;
-	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
+	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
 	char *newurl = NULL;
@@ -383,7 +382,6 @@ void *resolve_request(void *data)
 		{
 			task->type = HEAVY;
 			task->handle = serve_file;
-			task->status = TASK_SERVE_FILE;
 		}
 		return task;
 	}
@@ -480,7 +478,7 @@ static void error_die(const char *sc)
 void *serve_file(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
-	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
+	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
@@ -615,8 +613,7 @@ void *decode_request_header(void *data)
 	if (host)
 		free(host);
 	// header ok, now checkmethod
-	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL);
-	task->status = TASK_DECODE_RQ;
+	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL,rq->client->last_io);
 
 	task->priority++;
 	return task;
@@ -636,7 +633,7 @@ void *decode_request(void *data)
 	if (tmp && strcasecmp(tmp, "websocket") == 0)
 		ws = 1;
 	method = (char *)dvalue(rq->request, "METHOD");
-	task = antd_create_task(NULL, (void *)rq, NULL);
+	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0)
 	{
@@ -651,13 +648,11 @@ void *decode_request(void *data)
 		}
 		// resolve task
 		task->handle = resolve_request;
-		task->status = TASK_RESOLVE_RQ;
 		return task;
 	}
 	else if (strcmp(method, "POST") == 0)
 	{
 		task->handle = resolve_request;
-		task->status = TASK_RESOLVE_RQ;
 		//task->type = HEAVY;
 		return task;
 	}
@@ -682,7 +677,7 @@ void *decode_post_request(void *data)
 	if (tmp)
 		clen = atoi(tmp);
 	char *method = (char *)dvalue(rq->request, "METHOD");
-	task = antd_create_task(NULL, (void *)rq, NULL);
+	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	task->type = HEAVY;
 	if (!method || strcmp(method, "POST") != 0)
@@ -799,9 +794,8 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	char *str_copy = strdup(ctype);
 	char *orgcpy = str_copy;
 	antd_request_t *rq = (antd_request_t *)data;
-	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
+	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
-	task->status = TASK_DECODE_MP_DATA;
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -840,7 +834,7 @@ void *decode_multi_part_request_data(void *data)
 	FILE *fp = NULL;
 	char *token, *keytoken, *valtoken;
 	antd_request_t *rq = (antd_request_t *)data;
-	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
+	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary dic = (dictionary)dvalue(rq->request, "REQUEST_DATA");
@@ -979,7 +973,6 @@ void *decode_multi_part_request_data(void *data)
 		// continue upload
 		task->type = HEAVY;
 		task->handle = decode_multi_part_request_data;
-		task->status = TASK_DECODE_MP_DATA;
 	}
 	free(line);
 	free(boundend);
@@ -1072,7 +1065,7 @@ void *execute_plugin(void *data, const char *pname)
 	struct plugin_entry *plugin;
 	char *error;
 	antd_request_t *rq = (antd_request_t *)data;
-	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL);
+	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	LOG("Plugin name '%s'\n", pname);
 
@@ -1107,14 +1100,12 @@ void *execute_plugin(void *data, const char *pname)
 	{
 		task->handle = fn;
 		task->type = HEAVY;
-		task->status = TASK_EXEC_PLUGIN_RAW;
 	}
 	else
 	{
 		free(task);
-		task = antd_create_task(decode_post_request, (void *)rq, fn);
+		task = antd_create_task(decode_post_request, (void *)rq, fn, rq->client->last_io);
 		task->priority++;
-		task->status = TASK_EXEC_PLUGIN_COOK;
 	}
 	return task;
 }

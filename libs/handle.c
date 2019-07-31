@@ -193,6 +193,8 @@ int antd_send(void *src, const void* data, int len)
 	{
 		antd_close(src);
 	}*/
+	if(written > 0)
+		time(&source->last_io);
 	return written;
 }
 int antd_recv(void *src,  void* data, int len)
@@ -340,6 +342,8 @@ int antd_recv(void *src,  void* data, int len)
 	{
 		antd_close(src);
 	}*/
+	if(read > 0)
+		time(&source->last_io);
 	return read;
 }
 void set_nonblock(int socket) {

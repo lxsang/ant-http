@@ -154,6 +154,8 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
     scheduler->status = 1;
     scheduler->workers_queue = NULL;
     scheduler->pending_task = 0 ;
+    scheduler->validate_data = 0;
+    scheduler->destroy_data = NULL;
     // init semaphore
     scheduler->scheduler_sem = sem_open("scheduler", O_CREAT, 0600, 0);
     if (scheduler->scheduler_sem == SEM_FAILED)
@@ -216,7 +218,7 @@ void antd_scheduler_destroy(antd_scheduler_t* scheduler)
 /*
     create a task
 */
-antd_task_t* antd_create_task(void* (*handle)(void*), void *data, void* (*callback)(void*))
+antd_task_t* antd_create_task(void* (*handle)(void*), void *data, void* (*callback)(void*), time_t atime)
 {
     antd_task_t* task = (antd_task_t*)malloc(sizeof *task);
     task->stamp = (unsigned long)time(NULL);
@@ -225,7 +227,7 @@ antd_task_t* antd_create_task(void* (*handle)(void*), void *data, void* (*callba
     task->callback = callback_of(callback);
     task->priority = NORMAL_PRIORITY;
     task->type = LIGHT;
-    task->status = NOSTATUS;
+    task->access_time = atime;
     return task;
 }
 
@@ -312,11 +314,26 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
             break;
     }
     pthread_mutex_unlock(&scheduler->scheduler_lock);
+    // no task
     if(!it)
     {
         return 0;
     }
     // has the task now
+    // validate the task
+    if(scheduler->validate_data && difftime( time(NULL), it->task->access_time) > MAX_VALIDITY_INTERVAL)
+    {
+        // data task is not valid
+        LOG("Task data is not valid \n");
+        if(scheduler->destroy_data)
+            scheduler->destroy_data(it->task->data);
+        if(it->task->callback)
+            free_callback(it->task->callback);
+        free(it->task);
+        free(it);
+        return 0;
+    }
+
     // check the type of task
     if(it->task->type == LIGHT || scheduler->n_workers <= 0)
     {

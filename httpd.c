@@ -72,6 +72,7 @@ void configure_context(SSL_CTX *ctx)
 
 #endif
 
+
 void stop_serve(int dummy) {
 	UNUSED(dummy);
 	sigset_t mask;
@@ -99,25 +100,7 @@ void stop_serve(int dummy) {
 		close(server_sock);
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
-void antd_scheduler_dump(antd_scheduler_t* scheduler)
-{
-	antd_task_queue_t queue = NULL;
-	antd_task_item_t it = NULL;
-    LOG("[[[[SCHEDULER]]]] : dumping all value:\n");
-	pthread_mutex_lock(&scheduler->scheduler_lock);
-	for(int i = 0; i < N_PRIORITY; i++)
-    {
-        queue = scheduler->task_queue[i];
-		for(it = queue; it != NULL && it->next != NULL; it = it->next)
-		{
-			antd_request_t* request = it->task->data;
-			LOG("From: %s [%d]\n", request->client->ip, request->client->sock);
-			LOG("\tStamp: %ul\n", it->task->stamp);
-			LOG("\tstatus: %x\n", it->task->status);
-		}
-    }
-	 pthread_mutex_unlock(&scheduler->scheduler_lock);
-}
+
 int main(int argc, char* argv[])
 {
 // load the config first
@@ -150,6 +133,8 @@ int main(int argc, char* argv[])
 	LOG("httpd running on port %d\n", port);
 	// default to 4 workers
 	antd_scheduler_init(&scheduler, config()->n_workers);
+	scheduler.validate_data = 1;
+	scheduler.destroy_data = finish_request;
 	// use blocking server_sock
 	// make the scheduler wait for event on another thread
 	// this allow to ged rid of high cpu usage on
@@ -189,10 +174,6 @@ int main(int argc, char* argv[])
 			client_ip =  inet_ntoa(client_name.sin_addr);
 			client->ip = strdup(client_ip);
 			LOG("Client IP: %s\n", client_ip);
-			if(strcmp(client->ip, "193.48.235.2") == 0)
-			{
-				antd_scheduler_dump(&scheduler);
-			}
 			//LOG("socket: %d\n", client_sock);
 		}
 
@@ -209,10 +190,10 @@ int main(int argc, char* argv[])
 			perror("setsockopt failed\n");
 		*/
 		client->sock = client_sock;
+		time(&client->last_io);
 #ifdef USE_OPENSSL
 		client->ssl = NULL;
 		client->status = 0;
-		client->last_wait = 0;
 		if(config()->usessl == 1)
 		{
 			client->ssl = (void*)SSL_new(ctx);
@@ -227,9 +208,9 @@ int main(int argc, char* argv[])
         	}*/
 		}
 #endif
+		config()->connection++;
 		// create callback for the server
-		task = antd_create_task(accept_request,(void*)request, finish_request );
-		task->status = TASK_ACCEPT;
+		task = antd_create_task(accept_request,(void*)request, finish_request, client->last_io);
 		//task->type = LIGHT;
 		antd_add_task(&scheduler, task);
 	}

@@ -31,7 +31,7 @@ void* antd_redirect(void* user_data)
     __t(client, "This page has been moved to https://%s", host);
     free(host);
     free(user_data);
-    return antd_create_task(NULL,client, NULL);
+    return antd_create_task(NULL,client, NULL, ((antd_client_t*)client)->last_io);
 }
 
 void* antd_free_client(void* client)
@@ -68,7 +68,7 @@ void* antd_get_host(void * client)
     data[0] = client;
     data[1] = (void*)host;
     LOG("[%s] Request for: %s --> https://%s\n", ((antd_client_t*)client)->ip, host, host);
-    return antd_create_task(antd_redirect,data, NULL);
+    return antd_create_task(antd_redirect,data, NULL, time(NULL));
 }
 
 int main(int argc, char* argv[])
@@ -91,6 +91,8 @@ int main(int argc, char* argv[])
     //timeout.tv_usec = 500;
     // 0 worker
     antd_scheduler_init(&scheduler, 0);
+    scheduler.validate_data = 1;
+	scheduler.destroy_data = antd_free_client;
     // set server socket to non blocking
     set_nonblock(server_sock);
 	LOG("relayd running on port %d\n", port);
@@ -131,7 +133,7 @@ int main(int argc, char* argv[])
 			client->ip = strdup(inet_ntoa(client_name.sin_addr));
         client->sock = client_sock;
 		//accept_request(&client);
-        antd_add_task(&scheduler, antd_create_task(antd_get_host,(void*)client, antd_free_client ));
+        antd_add_task(&scheduler, antd_create_task(antd_get_host,(void*)client, antd_free_client, client->last_io));
 	}
 
 	return(0);

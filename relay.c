@@ -132,6 +132,7 @@ int main(int argc, char* argv[])
 		if (client_name.sin_family == AF_INET)
 			client->ip = strdup(inet_ntoa(client_name.sin_addr));
         client->sock = client_sock;
+        time(&client->last_io);
 		//accept_request(&client);
         antd_add_task(&scheduler, antd_create_task(antd_get_host,(void*)client, antd_free_client, client->last_io));
 	}

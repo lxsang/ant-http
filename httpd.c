@@ -49,7 +49,7 @@ void configure_context(SSL_CTX *ctx)
      * SSL_OP_NO_TICKET: We don't want TLS tickets used because this is an SSL server caching example.
      *                   It should be fine to use tickets in addition to server side caching.
      */
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
+    SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1|SSL_OP_NO_TLSv1_1|SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     /* Set the key and cert */
 	/* use the full chain bundle of certificate */

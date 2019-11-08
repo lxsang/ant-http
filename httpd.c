@@ -2,6 +2,11 @@
 #include <dirent.h>
 #include "http_server.h"
 #include "libs/ini.h"
+
+// define the cipher suit used
+// dirty hack, this should be configured by the configuration file
+#define CIPHER_SUIT "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256"
+
 static  antd_scheduler_t scheduler;
 static int server_sock = -1;
 
@@ -51,6 +56,12 @@ void configure_context(SSL_CTX *ctx)
      */
     SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1|SSL_OP_NO_TLSv1_1|SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
+    // set the cipher suit
+    if (SSL_CTX_set_cipher_list(ctx, CIPHER_SUIT) != 1)
+    {
+       ERR_print_errors_fp(stderr);
+       exit(EXIT_FAILURE);
+    }
     /* Set the key and cert */
 	/* use the full chain bundle of certificate */
     //if (SSL_CTX_use_certificate_file(ctx, server_config->sslcert, SSL_FILETYPE_PEM) <= 0) {

@@ -23,7 +23,7 @@ A lightweight and portable HTTP/HTTPs web server written in  C:
 * build-essential
 
 ### server dependencies
-* libssl-dev
+* libssl-dev (expecting openssl v1.1.1d)
 * libsqlite3-dev
 
 ### build

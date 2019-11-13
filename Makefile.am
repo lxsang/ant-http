@@ -34,6 +34,7 @@ pkginclude_HEADERS =  lib/ini.h \
 			lib/scheduler.h \
             lib/plugin.h
 
+EXTRA_DIST = plugin_manager.h http_server.h
 # check for db 
 if DB
 libantd_la_SOURCES += lib/dbhelper.c

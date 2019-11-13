@@ -63,3 +63,4 @@ config.guess
 depcomp
 install-sh
 missing
+libtool

@@ -58,3 +58,8 @@ dkms.con
 *.cache
 Makefile
 antd
+compile
+config.guess
+depcomp
+install-sh
+missing

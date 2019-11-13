@@ -71,4 +71,4 @@ config.ini.tpl
 configure
 aclocal.m4
 ltmain.sh
-Makefile.*
+Makefile.in

@@ -51,7 +51,7 @@ build
 *.cmd
 modules.order
 Module.symvers
-Mkfile.old
+Makefile.old
 dkms.con
 .DS_Store
 .*
@@ -64,3 +64,11 @@ depcomp
 install-sh
 missing
 libtool
+config.log
+config.status
+config.sub
+config.ini.tpl
+configure
+aclocal.m4
+ltmain.sh
+Makefile.*

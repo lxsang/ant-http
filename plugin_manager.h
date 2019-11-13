@@ -1,8 +1,8 @@
 #ifndef PLUGIN_MANAGER_H
 #define PLUGIN_MANAGER_H
 #include <dlfcn.h>
-#include "libs/utils.h"
-#include "libs/handle.h"
+#include "lib/utils.h"
+#include "lib/handle.h"
 #include "http_server.h"
 struct plugin_entry { 
     struct plugin_entry *next; 

@@ -25,8 +25,8 @@ char* htdocs(const char*);
 char* config_dir();
 /*Default function for plugin*/
 // init the plugin
-void init();
-void destroy();
+void __attribute__((weak)) init();
+void __attribute__((weak)) destroy();
 void* handle(void*);
 plugin_header_t* meta();
 void use_raw_body();

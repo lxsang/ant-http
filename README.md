@@ -36,3 +36,11 @@ cd antd
 wget -O- https://get.bitdojo.dev/antd | bash -s ""
 ```
 The script will ask for a place to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.
+
+### Generte distribution
+```sh
+libtoolize
+aclocal
+autoconf
+automake --add-missing
+``` 

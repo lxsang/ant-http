@@ -1,7 +1,7 @@
 
 #include <dirent.h>
 #include "http_server.h"
-#include "libs/ini.h"
+#include "lib/ini.h"
 
 // define the cipher suit used
 // dirty hack, this should be configured by the configuration file

@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 {
 // load the config first
 	if(argc==1)
-		load_config(CONFIG);
+		load_config(CONFIG_FILE);
 	else
 		load_config(argv[1]);
 	unsigned port = config()->port;

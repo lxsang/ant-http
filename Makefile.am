@@ -10,7 +10,7 @@ else
 endif
 
 
-AM_CPPFLAGS += -W  -Wall -g -std=c99
+AM_CPPFLAGS += -W  -Wall -g -std=c99 -DCONFIG_FILE=\"$(sysconfdir)/antd-config.ini\"
 
 lib_LTLIBRARIES = libantd.la
 libantd_la_SOURCES =  lib/ini.c \
@@ -34,7 +34,7 @@ pkginclude_HEADERS =  lib/ini.h \
 			lib/scheduler.h \
             lib/plugin.h
 
-EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE
+EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE antd-config.ini
 # check for db 
 if DB
 libantd_la_SOURCES += lib/dbhelper.c
@@ -46,3 +46,11 @@ bin_PROGRAMS = antd
 # lib source files
 antd_SOURCES = plugin_manager.c http_server.c httpd.c
 antd_LDADD = libantd.la
+
+sysconf_DATA = antd-config.ini
+
+#install-data-local: $(srcdir)/conf/config.file $(srcdir)/conf/sub1/config.file
+#        mkdir $(sysconfdir)/conf
+#        cp $(srcdir)/conf/config.file $(sysconfdir)/conf
+#        mkdir $(sysconfdir)/conf/sub1
+#        cp $(srcdir)/conf/sub1/config.file $(sysconfdir)/conf/sub1

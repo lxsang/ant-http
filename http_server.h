@@ -15,7 +15,9 @@
 #define PLUGIN_HANDLER	 "handle"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
-#define CONFIG "config.ini"
+#ifndef CONFIG_FILE
+#define CONFIG_FILE "antd-config.ini"
+#endif
 
 config_t* config(); 
 void destroy_config();

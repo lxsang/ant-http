@@ -67,7 +67,6 @@ libtool
 config.log
 config.status
 config.sub
-config.ini.tpl
 configure
 aclocal.m4
 ltmain.sh

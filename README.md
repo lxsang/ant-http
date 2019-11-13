@@ -34,6 +34,13 @@ mkdir antd
 cd antd
 # build without plugin
 wget -O- https://get.bitdojo.dev/antd | bash -s ""
+
+# or from the distribution tarball
+tar xvzf antd-x.x.x.tar.gz
+cd antd-x.x.x
+./configure --prefix=/usr --enable-debug=yes
+make
+sudo make install
 ```
 The script will ask for a place to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.
 

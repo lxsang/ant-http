@@ -61,7 +61,7 @@ void * plugin_from_file(char* name)
   char* error;
   char* path = __s("%s%s%s",config()->plugins_dir,name,config()->plugins_ext);
   void (*fn)(const char*, config_t*);
-   lib_handle = dlopen(path, RTLD_LAZY);
+   lib_handle = dlopen(path, RTLD_NOW| RTLD_GLOBAL);
    if (!lib_handle) 
    {
       LOG("Cannot load plugin '%s' : '%s'\n",name,dlerror());

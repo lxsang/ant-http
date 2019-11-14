@@ -44,7 +44,7 @@ sudo make install
 ```
 The script will ask for a place to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.
 
-### Generte distribution
+### Generate distribution
 ```sh
 libtoolize
 aclocal

@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 
-
+# AM_CFLAGS = -g -O0
 
 # check for system
 #if LINUX
@@ -11,7 +11,6 @@ AUTOMAKE_OPTIONS = foreign
 
 
 AM_CPPFLAGS = -W  -Wall -g -std=c99 -DCONFIG_FILE=\"$(sysconfdir)/antd-config.ini\"
-
 # dynamic library
 lib_LTLIBRARIES = libantd.la
 libantd_la_SOURCES =  lib/ini.c \

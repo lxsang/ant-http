@@ -4,6 +4,7 @@ AC_INIT([antd], [1.0.4b], [xsang.le@gmail.com])
 # We’re going to use automake for this project
 AM_INIT_AUTOMAKE([subdir-objects])
 
+: ${CFLAGS="-g -O0"}
 # dependencies
 # C compiler
 AC_PROG_CC

@@ -36,6 +36,7 @@ THE SOFTWARE.
 #include <regex.h>
 #include <time.h>
 #include <stdint.h>
+#include <errno.h>
 #ifdef USE_OPENSSL
 #include <openssl/sha.h>
 #else

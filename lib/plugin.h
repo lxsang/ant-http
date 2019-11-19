@@ -34,6 +34,7 @@ void use_raw_body();
 /*
 STATIC PART, should be included in any plugin
 */
+#ifdef PLUGIN_IMPLEMENT
 static plugin_header_t __plugin__;
 // private function
 void __init_plugin__(const char* pl,config_t* conf){
@@ -124,4 +125,5 @@ void __release__()
 	if(__plugin__.htdocs) free(__plugin__.htdocs);
 	if(__plugin__.pdir) free(__plugin__.pdir);
 }
+#endif
 #endif

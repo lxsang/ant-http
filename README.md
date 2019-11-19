@@ -32,8 +32,9 @@ When all dependencies are installed, the build can be done with a few single com
 ```bash
 mkdir antd
 cd antd
+# Replace x.x.x by the version number
 # build without plugin
-wget -O- https://get.bitdojo.dev/antd | bash -s ""
+wget -O- https://get.bitdojo.dev/antd | bash -s "x.x.x"
 
 # or from the distribution tarball
 tar xvzf antd-x.x.x.tar.gz

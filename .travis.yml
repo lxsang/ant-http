@@ -1,7 +1,9 @@
 language: c
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install libssl-dev
+  - sudo apt-get install libssl-dev libsqlite3-dev autotools-dev autoconf libtool libtool-bin
 script:
-  - make initd
+  - autoconf
+  - automake --add-missing
+  - ./configure
   - make

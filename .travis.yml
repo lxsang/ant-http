@@ -3,6 +3,7 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install libssl-dev libsqlite3-dev autotools-dev autoconf libtool libtool-bin
 script:
+  - libtoolize
   - aclocal
   - autoconf
   - automake --add-missing

@@ -508,10 +508,12 @@ int __f(void* client, const char* file)
 		LOG("Cannot read : %s\n", file);
 		return 0;
 	}
-	while(fgets(buf, sizeof(buf), ptr) != NULL)
+	memset(buf,0, sizeof(buf));
+	while(fgets(buf, sizeof(buf) - 1, ptr) != NULL)
 	{
 		nbytes = antd_send(client, buf, strlen(buf));
 		if(nbytes == -1) return 0;
+		memset(buf,0, sizeof(buf));
 		//LOG("READ : %s\n", buf);
 		//fgets(buf, sizeof(buf), ptr);
 	}

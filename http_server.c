@@ -483,10 +483,10 @@ void *serve_file(void *data)
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
 	ctype(rq->client, mime_type);
-	if (is_bin(path))
+	/*if (is_bin(path))
 		__fb(rq->client, path);
-	else
-		__f(rq->client, path);
+	else*/
+	__f(rq->client, path);
 	return task;
 }
 

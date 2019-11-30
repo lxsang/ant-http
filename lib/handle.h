@@ -95,7 +95,7 @@ int __ti(void*,int);
 int __t(void*, const char*,...);
 int __b(void*, const unsigned char*, int);
 int __f(void*, const char*);
-int __fb(void*, const char*);
+//int __fb(void*, const char*);
 int upload(const char*, const char*);
 
 void set_cookie(void*, const char*,dictionary,const char*);

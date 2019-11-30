@@ -477,7 +477,7 @@ int __b(void* client, const unsigned char* data, int size)
 	}
 	return 1;
 }
-int __fb(void* client, const char* file)
+int __f(void* client, const char* file)
 {
 	printf("Open file %s\n",file );
 	unsigned char buffer[BUFFLEN];
@@ -497,6 +497,7 @@ int __fb(void* client, const char* file)
 	fclose(ptr);
 	return 1;
 }
+/*
 int __f(void* client, const char* file)
 {
 	char buf[BUFFLEN];
@@ -520,7 +521,7 @@ int __f(void* client, const char* file)
 	fclose(ptr);
 	return 1;
 }
-
+*/
 int upload(const char* tmp, const char* path)
 {
 	return !rename(tmp, path);

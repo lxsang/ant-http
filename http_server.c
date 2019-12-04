@@ -482,11 +482,26 @@ void *serve_file(void *data)
 	task->priority++;
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
-	ctype(rq->client, mime_type);
+	// find content length
 	/*if (is_bin(path))
 		__fb(rq->client, path);
 	else*/
-	__f(rq->client, path);
+	struct stat st;
+	int s = stat(path, &st);
+	if(s == -1)
+	{
+		notfound(rq->client);
+	}
+	else
+	{
+		int size = (int)st.st_size;
+		set_status(rq->client,200,"OK");
+		__t(rq->client,"Content-Type: %s",mime_type);
+		__t(rq->client,"Content-Length: %d",size);
+		response(rq->client,"");
+		__f(rq->client, path);
+	}
+	
 	return task;
 }
 

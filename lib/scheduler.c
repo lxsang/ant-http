@@ -160,13 +160,13 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
     scheduler->scheduler_sem = sem_open("scheduler", O_CREAT, 0600, 0);
     if (scheduler->scheduler_sem == SEM_FAILED)
     {
-        LOG("Cannot open semaphore for scheduler\n");
+        ERROR("Cannot open semaphore for scheduler");
         exit(-1);
     }
     scheduler->worker_sem = sem_open("worker", O_CREAT, 0600, 0);
     if (!scheduler->worker_sem)
     {
-        LOG("Cannot open semaphore for workers\n");
+        ERROR("Cannot open semaphore for workers");
         exit(-1);
     }
     // init lock 
@@ -180,7 +180,7 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
         scheduler->workers = (antd_worker_t*)malloc(n*(sizeof(antd_worker_t)));
         if(!scheduler->workers)
         {
-            LOG("Cannot allocate memory for worker\n");
+            ERROR("Cannot allocate memory for worker");
             exit(-1);
         }
         for(int i = 0; i < scheduler->n_workers;i++)
@@ -197,7 +197,7 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
             }
         }
     }
-    LOG("Antd scheduler initialized with %d worker\n", scheduler->n_workers);
+    LOG("Antd scheduler initialized with %d worker", scheduler->n_workers);
 }
 /* 
     destroy all pending task
@@ -207,7 +207,7 @@ void antd_scheduler_destroy(antd_scheduler_t* scheduler)
 {
     // free all the chains
     stop(scheduler);
-    LOG("Destroy remaining queue\n");
+    LOG("Destroy remaining queue");
     for(int i=0; i < N_PRIORITY; i++)
     {
         destroy_queue(scheduler->task_queue[i]);
@@ -324,7 +324,7 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
     if(scheduler->validate_data && difftime( time(NULL), it->task->access_time) > MAX_VALIDITY_INTERVAL)
     {
         // data task is not valid
-        LOG("Task data is not valid \n");
+        LOG("Task data is not valid, task will be killed");
         if(scheduler->destroy_data)
             scheduler->destroy_data(it->task->data);
         if(it->task->callback)

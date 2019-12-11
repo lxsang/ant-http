@@ -3,14 +3,16 @@
 #include "http_server.h"
 #include "lib/ini.h"
 
-// define the cipher suit used
-// dirty hack, this should be configured by the configuration file
-#define CIPHER_SUIT "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256"
-
 static  antd_scheduler_t scheduler;
 static int server_sock = -1;
 
 #ifdef USE_OPENSSL
+
+// define the cipher suit used
+// dirty hack, this should be configured by the configuration file
+#define CIPHER_SUIT "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256"
+
+
 static int ssl_session_ctx_id = 1;
 SSL_CTX *ctx;
 void init_openssl()
@@ -33,7 +35,7 @@ SSL_CTX *create_context()
 
     ctx = SSL_CTX_new(method);
     if (!ctx) {
-		perror("Unable to create SSL context");
+		ERROR("Unable to create SSL context");
 		ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
@@ -75,7 +77,7 @@ void configure_context(SSL_CTX *ctx)
 		exit(EXIT_FAILURE);
     }
 	if (!SSL_CTX_check_private_key(ctx)) {
-        LOG("Failed to validate cert \n");
+        ERROR("Failed to validate cert");
         ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
@@ -95,7 +97,6 @@ void stop_serve(int dummy) {
 	sigprocmask(SIG_BLOCK, &mask, NULL);
 	antd_scheduler_destroy(&scheduler);
 	unload_all_plugin();
-	destroy_config(); 
 #ifdef USE_OPENSSL
 	FIPS_mode_set(0);
 	SSL_CTX_free(ctx);
@@ -110,6 +111,7 @@ void stop_serve(int dummy) {
 #endif
 	if(server_sock != -1)
 		close(server_sock);
+	destroy_config(); 
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
 
@@ -142,7 +144,7 @@ int main(int argc, char* argv[])
     
 #endif
 	server_sock = startup(&port);
-	LOG("httpd running on port %d\n", port);
+	LOG("httpd running on port %d", port);
 	// default to 4 workers
 	antd_scheduler_init(&scheduler, config()->n_workers);
 	scheduler.validate_data = 1;
@@ -155,7 +157,7 @@ int main(int argc, char* argv[])
 	pthread_t scheduler_th;
 	if (pthread_create(&scheduler_th, NULL,(void *(*)(void *))antd_wait, (void*)&scheduler) != 0)
 	{
-		perror("pthread_create: cannot create worker\n");
+		ERROR("pthread_create: cannot create worker");
 		stop_serve(0);
 		exit(1);
 	}
@@ -185,7 +187,7 @@ int main(int argc, char* argv[])
 		{
 			client_ip =  inet_ntoa(client_name.sin_addr);
 			client->ip = strdup(client_ip);
-			LOG("Client IP: %s\n", client_ip);
+			LOG("Client IP: %s", client_ip);
 			//LOG("socket: %d\n", client_sock);
 		}
 

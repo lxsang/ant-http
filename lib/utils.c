@@ -191,7 +191,9 @@ char* mime(const char* file)
     if(!ex) return "application/octet-stream";
 	mime_t m = mime_from_ext(ex);
     if(ex)
+    {
         free(ex);
+    }
 	return (char*)m.type;
 }
 
@@ -200,7 +202,9 @@ int is_bin(const char* file)
 	char * ex = ext(file);
 	mime_t m = mime_from_ext(ex);
     if(ex)
+    {
         free(ex);
+    }
 	return m.bin;
 }
 
@@ -228,9 +232,9 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
 	/* Compile regular expression */
     reti = regcomp(&regex, expr, REG_ICASE | REG_EXTENDED);
     if( reti ){ 
-    	LOG("Could not compile regex: %s\n",expr);
+    	//ERROR("Could not compile regex: %s",expr);
         regerror(reti, &regex, msgbuf, sizeof(msgbuf));
-        LOG("Regex match failed: %s\n", msgbuf);
+        //ERROR("Regex match failed: %s", msgbuf);
     	return 0; 
     }
 
@@ -246,7 +250,7 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
     }
     else{
         regerror(reti, &regex, msgbuf, sizeof(msgbuf));
-        LOG("Regex match failed: %s\n", msgbuf);
+        //ERROR("Regex match failed: %s\n", msgbuf);
         ret = 0;
     }
 
@@ -256,7 +260,9 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
 }
 char *url_decode(const char *str) {
     if(!str)
+    {
         return NULL;
+    }
 	char *pstr = (char*)str, *buf = malloc(strlen(str) + 1), *pbuf = buf;
 
 	while (*pstr) {

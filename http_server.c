@@ -6,6 +6,50 @@ config_t *config()
 	return &server_config;
 }
 
+void error_log(const char* fmt, ...)
+{
+	if(server_config.errorfp)
+	{
+		va_list arguments;
+		char * data;
+    	va_start( arguments, fmt);
+    	int dlen = vsnprintf(0,0,fmt,arguments) + 1;
+    	va_end(arguments); 
+    	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
+    	{
+			va_start(arguments, fmt);
+			vsnprintf(data, dlen, fmt, arguments);
+			va_end(arguments);
+			fwrite(data,dlen,1,server_config.errorfp);
+            fflush(server_config.errorfp);
+			free(data);
+		}
+    }
+}
+
+#ifdef DEBUG
+void server_log(const char* fmt, ...)
+{
+
+	if(server_config.logfp)
+	{
+		va_list arguments;
+		char * data;
+    	va_start( arguments, fmt);
+    	int dlen = vsnprintf(0,0,fmt,arguments) + 1;
+    	va_end(arguments); 
+    	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
+    	{
+			va_start(arguments, fmt);
+			vsnprintf(data, dlen, fmt, arguments);
+			va_end(arguments);
+			fwrite(data,dlen,1,server_config.logfp);
+            fflush(server_config.logfp);
+			free(data);
+		}
+    }
+}
+#endif
 void destroy_config()
 {
 	list_free(&(server_config.rules));
@@ -20,8 +64,17 @@ void destroy_config()
 		free(server_config.htdocs);
 	if (server_config.tmpdir)
 		free(server_config.tmpdir);
-
-	LOG("Unclosed connection: %d\n", server_config.connection);
+	if(server_config.errorfp)
+	{
+		fclose(server_config.errorfp);
+	}
+#ifdef DEBUG
+	if(server_config.logfp)
+	{
+		fclose(server_config.logfp);
+	}
+#endif
+	LOG("Unclosed connection: %d", server_config.connection);
 }
 
 static int config_handler(void *conf, const char *section, const char *name,
@@ -65,6 +118,16 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->n_workers = atoi(value);
 	}
+	else if (MATCH("SERVER", "error_log"))
+	{
+		pconfig->errorfp = fopen(value, "w");
+	}
+#ifdef DEBUG
+	else if (MATCH("SERVER", "server_log"))
+	{
+		pconfig->logfp = fopen(value, "w");
+	}
+#endif
 #ifdef USE_OPENSSL
 	else if (MATCH("SERVER", "ssl.enable"))
 	{
@@ -137,15 +200,15 @@ void load_config(const char *file)
 #endif
 	if (ini_parse(file, config_handler, &server_config) < 0)
 	{
-		LOG("Can't load '%s'\n. Used defaut configuration", file);
+		ERROR("Can't load '%s'. Used defaut configuration", file);
 	}
 	else
 	{
-		LOG("Using configuration : %s\n", file);
+		LOG("Using configuration : %s", file);
 #ifdef USE_OPENSSL
-		LOG("SSL enable %d\n", server_config.usessl);
-		LOG("SSL cert %s\n", server_config.sslcert);
-		LOG("SSL key %s\n", server_config.sslkey);
+		LOG("SSL enable %d", server_config.usessl);
+		LOG("SSL cert %s", server_config.sslcert);
+		LOG("SSL key %s", server_config.sslkey);
 #endif
 	}
 	init_file_system();
@@ -219,7 +282,7 @@ void *accept_request(void *data)
 				task->handle = accept_request;
 				return task;
 			default:
-				LOG("Error performing SSL handshake %d %d %lu\n", stat, ret, ERR_get_error());
+				ERROR("Error performing SSL handshake %d %d %lu", stat, ret, ERR_get_error());
 				//server_config.connection++;
 				ERR_print_errors_fp(stderr);
 				unknow(rq->client);
@@ -248,7 +311,7 @@ void *accept_request(void *data)
 		}
 	}
 #endif
-	LOG("Ready for reading %d\n", client->sock);
+	//LOG("Ready for reading %d\n", client->sock);
 	//server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
@@ -256,7 +319,7 @@ void *accept_request(void *data)
 	token = strsep(&line, " ");
 	if (!line)
 	{
-		LOG("No method found\n");
+		LOG("No method found");
 		unknow(rq->client);
 		return task;
 	}
@@ -267,7 +330,7 @@ void *accept_request(void *data)
 	token = strsep(&line, " ");
 	if (!line)
 	{
-		LOG("No request found\n");
+		LOG("No request found");
 		unknow(rq->client);
 		return task;
 	}
@@ -299,7 +362,7 @@ void *resolve_request(void *data)
 	char *oldrqp = NULL;
 	strcpy(path, server_config.htdocs);
 	strcat(path, url);
-	LOG("Path is : %s \n", path);
+	LOG("Path is : %s", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1)
@@ -369,7 +432,7 @@ void *resolve_request(void *data)
 			if (h)
 			{
 				//sprintf(path,"/%s%s",h,url);
-				LOG("WARNING::::Access octetstream via handle %s\n", h);
+				LOG("WARNING::::Access octetstream via handle %s", h);
 				//if(execute_plugin(client,buf,method,rq) < 0)
 				//	cannot_execute(client);
 				free(task);
@@ -391,7 +454,7 @@ void *finish_request(void *data)
 {
 	destroy_request(data);
 	server_config.connection--;
-	LOG("Remaining connection %d\n", server_config.connection);
+	LOG("Remaining connection %d", server_config.connection);
 	return NULL;
 }
 
@@ -526,7 +589,7 @@ int startup(unsigned *port)
 			error_die("getsockname");
 		*port = ntohs(name.sin_port);
 	}
-	LOG("back log is %d\n", server_config.backlog);
+	LOG("back log is %d", server_config.backlog);
 	if (listen(httpd, server_config.backlog) < 0)
 		error_die("listen");
 	return (httpd);
@@ -614,9 +677,9 @@ void *decode_request_header(void *data)
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
-	LOG("Original query: %s\n", url);
+	LOG("Original query: %s", url);
 	query = apply_rules(host, buf);
-	LOG("Processed query: %s\n", query);
+	LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{
@@ -699,7 +762,7 @@ void *decode_post_request(void *data)
 		return task;
 	if (ctype == NULL || clen == -1)
 	{
-		LOG("Bad request\n");
+		LOG("Bad request");
 		badrequest(rq->client);
 		return task;
 	}
@@ -767,7 +830,7 @@ void ws_confirm_request(void *client, const char *key)
 	sprintf(buf, "\r\n");
 	antd_send(client, buf, strlen(buf));
 
-	LOG("%s\n", "Websocket is now enabled for plugin");
+	LOG("%s", "Websocket is now enabled for plugin");
 }
 /**
  * Decode the cookie header to a dictionary
@@ -948,7 +1011,8 @@ void *decode_multi_part_request_data(void *data)
 				fseek(fp, 0, SEEK_SET);
 				//fseek(fp,-2, SEEK_CUR);
 				totalsize -= 2;
-				ftruncate(fileno(fp), totalsize);
+				int stat = ftruncate(fileno(fp), totalsize);
+				UNUSED(stat);
 				fclose(fp);
 				line = strdup(buf);
 
@@ -967,7 +1031,7 @@ void *decode_multi_part_request_data(void *data)
 			}
 			else
 			{
-				LOG("Cannot write file to :%s\n", file_path);
+				ERROR("Cannot write file to :%s", file_path);
 			}
 			free(file_path);
 			free(part_file);
@@ -978,7 +1042,7 @@ void *decode_multi_part_request_data(void *data)
 	// check if end of request
 	if (line && strstr(line, boundend))
 	{
-		LOG("End request %s\n", boundend);
+		LOG("End request %s", boundend);
 		free(line);
 		free(boundend);
 		return task;
@@ -1082,7 +1146,7 @@ void *execute_plugin(void *data, const char *pname)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
-	LOG("Plugin name '%s'\n", pname);
+	LOG("Plugin name '%s'", pname);
 
 	//load the plugin
 	if ((plugin = plugin_lookup((char *)pname)) == NULL)
@@ -1106,7 +1170,7 @@ void *execute_plugin(void *data, const char *pname)
 	fn = (void *(*)(void *))dlsym(plugin->handle, PLUGIN_HANDLER);
 	if ((error = dlerror()) != NULL)
 	{
-		LOG("Problem when finding %s method from %s : %s \n", PLUGIN_HANDLER, pname, error);
+		ERROR("Problem when finding %s method from %s : %s", PLUGIN_HANDLER, pname, error);
 		unknow(rq->client);
 		return task;
 	}

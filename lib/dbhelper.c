@@ -5,7 +5,7 @@ sqlite3 * database(const char* file)
 	sqlite3* db;
 	int rc = sqlite3_open(file,&db);
 	if (rc != SQLITE_OK) {    
-        LOG( "Cannot open database: %s %s\n",file, sqlite3_errmsg(db));
+        ERROR( "Cannot open database: %s %s",file, sqlite3_errmsg(db));
         sqlite3_close(db);
         return NULL;
     }
@@ -23,7 +23,7 @@ int dbquery(sqlite3* db,const char* sql, int (*call_back)())
 	sqlite3_mutex_leave(sqlite3_db_mutex(db));
 	if(rc != SQLITE_OK)
 	{
-		LOG("Cannot query : '%s' [%s]\n", sql,err_msg);
+		ERROR("Cannot query : '%s' [%s]", sql,err_msg);
 		sqlite3_free(err_msg);
 		return 0;
 	}

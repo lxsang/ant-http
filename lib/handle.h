@@ -31,6 +31,10 @@
 #ifdef USE_OPENSSL
 int __attribute__((weak)) usessl();
 #endif
+void __attribute__((weak)) error_log(const char*, ...);
+#ifdef DEBUG
+void __attribute__((weak)) server_log(const char*, ...);
+#endif
 //extern config_t server_config;
 typedef struct{
     int sock;
@@ -61,6 +65,10 @@ typedef struct  {
     int maxcon;
     int connection;
     int n_workers;
+    FILE* errorfp;
+#ifdef DEBUG
+    FILE* logfp;
+#endif
 #ifdef USE_OPENSSL
     int usessl;
     char* sslcert;

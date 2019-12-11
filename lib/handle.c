@@ -111,7 +111,7 @@ int antd_send(void *src, const void* data, int len)
                     case SSL_ERROR_ZERO_RETURN: 
                     {
                         // peer disconnected...
-                        //printf("SSL_ERROR_ZERO_RETURN \n");
+                        ERROR("SSLWRITE: SSL_ERROR_ZERO_RETURN: peer disconected: %d", source->sock);
                         break;
                     }   
 
@@ -132,6 +132,7 @@ int antd_send(void *src, const void* data, int len)
 							//source->attempt++;
                             continue; // more data to read...
 						}
+						ERROR("SSL WRITE: want read but select error on the socket %d: %s", source->sock, strerror(errno));
 						break;
                     }
 
@@ -152,12 +153,14 @@ int antd_send(void *src, const void* data, int len)
 							//source->attempt++;
                             continue; // can write more data now...
 						}
+						ERROR("SSL WRITE: want write but select error on the socket %d: %s", source->sock, strerror(errno));
 					    break;
                     }
 
                     default:
                     {
-                        // other error 
+                        // other error
+						ERROR("SSLWRITE: Unknown error on %d: %s", source->sock, ERR_get_error());
                         break;
                     }
                 }     
@@ -238,7 +241,7 @@ int antd_recv(void *src,  void* data, int len)
                     case SSL_ERROR_ZERO_RETURN: 
                     {
                         // peer disconnected...
-                        //printf("SSL_ERROR_ZERO_RETURN \n");
+                        ERROR("SSL READ: SSL_ERROR_ZERO_RETURN, peer disconnected %d", source->sock);
                         break;
                     }   
 
@@ -259,6 +262,7 @@ int antd_recv(void *src,  void* data, int len)
 							//source->attempt++;
                             continue; // more data to read...
 						}
+						ERROR("SSL READ: want read but select error on the socket %d: %s", source->sock, strerror(errno));
 						break;
                     }
 
@@ -279,12 +283,14 @@ int antd_recv(void *src,  void* data, int len)
 							//source->attempt++;
                             continue; // can write more data now...
 						}
+						ERROR("SSL READ: want write but select error on the socket %d: %s", source->sock, strerror(errno));
 						break;
                     }
 
                     default:
                     {
                         // other error 
+						ERROR("SSL READ: unkown error on %d: %s", source->sock, ERR_get_error());
                         break;
                     }
                 }     
@@ -479,13 +485,12 @@ int __b(void* client, const unsigned char* data, int size)
 }
 int __f(void* client, const char* file)
 {
-	printf("Open file %s\n",file );
 	unsigned char buffer[BUFFLEN];
 	FILE *ptr;
 	ptr = fopen(file,"rb");
 	if(!ptr)
 	{
-		LOG("Cannot read : %s\n", file);
+		LOG("Cannot read : %s", file);
 		return 0;
 	}
 	size_t size;
@@ -642,8 +647,8 @@ void destroy_request(void *data)
 {
 	if (!data)
 		return;
-	LOG("Close request\n");
 	antd_request_t *rq = (antd_request_t *)data;
+	LOG("Close request %d", rq->client->sock);
 	// free all other thing
 	if (rq->request)
 	{

@@ -45,7 +45,7 @@ struct plugin_entry *plugin_load(char *name)
         plugin_table[hashval] = np;
     } else /* already there */
     {
-    	LOG("The plugin %s id already loaded\n", name);
+    	LOG("The plugin %s id already loaded", name);
     }
    
     return np;
@@ -64,7 +64,7 @@ void * plugin_from_file(char* name)
    lib_handle = dlopen(path, RTLD_NOW| RTLD_GLOBAL);
    if (!lib_handle) 
    {
-      LOG("Cannot load plugin '%s' : '%s'\n",name,dlerror());
+      ERROR("Cannot load plugin '%s' : '%s'",name,dlerror());
 	  if(path)
 		free(path);
       return NULL;
@@ -72,7 +72,7 @@ void * plugin_from_file(char* name)
    // set database path
    fn = (void (*)(const char *, config_t*))dlsym(lib_handle, "__init_plugin__");
   if ((error = dlerror()) != NULL)  
-  		LOG("Problem when setting data path for %s : %s \n", name,error);
+  		ERROR("Problem when finding plugin init function for %s : %s", name,error);
   else
 	(*fn)(name,config()); 
   if(path)
@@ -88,7 +88,7 @@ void unload_plugin(struct plugin_entry* np)
 	fn = (void(*)()) dlsym(np->handle, "__release__");
 	if ((error = dlerror()) != NULL)  
  	{
-     	LOG("Cant not release plugin %s : %s \n", np->pname,error);
+     	ERROR("Cant not release plugin %s : %s", np->pname,error);
     }
 	if(fn)
 	{
@@ -103,7 +103,6 @@ void unload_plugin(struct plugin_entry* np)
 */
 void unload_plugin_by_name(const char* name)
 {
-	LOG("%s\n","Unloading thing");
 	struct plugin_entry *np;
 	int hasval = hash(name, HASHSIZE);
 	np = plugin_table[hasval];
@@ -114,9 +113,13 @@ void unload_plugin_by_name(const char* name)
 	}
 	else
 	{
-	    for (; np != NULL; np = np->next)
+	    for (np ; np != NULL; np = np->next)
+		{
 	        if (np->next != NULL  && strcmp(name, np->next->pname) == 0)
+			{
 				break;
+			}
+		}
 		if(np == NULL) return; // the plugin is is not loaded
 		unload_plugin(np->next);
 		np->next = np->next->next;
@@ -127,7 +130,7 @@ void unload_plugin_by_name(const char* name)
  */
 void unload_all_plugin()
 {
-	LOG("Unload all plugins\n");
+	LOG("Unload all plugins");
 	for(int i=0;i<HASHSIZE;i++)
 	{
 		struct plugin_entry **np, *curr;

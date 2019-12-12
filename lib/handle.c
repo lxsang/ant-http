@@ -160,7 +160,7 @@ int antd_send(void *src, const void* data, int len)
                     default:
                     {
                         // other error
-						ERROR("SSLWRITE: Unknown error on %d: %s", source->sock, ERR_get_error());
+						ERROR("SSL WRITE: Unknown error on %d: %d", source->sock, err);
                         break;
                     }
                 }     
@@ -290,7 +290,7 @@ int antd_recv(void *src,  void* data, int len)
                     default:
                     {
                         // other error 
-						ERROR("SSL READ: unkown error on %d: %s", source->sock, ERR_get_error());
+						ERROR("SSL READ: unkown error on %d: %d", source->sock, err);
                         break;
                     }
                 }     

@@ -25,8 +25,8 @@ THE SOFTWARE.
 
 dictionary dict()
 {
-	dictionary d = (dictionary)malloc(HASHSIZE*sizeof(association));
-	for(int i=0; i< HASHSIZE;i++)
+	dictionary d = (dictionary)malloc(DHASHSIZE*sizeof(association));
+	for(int i=0; i< DHASHSIZE;i++)
 		d[i] = NULL;
 	return d;
 }
@@ -119,7 +119,7 @@ void free_association(association * asoc)
 }
 
 void freedict(dictionary dic){
-	for(int i = 0; i < HASHSIZE; i++)
+	for(int i = 0; i < DHASHSIZE; i++)
 		free_association(&(dic[i]));
 	free(dic);
 

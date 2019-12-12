@@ -40,9 +40,9 @@ typedef struct{
     int sock;
     void* ssl;
     char* ip;
-#ifdef USE_OPENSSL
+//#ifdef USE_OPENSSL
     int status;
-#endif
+//#endif
     time_t last_io;
 } antd_client_t;
 
@@ -66,14 +66,14 @@ typedef struct  {
     int connection;
     int n_workers;
     FILE* errorfp;
-#ifdef DEBUG
+// #ifdef DEBUG
     FILE* logfp;
-#endif
-#ifdef USE_OPENSSL
+// #endif
+// #ifdef USE_OPENSSL
     int usessl;
     char* sslcert;
     char* sslkey;
-#endif
+// #endif
 }config_t;
 
 typedef struct  { 
@@ -83,9 +83,9 @@ typedef struct  {
     char*pdir;
 	int sport;
     int raw_body;
-#ifdef USE_OPENSSL
+//#ifdef USE_OPENSSL
     int usessl;
-#endif
+//#endif
 } plugin_header_t;
 
 void set_nonblock(int socket);

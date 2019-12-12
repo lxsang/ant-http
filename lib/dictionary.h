@@ -26,7 +26,7 @@ THE SOFTWARE.
 
 #include "utils.h"
 #define for_each_assoc(assoc, dic) \
-    for(int i = 0; i < HASHSIZE; i++) \
+    for(int i = 0; i < DHASHSIZE; i++) \
     	for(assoc = dic[i];assoc!= NULL; assoc = assoc->next)
 
 /**

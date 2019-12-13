@@ -6,6 +6,18 @@ int usessl()
 }
 #endif
 
+void error_log(const char* fmt, ...)
+{
+	UNUSED(fmt);
+	return;
+}
+#ifdef DEBUG
+void server_log(const char* fmt, ...)
+{
+	UNUSED(fmt);
+	return;
+}
+#endif
 void set_status(void* client,int code,const char* msg)
 {
 	char *s = __s("HTTP/1.1 %d %s", code, msg);

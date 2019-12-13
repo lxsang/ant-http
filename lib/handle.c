@@ -88,6 +88,8 @@ int antd_send(void *src, const void* data, int len)
     	struct timeval timeout;
 		while (writelen > 0) //source->attempt < MAX_ATTEMPT
         {
+			// clear the error queue
+			ERR_clear_error();
             count = SSL_write (source->ssl, ptr+written, writelen);
             if (count > 0)
             {
@@ -160,7 +162,7 @@ int antd_send(void *src, const void* data, int len)
                     default:
                     {
                         // other error
-						ERROR("SSL WRITE: Unknown error on %d: %d", source->sock, err);
+						ERROR("SSL WRITE: Unknown error on %d: %s", source->sock, ERR_error_string(ERR_get_error(), NULL) );
                         break;
                     }
                 }     
@@ -218,6 +220,7 @@ int antd_recv(void *src,  void* data, int len)
     	struct timeval timeout;
 		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
         {
+			ERR_clear_error();
             received = SSL_read (source->ssl, ptr+read, readlen);
             if (received > 0)
             {
@@ -290,7 +293,7 @@ int antd_recv(void *src,  void* data, int len)
                     default:
                     {
                         // other error 
-						ERROR("SSL READ: unkown error on %d: %d", source->sock, err);
+						ERROR("SSL READ: unkown error on %d: %s", source->sock, ERR_error_string(ERR_get_error(), NULL));
                         break;
                     }
                 }     

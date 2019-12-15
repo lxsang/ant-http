@@ -59,7 +59,9 @@ void configure_context(SSL_CTX *ctx)
     SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1|SSL_OP_NO_TLSv1_1|SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     // set the cipher suit
-    if (SSL_CTX_set_cipher_list(ctx, CIPHER_SUIT) != 1)
+	config_t * cnf = config();
+	const char* suit = cnf->ssl_cipher?cnf->ssl_cipher:CIPHER_SUIT;
+    if (SSL_CTX_set_cipher_list(ctx, suit) != 1)
     {
        ERR_print_errors_fp(stderr);
        exit(EXIT_FAILURE);

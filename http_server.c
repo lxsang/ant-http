@@ -364,7 +364,7 @@ void *accept_request(void *data)
 	token = strsep(&line, " ");
 	if (!line)
 	{
-		LOG("No method found");
+		//LOG("No method found");
 		antd_error(rq->client, 405, "No method found");
 		return task;
 	}
@@ -375,7 +375,7 @@ void *accept_request(void *data)
 	token = strsep(&line, " ");
 	if (!line)
 	{
-		LOG("No request found");
+		//LOG("No request found");
 		antd_error(rq->client, 400, "Bad request");
 		return task;
 	}
@@ -407,7 +407,7 @@ void *resolve_request(void *data)
 	char *oldrqp = NULL;
 	strcpy(path, server_config.htdocs);
 	strcat(path, url);
-	LOG("Path is : %s", path);
+	//LOG("Path is : %s", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1)
@@ -477,7 +477,7 @@ void *resolve_request(void *data)
 			if (h)
 			{
 				//sprintf(path,"/%s%s",h,url);
-				LOG("WARNING::::Access octetstream via handle %s", h);
+				//LOG("WARNING::::Access octetstream via handle %s", h);
 				//if(execute_plugin(client,buf,method,rq) < 0)
 				//	cannot_execute(client);
 				free(task);
@@ -640,7 +640,7 @@ int startup(unsigned *port)
 			error_die("getsockname");
 		*port = ntohs(name.sin_port);
 	}
-	LOG("back log is %d", server_config.backlog);
+	//LOG("back log is %d", server_config.backlog);
 	if (listen(httpd, server_config.backlog) < 0)
 		error_die("listen");
 	return (httpd);
@@ -728,9 +728,9 @@ void *decode_request_header(void *data)
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
-	LOG("Original query: %s", url);
+	//LOG("Original query: %s", url);
 	query = apply_rules(host, buf);
-	LOG("Processed query: %s", query);
+	//LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{
@@ -1095,7 +1095,7 @@ void *decode_multi_part_request_data(void *data)
 	// check if end of request
 	if (line && strstr(line, boundend))
 	{
-		LOG("End request %s", boundend);
+		//LOG("End request %s", boundend);
 		free(line);
 		free(boundend);
 		return task;
@@ -1199,7 +1199,7 @@ void *execute_plugin(void *data, const char *pname)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
-	LOG("Plugin name '%s'", pname);
+	//LOG("Plugin name '%s'", pname);
 
 	//load the plugin
 	if ((plugin = plugin_lookup((char *)pname)) == NULL)

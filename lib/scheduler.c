@@ -226,7 +226,8 @@ antd_task_t* antd_create_task(void* (*handle)(void*), void *data, void* (*callba
     task->handle = handle;
     task->callback = callback_of(callback);
     task->priority = NORMAL_PRIORITY;
-    task->type = LIGHT;
+    task->type = HEAVY;
+    //task->type = LIGHT;
     task->access_time = atime;
     return task;
 }

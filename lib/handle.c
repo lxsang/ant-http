@@ -1,6 +1,75 @@
 #include "handle.h" 
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 #ifdef USE_OPENSSL
+
+static const char* S_100 =  "Continue";
+static const char* S_101 =  "Switching Protocols";
+static const char* S_102 =  "Processing";
+static const char* S_103 =  "Early Hints"; 
+
+static const char* S_200 =  "OK";
+static const char* S_201 =  "Created";
+static const char* S_202 =  "Accepted";
+static const char* S_203 =  "Non-Authoritative Information";
+static const char* S_204 =  "No Content";
+static const char* S_205 =  "Reset Content";
+static const char* S_206 =  "Partial Content";
+static const char* S_207 =  "Multi-Status";
+static const char* S_208 =  "Already Reported";
+static const char* S_226 =  "IM Used"; 
+
+static const char* S_300 =  "Multiple Choices";
+static const char* S_301 =  "Moved Permanently";
+static const char* S_302 =  "Found";
+static const char* S_303 =  "See Other";
+static const char* S_304 =  "Not Modified";
+static const char* S_305 =  "Use Proxy";
+static const char* S_306 =  "Switch Proxy";
+static const char* S_307 =  "Temporary Redirect";
+static const char* S_308 =  "Permanent Redirect"; 
+
+static const char* S_400 =  "Bad Request";
+static const char* S_401 =  "Unauthorized";
+static const char* S_402 =  "Payment Required";
+static const char* S_403 =  "Forbidden";
+static const char* S_404 =  "Not Found";
+static const char* S_405 =  "Method Not Allowed";
+static const char* S_406 =  "Not Acceptable";
+static const char* S_407 =  "Proxy Authentication Required";
+static const char* S_408 =  "Request Timeout";
+static const char* S_409 =  "Conflict";
+static const char* S_410 =  "Gone";
+static const char* S_411 =  "Length Required";
+static const char* S_412 =  "Precondition Failed";
+static const char* S_413 =  "Payload Too Large";
+static const char* S_414 =  "URI Too Long";
+static const char* S_415 =  "Unsupported Media Type";
+static const char* S_416 =  "Range Not Satisfiable";
+static const char* S_417 =  "Expectation Failed";
+static const char* S_421 =  "Misdirected Request";
+static const char* S_422 =  "Unprocessable Entity";
+static const char* S_423 =  "Locked";
+static const char* S_424 =  "Failed Dependency";
+static const char* S_425 =  "Too Early";
+static const char* S_426 =  "Upgrade Required";
+static const char* S_428 =  "Precondition Required";
+static const char* S_429 =  "Too Many Requests";
+static const char* S_431 =  "Request Header Fields Too Large";
+static const char* S_451 =  "Unavailable For Legal Reasons"; 
+
+static const char* S_500 =  "Internal Server Error";
+static const char* S_501 =  "Not Implemented";
+static const char* S_502 =  "Bad Gateway";
+static const char* S_503 =  "Service Unavailable";
+static const char* S_504 =  "Gateway Timeout";
+static const char* S_505 =  "HTTP Version Not Supported";
+static const char* S_506 =  "Variant Also Negotiates";
+static const char* S_507 =  "Insufficient Storage";
+static const char* S_508 =  "Loop Detected";
+static const char* S_510 =  "Not Extended";
+static const char* S_511 =  "Network Authentication Required";
+static const char* S_UNOF =  "Unofficial Status";
+
 int usessl()
 {
 	return 0;
@@ -24,73 +93,73 @@ const char* get_status_str(int stat)
 {
 	switch(stat)
 	{
-		case 100: return "Continue";
-		case 101: return "Switching Protocols";
-		case 102: return "Processing";
-		case 103: return "Early Hints";
+		case 100: return S_100;
+		case 101: return S_101;
+		case 102: return S_102;
+		case 103: return S_103;
 
-		case 200: return "OK";
-		case 201: return "Created";
-		case 202: return "Accepted";
-		case 203: return "Non-Authoritative Information";
-		case 204: return "No Content";
-		case 205: return "Reset Content";
-		case 206: return "Partial Content";
-		case 207: return "Multi-Status";
-		case 208: return "Already Reported";
-		case 226: return "IM Used";
+		case 200: return S_200;
+		case 201: return S_201;
+		case 202: return S_202;
+		case 203: return S_203;
+		case 204: return S_204;
+		case 205: return S_205;
+		case 206: return S_206;
+		case 207: return S_207;
+		case 208: return S_208;
+		case 226: return S_226;
 
-		case 300: return "Multiple Choices";
-		case 301: return "Moved Permanently";
-		case 302: return "Found";
-		case 303: return "See Other";
-		case 304: return "Not Modified";
-		case 305: return "Use Proxy";
-		case 306: return "Switch Proxy";
-		case 307: return "Temporary Redirect";
-		case 308: return "Permanent Redirect";
+		case 300: return S_300;
+		case 301: return S_301;
+		case 302: return S_302;
+		case 303: return S_303;
+		case 304: return S_304;
+		case 305: return S_305;
+		case 306: return S_306;
+		case 307: return S_307;
+		case 308: return S_308;
 
-		case 400: return "Bad Request";
-		case 401: return "Unauthorized";
-		case 402: return "Payment Required";
-		case 403: return "Forbidden";
-		case 404: return "Not Found";
-		case 405: return "Method Not Allowed";
-		case 406: return "Not Acceptable";
-		case 407: return "Proxy Authentication Required";
-		case 408: return "Request Timeout";
-		case 409: return "Conflict";
-		case 410: return "Gone";
-		case 411: return "Length Required";
-		case 412: return "Precondition Failed";
-		case 413: return "Payload Too Large";
-		case 414: return "URI Too Long";
-		case 415: return "Unsupported Media Type";
-		case 416: return "Range Not Satisfiable";
-		case 417: return "Expectation Failed";
-		case 421: return "Misdirected Request";
-		case 422: return "Unprocessable Entity";
-		case 423: return "Locked";
-		case 424: return "Failed Dependency";
-		case 425: return "Too Early";
-		case 426: return "Upgrade Required";
-		case 428: return "Precondition Required";
-		case 429: return "Too Many Requests";
-		case 431: return "Request Header Fields Too Large";
-		case 451: return "Unavailable For Legal Reasons";
+		case 400: return S_400;
+		case 401: return S_401;
+		case 402: return S_402;
+		case 403: return S_403;
+		case 404: return S_404;
+		case 405: return S_405;
+		case 406: return S_406;
+		case 407: return S_407;
+		case 408: return S_408;
+		case 409: return S_409;
+		case 410: return S_410;
+		case 411: return S_411;
+		case 412: return S_412;
+		case 413: return S_413;
+		case 414: return S_414;
+		case 415: return S_415;
+		case 416: return S_416;
+		case 417: return S_417;
+		case 421: return S_421;
+		case 422: return S_422;
+		case 423: return S_423;
+		case 424: return S_424;
+		case 425: return S_425;
+		case 426: return S_426;
+		case 428: return S_428;
+		case 429: return S_429;
+		case 431: return S_431;
+		case 451: return S_451;
 
-		case 500: return "Internal Server Error";
-		case 501: return "Not Implemented";
-		case 502: return "Bad Gateway";
-		case 503: return "Service Unavailable";
-		case 504: return "Gateway Timeout";
-		case 505: return "HTTP Version Not Supported";
-		case 506: return "Variant Also Negotiates";
-		case 507: return "Insufficient Storage";
-		case 508: return "Loop Detected";
-		case 510: return "Not Extended";
-		case 511: return "Network Authentication Required";
-		default: return "Unofficial Status";
+		case 500: return S_500;
+		case 501: return S_501;
+		case 502: return S_502;
+		case 503: return S_503;
+		case 504: return S_504;
+		case 505: return S_505;
+		case 506: return S_506;
+		case 507: return S_507;
+		case 508: return S_508;
+		case 510: return S_510;
+		case 511: return S_511;
+		default: return S_UNOF;
 	}
 }
 

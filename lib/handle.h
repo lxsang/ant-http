@@ -13,6 +13,7 @@
 #include "dbhelper.h"
 #endif
 #include <fcntl.h>
+#include <stdlib.h>
 #include "dictionary.h"
 #include "list.h"
 #include "ini.h"
@@ -48,8 +49,16 @@ typedef struct{
 
 typedef struct {
     antd_client_t* client;
-    dictionary request;
+    dictionary_t request;
 } antd_request_t;
+
+typedef struct
+{
+    dictionary_t header;
+    list_t cookie;
+    int status;
+
+} antd_response_header_t;
 
 
 typedef struct  { 
@@ -59,8 +68,8 @@ typedef struct  {
     char *db_path;
     char* htdocs;
     char* tmpdir;
-    list rules;
-    dictionary handlers;
+    list_t rules;
+    dictionary_t handlers;
     int backlog;
     int maxcon;
     int connection;
@@ -73,6 +82,8 @@ typedef struct  {
     int usessl;
     char* sslcert;
     char* sslkey;
+    char* ssl_cipher;
+    dictionary_t mimes;
 // #endif
 }config_t;
 
@@ -90,31 +101,19 @@ typedef struct  {
 
 void set_nonblock(int socket);
 //void set_block(int socket);
-int response(void*, const char*);
-void ctype(void*,const char*);
-void redirect(void*,const char*);
-void html(void*);
-void text(void*);
-void json(void*);
-void jpeg(void*);
-void octstream(void*, char*);
-void textstream(void*);
-int __ti(void*,int);
+
+void antd_send_header(void*,antd_response_header_t*);
+const char* get_status_str(int stat);
 int __t(void*, const char*,...);
 int __b(void*, const unsigned char*, int);
 int __f(void*, const char*);
-//int __fb(void*, const char*);
+
 int upload(const char*, const char*);
 
-void set_cookie(void*, const char*,dictionary,const char*);
-void set_status(void*,int,const char*);
-void clear_cookie(void*, dictionary);
 /*Default function for plugin*/
-void unknow(void*);
-void badrequest(void* client);
-void unimplemented(void* client);
-void notfound(void* client);
-int ws_enable(dictionary);
+void antd_error(void* client, int status, const char* msg);
+
+int ws_enable(dictionary_t);
 char* read_line(void* sock);
 int read_buf(void* sock,char* buf,int i);
 int antd_send( void *source, const void* data, int len);

@@ -1,4 +1,5 @@
 #include "handle.h" 
+#define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 #ifdef USE_OPENSSL
 int usessl()
 {
@@ -18,36 +19,110 @@ void server_log(const char* fmt, ...)
 	return;
 }
 #endif
-void set_status(void* client,int code,const char* msg)
+
+const char* get_status_str(int stat)
 {
-	char *s = __s("HTTP/1.1 %d %s", code, msg);
-	response(client, s);
-	free(s);
-	s = __s("Server: %s ", SERVER_NAME);
-	response(client, s);
-	free(s);
-}
-void redirect(void* client,const char*path)
-{
-	__t(client,"<html><head><meta http-equiv=\"refresh\" content=\"0; url=%s\"></head><body></body></html>",path);
+	switch(stat)
+	{
+		case 100: return "Continue";
+		case 101: return "Switching Protocols";
+		case 102: return "Processing";
+		case 103: return "Early Hints";
+
+		case 200: return "OK";
+		case 201: return "Created";
+		case 202: return "Accepted";
+		case 203: return "Non-Authoritative Information";
+		case 204: return "No Content";
+		case 205: return "Reset Content";
+		case 206: return "Partial Content";
+		case 207: return "Multi-Status";
+		case 208: return "Already Reported";
+		case 226: return "IM Used";
+
+		case 300: return "Multiple Choices";
+		case 301: return "Moved Permanently";
+		case 302: return "Found";
+		case 303: return "See Other";
+		case 304: return "Not Modified";
+		case 305: return "Use Proxy";
+		case 306: return "Switch Proxy";
+		case 307: return "Temporary Redirect";
+		case 308: return "Permanent Redirect";
+
+		case 400: return "Bad Request";
+		case 401: return "Unauthorized";
+		case 402: return "Payment Required";
+		case 403: return "Forbidden";
+		case 404: return "Not Found";
+		case 405: return "Method Not Allowed";
+		case 406: return "Not Acceptable";
+		case 407: return "Proxy Authentication Required";
+		case 408: return "Request Timeout";
+		case 409: return "Conflict";
+		case 410: return "Gone";
+		case 411: return "Length Required";
+		case 412: return "Precondition Failed";
+		case 413: return "Payload Too Large";
+		case 414: return "URI Too Long";
+		case 415: return "Unsupported Media Type";
+		case 416: return "Range Not Satisfiable";
+		case 417: return "Expectation Failed";
+		case 421: return "Misdirected Request";
+		case 422: return "Unprocessable Entity";
+		case 423: return "Locked";
+		case 424: return "Failed Dependency";
+		case 425: return "Too Early";
+		case 426: return "Upgrade Required";
+		case 428: return "Precondition Required";
+		case 429: return "Too Many Requests";
+		case 431: return "Request Header Fields Too Large";
+		case 451: return "Unavailable For Legal Reasons";
+
+		case 500: return "Internal Server Error";
+		case 501: return "Not Implemented";
+		case 502: return "Bad Gateway";
+		case 503: return "Service Unavailable";
+		case 504: return "Gateway Timeout";
+		case 505: return "HTTP Version Not Supported";
+		case 506: return "Variant Also Negotiates";
+		case 507: return "Insufficient Storage";
+		case 508: return "Loop Detected";
+		case 510: return "Not Extended";
+		case 511: return "Network Authentication Required";
+		default: return "Unofficial Status";
+	}
 }
 
-void html(void* client)
+void antd_send_header(void* client, antd_response_header_t* res)
 {
-	ctype(client,"text/html; charset=utf-8");
+	if(!res->header)
+		res->header = dict();
+	dput(res->header,"Server", strdup(SERVER_NAME));
+	const char* stat_str = get_status_str(res->status);
+	__t(client, "HTTP/1.1 %d %s", res->status, stat_str);
+	chain_t it;
+	for_each_assoc(it, res->header)
+	{
+		__t(client,"%s: %s", it->key, (const char*)it->value);
+	}
+	// send out cookie
+	if(res->cookie)
+	{
+		int size = list_size(res->cookie);
+		for (int i = 0; i < size; i++)
+		{
+			__t(client,"Set-Cookie: %s", list_at(res->cookie, i)->value.s);
+		}
+		list_free(&res->cookie);
+		res->cookie = NULL;
+	}
+	__b(client, (unsigned char*)"\r\n", 2);
+	freedict(res->header);
+	res->header = NULL;
 }
-void text(void* client)
-{
-	ctype(client,"text/plain; charset=utf-8");
-}
-void json(void* client)
-{
-	ctype(client,"application/json");
-}
-void textstream(void* client)
-{
-	ctype(client, "text/event-stream");
-}
+
+/*
 void octstream(void* client, char* name)
 {
 	set_status(client,200,"OK");
@@ -55,38 +130,15 @@ void octstream(void* client, char* name)
 	__t(client,"Content-Disposition: attachment; filename=\"%s\"", name);
 	response(client,"");
 	//Content-Disposition: attachment; filename="fname.ext"
-}
-void jpeg(void* client)
-{
-	ctype(client,"image/jpeg");
-}
-void ctype(void* client, const char* type)
-{
-	set_status(client,200,"OK");
-	__t(client,"Content-Type: %s",type);
-	response(client,"");
-}
+}*/
 
-int response(void* client, const char* data)
-{
-	char buf[BUFFLEN+3];
-	strcpy(buf, data);
-	int nbytes;
-	int size = strlen(data);
-	buf[size] = '\r';
-	buf[size+1] = '\n';
-	buf[size+2] = '\0'; 
-	
-	nbytes = antd_send(client, buf, strlen(buf));
-	return (nbytes ==-1?0:1);
-}
 int antd_send(void *src, const void* data, int len)
 {
 	if(!src || !data) return -1;
 	int written;
 	antd_client_t * source = (antd_client_t *) src;
 	char* ptr;
-	int writelen;
+	int writelen = 0;
 	int  count;
 #ifdef USE_OPENSSL
 	if(usessl())
@@ -200,7 +252,9 @@ int antd_send(void *src, const void* data, int len)
             }
 			else if(count == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
 			{
-				return written;
+				ERROR("Error while writing: %s", strerror(errno));
+				break;
+				//return written;
 			}
 		}
 #ifdef USE_OPENSSL
@@ -351,6 +405,7 @@ int antd_recv(void *src,  void* data, int len)
             }
 			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
+				ERROR("Error while writing: %s", strerror(errno));
 				break;
 			}
 		}
@@ -408,66 +463,27 @@ int antd_close(void* src)
 	src = NULL;
 	return ret;
 }
-int __ti(void* client,int data)
-{
-	char str[15];
-	sprintf(str, "%d", data);
-	return response(client,str);
-}
 
 int __t(void* client, const char* fstring,...)
 {
-	int nbytes;
 	int dlen;
-	int sent = 0;
-	int buflen = 0;
+	int st;
 	va_list arguments;      
     char * data;
-    char* chunk;
     va_start( arguments, fstring);
-    dlen = vsnprintf(0,0,fstring,arguments) + 1;
+    dlen = vsnprintf(0,0,fstring,arguments)+1;
     va_end(arguments); 
     if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
     {
         va_start(arguments, fstring);
         vsnprintf(data, dlen, fstring, arguments);
         va_end(arguments);
-        
-        if(dlen < BUFFLEN) 
-		{
-			int ret = response(client,data);
-			free(data);
-			return ret;
-		}
-		else
-		{
-			while(sent < dlen - 1)
-			{
-				if(dlen - sent > BUFFLEN)
-					buflen = BUFFLEN;
-				else
-					buflen = dlen - sent - 1;
-				//LOG("BUFFLEN %d\n",buflen);
-				chunk = (char*) malloc((buflen)*sizeof(char));
-				memcpy(chunk,data+sent,buflen);
-				//chunk[buflen-1] = '\0';
-				//response(client,chunk);
-				sent += buflen;
-				nbytes = antd_send(client, chunk, buflen);
-				free(chunk);	
-				if(nbytes == -1)
-				{
-					//free(data);
-					//return 0;
-					break;
-				}
-			}
-			chunk = "\r\n";
-			antd_send(client, chunk, strlen(chunk));
-		}
+		st = __b(client, (const unsigned char*)data, strlen(data));
+		__b(client, (unsigned char*)"\r\n", 2);
         free(data);
+		return st;
     }
-	return 1;
+	return 0;
 	//
 }
 int __b(void* client, const unsigned char* data, int size)
@@ -475,15 +491,15 @@ int __b(void* client, const unsigned char* data, int size)
 	char buf[BUFFLEN];
 	int sent = 0;
 	int buflen = 0;
-	int nbytes;
+	int nbytes = 0;
 
-	if(size <= BUFFLEN)
+	/*if(size <= BUFFLEN)
 	{
 		nbytes = antd_send(client,data,size);
 		return (nbytes==-1?0:1);
 	}
 	else
-	{
+	{*/
 		while(sent < size)
 		{
 			if(size - sent > BUFFLEN)
@@ -492,10 +508,13 @@ int __b(void* client, const unsigned char* data, int size)
 				buflen = size - sent;
 			memcpy(buf,data+sent,buflen);
 			nbytes = antd_send(client,buf,buflen);
-			sent += buflen;
-			if(nbytes == -1) return 0;
+			if(nbytes == -1)
+			{
+				return 0;
+			}
+			sent += nbytes;
 		}	
-	}
+	//}
 	return 1;
 }
 int __f(void* client, const char* file)
@@ -517,95 +536,64 @@ int __f(void* client, const char* file)
 	fclose(ptr);
 	return 1;
 }
-/*
-int __f(void* client, const char* file)
-{
-	char buf[BUFFLEN];
-	FILE *ptr;
-	int nbytes;
-	ptr = fopen(file,"r");
-	if(!ptr)
-	{
-		LOG("Cannot read : %s\n", file);
-		return 0;
-	}
-	memset(buf,0, sizeof(buf));
-	while(fgets(buf, sizeof(buf) - 1, ptr) != NULL)
-	{
-		nbytes = antd_send(client, buf, strlen(buf));
-		if(nbytes == -1) return 0;
-		memset(buf,0, sizeof(buf));
-		//LOG("READ : %s\n", buf);
-		//fgets(buf, sizeof(buf), ptr);
-	}
-	fclose(ptr);
-	return 1;
-}
-*/
+
 int upload(const char* tmp, const char* path)
 {
 	return !rename(tmp, path);
 }
-// __plugin__.name
-void set_cookie(void* client,const char* type, dictionary dic, const char* name)
+
+/*
+void set_cookie(void* client,const char* type, dictionary_t dic, const char* name)
 {
 	set_status(client,200,"OK");
 	__t(client,"Content-Type: %s",type);
-	association assoc;
+	chain_t assoc;
 	for_each_assoc(assoc,dic){
 		__t(client,"Set-Cookie: %s=%s; Path=/%s",assoc->key, (char*)assoc->value, name);
 	}
 	response(client,"");
 }
-void clear_cookie(void* client,  dictionary dic)
+void clear_cookie(void* client,  dictionary_t dic)
 {
 	set_status(client,200,"OK");
 	__t(client,"Content-Type: text/html; charset=utf-8");
-	association assoc;
+	chain_t assoc;
 	for_each_assoc(assoc,dic){
-		__t(client,"Set-Cookie: %s=%s;expires=",assoc->key, (char*)assoc->value, server_time());
+		__t(client,"Set-Cookie: %s=%s;expires=%s",assoc->key, (char*)assoc->value, server_time());
 	}
 	response(client,"");
 }
-void unknow(void* client)
+*/
+
+void antd_error(void* client, int status, const char* msg)
 {
-	set_status(client,520,"Unknown Error");
-	__t(client,"Content-Type: text/html; charset=utf-8");
-	response(client,"");
-	__t(client,"520 Unknow request");
+	antd_response_header_t rsh;
+	rsh.header = dict();
+	rsh.cookie = NULL;
+	const char* stat_str = get_status_str(status);
+	rsh.status = status;
+	dput(rsh.header, "Content-Type", strdup("text/html; charset=utf-8"));
+	char * res_str = __s(HTML_TPL, stat_str, msg);
+	int clen = 0;
+	if(res_str)
+	{
+		clen = strlen(res_str);
+	}
+	char ibuf[20];
+    snprintf (ibuf, sizeof(ibuf), "%d",clen);
+	dput(rsh.header, "Content-Length", strdup(ibuf));
+	antd_send_header(client, &rsh);
+	if(res_str)
+	{
+		//printf("%s\n", res_str);
+		__b(client, (unsigned char*)res_str, clen);
+		//__t(client, HTML_TPL, stat_str, msg);
+		free(res_str);
+	}
 }
-void notfound(void* client)
-{
-	set_status(client,404,"Not found");
-	__t(client,"Content-Type: text/html; charset=utf-8");
-	response(client,"");
-	__t(client,"Resource not found");
-}
-void badrequest(void* client)
-{
-	set_status(client,400,"Bad request");
-	__t(client,"Content-Type: text/html; charset=utf-8");
-	response(client,"");
-	__t(client,"400 Bad request");
-}
-void unimplemented(void* client)
-{
-	set_status(client,501,"Method Not Implemented");
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client, "<HTML><HEAD><TITLE>Method Not Implemented");
-	__t(client, "</TITLE></HEAD>");
-	__t(client, "<BODY><P>HTTP request method not supported.");
-	__t(client, "</BODY></HTML>");
-}
-void cannot_execute(void* client)
-{
-	set_status(client,500,"Internal Server Error");
-	__t(client,"Content-Type: text/html");
-	response(client,"");
-	__t(client, "<P>Error prohibited CGI execution.");
-}
-int ws_enable(dictionary dic)
+
+
+int ws_enable(dictionary_t dic)
 {
 	if(!dic) return 0;
 	char*v = (char*)dvalue(dic, "__web_socket__");
@@ -667,7 +655,7 @@ void destroy_request(void *data)
 	// free all other thing
 	if (rq->request)
 	{
-		dictionary tmp = dvalue(rq->request, "COOKIE");
+		dictionary_t tmp = dvalue(rq->request, "COOKIE");
 		if (tmp)
 			freedict(tmp);
 		tmp = dvalue(rq->request, "REQUEST_HEADER");

@@ -23,52 +23,52 @@ THE SOFTWARE.
 */
 #include "list.h"
 
-list list_init()
+list_t list_init()
 {
-	list ret = (list)malloc(sizeof *ret);
-	ret->type = RPC_TYPE_NIL;
+	list_t ret = (list_t)malloc(sizeof *ret);
+	ret->type = LIST_TYPE_NIL;
 	ret->next = NULL;
 	return ret;
 }
-void list_put(list* l, item it)
+void list_put(list_t* l, item_t it)
 {
-	if(*l == NULL || (*l)->type == RPC_TYPE_NIL)
+	if(*l == NULL || (*l)->type == LIST_TYPE_NIL)
 	{
 		free(*l);
 		*l = it;
 		return ;
 	}	
-	item np = list_last(*l);
+	item_t np = list_last(*l);
 	np->next = it;
 }
-void list_put_special(list* l, const char* str)
+void list_put_special(list_t* l, const char* str)
 {
-	item v;
+	item_t v;
 	if(IS_INT(str))
 	{
-		v = list_item(RPC_TYPE_INT);
+		v = list_item(LIST_TYPE_INT);
 		v->value.i = atoi(str);
 	} 
 	else if(IS_FLOAT(str))
 	{
-		v = list_item(RPC_TYPE_DOUBLE);
+		v = list_item(LIST_TYPE_DOUBLE);
 		v->value.d = (double)atof(str);
 	}
 	else
 	{
-		v = list_item(RPC_TYPE_STRING);
+		v = list_item(LIST_TYPE_STRING);
 		v->value.s = strdup(str);
 	}
 	list_put(l,v);
 }
-item list_last(list l)
+item_t list_last(list_t l)
 {
-	item p = l;
+	item_t p = l;
 	while(p && p->next != NULL)
 		p = p->next;
 	return p;
 }
-int list_remove(list l,int idx)
+int list_remove(list_t l,int idx)
 {
 	if(l==NULL) return 0;
 	if(idx <0 || idx >= list_size(l)) return 0;
@@ -77,17 +77,17 @@ int list_remove(list l,int idx)
 		l=l->next;
 		return 1;
 	}
-	item np = list_at(l,idx-1);
+	item_t np = list_at(l,idx-1);
 	if(np == NULL) return 0;
 	if(np->next == NULL) return 1;
 	np->next = np->next->next;
 	return 1;
 }
-int list_size(list l)
+int list_size(list_t l)
 {
-	if(l == NULL || l->type == RPC_TYPE_NIL) return 0;
+	if(l == NULL || l->type == LIST_TYPE_NIL) return 0;
 	int i=0;
-	item np = l;
+	item_t np = l;
 	while(np)
 	{
 		np = np->next;
@@ -95,46 +95,46 @@ int list_size(list l)
 	}
 	return i;
 }
-char* as_string(list l)
+char* as_string(list_t l)
 {
 	char* str = "";
-	if(l != NULL && l->type != RPC_TYPE_NIL)
+	if(l != NULL && l->type != LIST_TYPE_NIL)
 	{
 		switch(l->type)
 		{
-			case RPC_TYPE_BASE64:
+			case LIST_TYPE_BASE64:
 			str = __s("b64:%s", l->value.b64);
 			break;
 		
-			case RPC_TYPE_BOOL:
+			case LIST_TYPE_BOOL:
 			str = __s("bool:%d", l->value.b);
 			break;
 		
-			case RPC_TYPE_DOUBLE:
+			case LIST_TYPE_DOUBLE:
 			str = __s("double:%lf", l->value.d);
 			break;
 		
-			case RPC_TYPE_DATE:
+			case LIST_TYPE_DATE:
 			str = __s("date:%s", l->value.date);
 			break;
 		
-			case RPC_TYPE_INT:
-			case RPC_TYPE_I4:
+			case LIST_TYPE_INT:
+			case LIST_TYPE_I4:
 			str = __s("int:%d", l->value.i);
 			break;
 		
-			case RPC_TYPE_STRING:
+			case LIST_TYPE_STRING:
 			str = __s("string:%s", l->value.s);
 			break;
 			
-			case RPC_TYPE_ARRAY:
+			case LIST_TYPE_ARRAY:
 			str = __s("[%s]", as_string(l->value.array));
 			break;
 			default:
 			str = "<Unknown>";
 			break;
 		}
-		item np = l->next;
+		item_t np = l->next;
 		if(np)
 		{
 			str = __s("%s,\n%s", str, as_string(np));
@@ -143,12 +143,12 @@ char* as_string(list l)
 	}
 	return "[empty]";
 }
-item list_at(list l,int idx)
+item_t list_at(list_t l,int idx)
 {
 	if(l == NULL || idx<0 || idx>= list_size(l)) 
 		return NULL;
 	int i=0;
-	item np = l;
+	item_t np = l;
 	while(np)
 	{
 		if(i==idx)
@@ -158,20 +158,20 @@ item list_at(list l,int idx)
 	}
 	return NULL;
 }
-item list_item(int type)
+item_t list_item(int type)
 {
-	item ret = (item)malloc(sizeof *ret);
+	item_t ret = (item_t)malloc(sizeof *ret);
 	ret->type = type;
 	ret->next = NULL;
 	return ret;
 }
-list split(const char* str, const char* delim)
+list_t split(const char* str, const char* delim)
 {
 	if(str == NULL || delim == NULL) return NULL;
 	char* str_cpy = strdup(str);
 	char* org_str = str_cpy;
 	char* token;
-	list l = list_init();
+	list_t l = list_init();
 	while((token = strsep(&str_cpy,delim)))
 	{
 		if(strlen(token) > 0) 
@@ -180,69 +180,72 @@ list split(const char* str, const char* delim)
 		}
 	}
 	free(org_str);
-	if(l->type== RPC_TYPE_NIL)
+	if(l->type== LIST_TYPE_NIL)
+	{
+		free(l);
 		return NULL;
+	}
 	return l;
 }
-void list_put_i(list* l,int v)
+void list_put_i(list_t* l,int v)
 {
-	item it = list_item(RPC_TYPE_INT);
+	item_t it = list_item(LIST_TYPE_INT);
 	it->value.i = v;
 	list_put(l,it);
 }
-void list_put_d(list* l,double v)
+void list_put_d(list_t* l,double v)
 {
-	item it = list_item(RPC_TYPE_DOUBLE);
+	item_t it = list_item(LIST_TYPE_DOUBLE);
 	it->value.d = v;
 	list_put(l,it);
 }
-void list_put_b(list* l,int v)
+void list_put_b(list_t* l,int v)
 {
-	item it = list_item(RPC_TYPE_BOOL);
+	item_t it = list_item(LIST_TYPE_BOOL);
 	it->value.b = v;
 	list_put(l,it);
 }
-void list_put_b64(list* l,const char* v)
+void list_put_b64(list_t* l,const char* v)
 {
-	item it = list_item(RPC_TYPE_BASE64);
+	item_t it = list_item(LIST_TYPE_BASE64);
 	it->value.b64 = strdup(v);
 	list_put(l,it);
 }
-void list_put_date(list* l,const char* v)
+void list_put_date(list_t* l,const char* v)
 {
-	item it = list_item(RPC_TYPE_DATE);
+	item_t it = list_item(LIST_TYPE_DATE);
 	it->value.date = strdup(v);
 	list_put(l,it);
 }
-void list_put_s(list* l,const char* v)
+void list_put_s(list_t* l,const char* v)
 {
-	item it = list_item(RPC_TYPE_STRING);
+	item_t it = list_item(LIST_TYPE_STRING);
 	it->value.s = strdup(v);
 	list_put(l,it);
 }
-void list_put_array(list* l,list v)
+void list_put_array(list_t* l,list_t v)
 {
-	item it = list_item(RPC_TYPE_ARRAY);
+	item_t it = list_item(LIST_TYPE_ARRAY);
 	it->value.array = v;
 	list_put(l,it);
 }
-void list_free(list *l)
+void list_free(list_t *l)
 {
-	item curr;
+	item_t curr;
 	while ((curr = (*l)) != NULL) { 
 		(*l) = (*l)->next;
-		if(curr->type == RPC_TYPE_ARRAY)
+		if(curr->type == LIST_TYPE_ARRAY)
 			list_free(&curr->value.array);
-		else if(curr->type == RPC_TYPE_STRING)
+		else if(curr->type == LIST_TYPE_STRING)
 			free(curr->value.s);
-		else if(curr->type == RPC_TYPE_DATE)
+		else if(curr->type == LIST_TYPE_DATE)
 			free(curr->value.date);
-		else if(curr->type == RPC_TYPE_BASE64)
+		else if(curr->type == LIST_TYPE_BASE64)
 			free(curr->value.b64);
 	    free (curr);
 	}
 }
-int list_empty(list l)
+int list_empty(list_t l)
 {
-	return l== NULL || l->type == RPC_TYPE_NIL;
+	return l== NULL || l->type == LIST_TYPE_NIL;
 }

@@ -23,58 +23,6 @@ THE SOFTWARE.
 */
 #include "utils.h"
 
-//define all basic mime here
-
-static mime_t _mimes[] = {
-	{"image/bmp",(const char *[]){"bmp",NULL},1},
-	{"image/jpeg",(const char *[]){"jpg","jpeg",NULL},1},
-	{"text/css",(const char *[]){"css",NULL},0},
-    {"text/markdown",(const char *[]){"md",NULL},0},
-	{"text/csv",(const char *[]){"csv",NULL},0},
-	{"application/pdf",(const char *[]){"pdf",NULL},1},
-	{"image/gif",(const char *[]){"gif",NULL},1},
-	{"text/html",(const char *[]){"html","htm",NULL},0},
-	{"application/json",(const char *[]){"json",NULL},0},
-	{"application/javascript",(const char *[]){"js",NULL},0},
-	{"image/png",(const char *[]){"png",NULL},1},
-	{"image/x-portable-pixmap",(const char *[]){"ppm",NULL},1},
-	{"application/x-rar-compressed",(const char *[]){"rar",NULL},1},
-	{"image/tiff",(const char *[]){"tiff",NULL},1},
-	{"application/x-tar",(const char *[]){"tar",NULL},1},
-	{"text/plain",(const char *[]){"txt",NULL},0},
-	{"application/x-font-ttf",(const char *[]){"ttf",NULL},1},
-	{"application/xhtml+xml",(const char *[]){"xhtml",NULL},0},
-	{"application/xml",(const char *[]){"xml",NULL},0},
-	{"application/zip",(const char *[]){"zip",NULL},1},
-	{"image/svg+xml",(const char *[]){"svg",NULL},0},
-	{"application/vnd.ms-fontobject",(const char *[]){"eot",NULL},1},
-	{"application/x-font-woff",(const char *[]){"woff","woff2",NULL},1},
-	{"application/x-font-otf",(const char *[]){"otf",NULL},1},
-	{"audio/mpeg",(const char *[]){"mp3","mpeg",NULL},1},
-	{NULL,NULL,0}
-};
-
-
-char* __s(const char* fstring,...)
-{
-	char* data;
-	va_list arguments; 
-	int dlen;
-	va_start( arguments, fstring);
-    dlen = vsnprintf(0,0,fstring,arguments) + 1;
-    va_end(arguments); 
-    va_end(arguments); 
-    if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
-    {
-        va_start(arguments, fstring);
-        vsnprintf(data, dlen, fstring, arguments);
-        va_end(arguments);
-        return data;
-    } else
-    	return "";
-}
-
-
 /**
  * Trim a string by a character on both ends
  * @param str   The target string
@@ -162,21 +110,47 @@ char* ext(const char* file)
 /*get mime file info from extension*/
 mime_t mime_from_ext(const char* ex)
 {
-	for(int i = 0; _mimes[i].type != NULL; i++)
-		for(int j = 0; _mimes[i].ext[j] != NULL; j++)
-		{
-			if(IEQU(ex,_mimes[i].ext[j])) return _mimes[i];
-		}
-	
-	return (mime_t){"application/octet-stream",(const char *[]){(char*)ext,NULL},1};
+    dictionary_t mime_list = mimes_list();
+    mime_t ret = (mime_t){"application/octet-stream",NULL};
+    if(!mime_list)
+        return ret;
+    chain_t it;
+    char * pattern = __s("(^\\s*%s\\s*,)|(\\s*,\\s*%s\\s*,\\s*)|(^\\s*%s\\s*$)|(,\\s*%s\\s*$)", ex, ex, ex, ex);
+    if(pattern)
+    {
+        for_each_assoc(it,mime_list)
+        {
+            
+            if(regex_match(pattern,it->value,0, NULL))
+            {
+                ret.type = it->key;
+                ret.ext = it->value;
+                free(pattern);
+                return ret;
+            }
+        }
+        free(pattern);
+    }
+    return ret;
+}
+dictionary_t mimes_list()
+{
+    return NULL;
 }
 /*get mime file info from type*/
 mime_t mime_from_type(const char* type)
 {
-	for(int i = 0; _mimes[i].type != NULL; i++)
-		if(strstr(type, _mimes[i].type) != NULL) 
-	   		return _mimes[i];
-	return (mime_t){NULL,NULL,0};
+    dictionary_t mime_list = mimes_list();
+    mime_t ret = (mime_t){NULL,NULL};
+    if(!mime_list)
+        return ret;
+    chain_t it = dlookup(mime_list, type);
+    if(it)
+    {
+        ret.type = it->key;
+        ret.ext = it->value;
+    }
+	return ret;
 }
 /**
  * Get correct HTTP mime type of a file
@@ -194,18 +168,7 @@ char* mime(const char* file)
     {
         free(ex);
     }
-	return (char*)m.type;
-}
-
-int is_bin(const char* file)
-{
-	char * ex = ext(file);
-	mime_t m = mime_from_ext(ex);
-    if(ex)
-    {
-        free(ex);
-    }
-	return m.bin;
+    return (char*)m.type;
 }
 
 int match_int(const char* search)
@@ -474,4 +437,24 @@ void sha1(const char* text, char* out)
     SHA1_Update(&context, text, strlen(text));
     SHA1_Final(d, &context);
     digest_to_hex(d,out);
+}
+
+
+char* __s(const char* fstring,...)
+{
+	char* data;
+	va_list arguments; 
+	int dlen;
+	va_start( arguments, fstring);
+    dlen = vsnprintf(0,0,fstring,arguments) + 1;
+    va_end(arguments); 
+    va_end(arguments); 
+    if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
+    {
+        va_start(arguments, fstring);
+        vsnprintf(data, dlen, fstring, arguments);
+        va_end(arguments);
+        return data;
+    } else
+    	return "";
 }

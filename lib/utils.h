@@ -43,6 +43,7 @@ THE SOFTWARE.
 #include "sha1.h"
 #endif
 #include "base64.h"
+#include "dictionary.h"
 
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 #define EQU(a,b) (strcmp(a,b) == 0)
@@ -54,36 +55,25 @@ THE SOFTWARE.
 #define true 1
 #define false 0
 #ifdef DEBUG
-	#define LOG(a,...) server_log("%s:%d: " a "\n", __FILE__, \
+	#define LOG(a,...) server_log("[%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 #else
     #define LOG(a,...) do{}while(0)
 #endif
-#define ERROR(a,...) error_log("%s:%d: " a "\n", __FILE__, \
+#define ERROR(a,...) error_log("[%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 // add this to the utils
 #define UNUSED(x) (void)(x)
 
 #define	BUFFLEN 	1024
 #define HASHSIZE 	1024
-#define DHASHSIZE 	50
-			
-#define RPC_TYPE_ARRAY	601//hash("array")
-#define RPC_TYPE_BASE64	335//hash("base64")
-#define RPC_TYPE_BOOL	40//hash("boolean")
-#define RPC_TYPE_DOUBLE	977//hash("double")
-#define RPC_TYPE_DATE	49//hash("dateTime.iso8601")
-#define RPC_TYPE_INT	1007//hash("int")
-#define RPC_TYPE_I4		235//hash("i4")
-#define RPC_TYPE_STRING	17//hash("string")
-#define RPC_TYPE_NIL	529//hash("nil")
 
 typedef struct{
 	const char* type;
-	const char** ext;
-	int bin;
+	const char* ext;
 } mime_t;
 
+dictionary_t __attribute__((weak)) mimes_list();
 char* __s(const char*,...);
 void trim(char*,const char);
 void removeAll(const char* path,int mode);
@@ -91,7 +81,6 @@ char* __time(time_t time);
 char* server_time();
 char* ext(const char*);
 char* mime(const char*);
-int is_bin(const char*);
 int match_int(const char*);
 int match_float(const char*);
 int regex_match(const char*,const char*, int, regmatch_t*);

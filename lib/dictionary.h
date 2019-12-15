@@ -24,10 +24,10 @@ THE SOFTWARE.
 #ifndef DICTIONARY_H
 #define DICTIONARY_H
 
-#include "utils.h"
+#define DHASHSIZE 	16
 #define for_each_assoc(assoc, dic) \
-    for(int i = 0; i < DHASHSIZE; i++) \
-    	for(assoc = dic[i];assoc!= NULL; assoc = assoc->next)
+    for(unsigned int i = 0; i < dic->cap; i++) \
+    	for(assoc = dic->map[i];assoc!= NULL; assoc = assoc->next)
 
 /**
  * Dictionary for header
@@ -37,14 +37,22 @@ typedef struct  __assoc{
     char *key; 
     void* value;
     //char *value;
-} * association;
+} * chain_t;
 
-typedef  association* dictionary;
-dictionary dict();
-association dlookup(dictionary,const char*);
-void* dvalue(dictionary, const char*);
-association dput(dictionary,const char*, void*);
-int dremove(dictionary, const char*);
-void freedict(dictionary);
+typedef  chain_t* map_t;
+
+typedef struct __dict{
+    unsigned int cap;
+    map_t map;
+    unsigned int size;
+}* dictionary_t;
+
+dictionary_t dict();
+dictionary_t dict_n(unsigned int n);
+chain_t dlookup(dictionary_t,const char*);
+void* dvalue(dictionary_t, const char*);
+chain_t dput(dictionary_t,const char*, void*);
+chain_t dremove(dictionary_t, const char*);
+void freedict(dictionary_t);
 
 #endif

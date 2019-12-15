@@ -1,4 +1,26 @@
 #include "http_server.h"
+
+//define all basic mime here
+static mime_t _mimes[] = {
+	{"image/bmp","bmp"},
+	{"image/jpeg","jpg,jpeg"},
+	{"text/css","css"},
+    {"text/markdown","md"},
+	{"text/csv","csv"},
+	{"application/pdf","pdf"},
+	{"image/gif","gif"},
+	{"text/html","html"},
+	{"application/json","json"},
+	{"application/javascript","js"},
+	{"image/png","png"},
+	{"text/plain","txt"},
+	{"application/xhtml+xml","xhtml"},
+	{"application/xml","xml"},
+	{"image/svg+xml","svg"},
+	{NULL,NULL}
+};
+
+
 static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
 config_t server_config;
 config_t *config()
@@ -64,6 +86,8 @@ void destroy_config()
 		free(server_config.htdocs);
 	if (server_config.tmpdir)
 		free(server_config.tmpdir);
+	if(server_config.ssl_cipher)
+		free(server_config.ssl_cipher);
 	if(server_config.errorfp)
 	{
 		fclose(server_config.errorfp);
@@ -74,6 +98,8 @@ void destroy_config()
 		fclose(server_config.logfp);
 	}
 #endif
+	if(server_config.mimes)
+		freedict(server_config.mimes);
 	LOG("Unclosed connection: %d", server_config.connection);
 }
 
@@ -141,6 +167,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->sslkey = strdup(value);
 	}
+	else if(MATCH("SERVER","ssl.cipher"))
+	{
+		pconfig->ssl_cipher = strdup(value);
+	}
 #endif
 	else if (strcmp(section, "RULES") == 0)
 	{
@@ -156,6 +186,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 		// The server section must be added before the autostart section
 		// auto start plugin
 		plugin_load((char *)value);
+	}
+	else if(strcmp(section, "MIMES") == 0)
+	{
+		dput(pconfig->mimes,name,strdup(value));
 	}
 	else
 	{
@@ -193,11 +227,18 @@ void load_config(const char *file)
 	server_config.handlers = dict();
 	server_config.maxcon = 1000;
 	server_config.connection = 0;
-#ifdef USE_OPENSSL
+	server_config.errorfp = NULL;
+	server_config.logfp = NULL;
+	server_config.mimes = dict();
 	server_config.usessl = 0;
 	server_config.sslcert = "cert.pem";
 	server_config.sslkey = "key.pem";
-#endif
+	server_config.ssl_cipher = NULL;
+	// put it default mimes
+	for(int i = 0; _mimes[i].type != NULL; i++)
+	{
+		dput(server_config.mimes,_mimes[i].type, strdup(_mimes[i].ext));
+	}
 	if (ini_parse(file, config_handler, &server_config) < 0)
 	{
 		ERROR("Can't load '%s'. Used defaut configuration", file);
@@ -209,9 +250,13 @@ void load_config(const char *file)
 		LOG("SSL enable %d", server_config.usessl);
 		LOG("SSL cert %s", server_config.sslcert);
 		LOG("SSL key %s", server_config.sslkey);
+		if(!server_config.ssl_cipher)
+			LOG("SSL Cipher suite: %s", "HIGH");
+		else
+			LOG("SSL Cipher suite: %s", server_config.ssl_cipher);
 #endif
 	}
-	init_file_system();
+	LOG("%d mimes entries found", server_config.mimes->size);
 }
 
 void *accept_request(void *data)
@@ -238,7 +283,7 @@ void *accept_request(void *data)
 	int sel = select(client->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
 	if (sel == -1)
 	{
-		unknow(rq->client);
+		antd_error(rq->client, 400, "Bad request");
 		return task;
 	}
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
@@ -285,7 +330,7 @@ void *accept_request(void *data)
 				ERROR("Error performing SSL handshake %d %d %lu", stat, ret, ERR_get_error());
 				//server_config.connection++;
 				ERR_print_errors_fp(stderr);
-				unknow(rq->client);
+				antd_error(rq->client, 400, "Invalid SSL request");
 				return task;
 			}
 		}
@@ -320,7 +365,7 @@ void *accept_request(void *data)
 	if (!line)
 	{
 		LOG("No method found");
-		unknow(rq->client);
+		antd_error(rq->client, 405, "No method found");
 		return task;
 	}
 	trim(token, ' ');
@@ -331,7 +376,7 @@ void *accept_request(void *data)
 	if (!line)
 	{
 		LOG("No request found");
-		unknow(rq->client);
+		antd_error(rq->client, 400, "Bad request");
 		return task;
 	}
 	trim(token, ' ');
@@ -388,7 +433,7 @@ void *resolve_request(void *data)
 			strcat(path, "/index.html");
 			if (stat(path, &st) == -1)
 			{
-				association it;
+				chain_t it;
 				for_each_assoc(it, server_config.handlers)
 				{
 					newurl = __s("%s/index.%s", url, it->key);
@@ -408,7 +453,7 @@ void *resolve_request(void *data)
 				}
 				if (!newurl)
 				{
-					notfound(rq->client);
+					antd_error(rq->client, 404, "Resource Not Found");
 					return task;
 				}
 				//if(url) free(url); this is freed in the dput function
@@ -439,7 +484,7 @@ void *resolve_request(void *data)
 				return execute_plugin(rq, h);
 			}
 			else
-				unknow(rq->client);
+				antd_error(rq->client, 403, "Access forbidden");
 		}
 		else
 		{
@@ -553,15 +598,21 @@ void *serve_file(void *data)
 	int s = stat(path, &st);
 	if(s == -1)
 	{
-		notfound(rq->client);
+		antd_error(rq->client, 404, "File not found");
 	}
 	else
 	{
 		int size = (int)st.st_size;
-		set_status(rq->client,200,"OK");
-		__t(rq->client,"Content-Type: %s",mime_type);
-		__t(rq->client,"Content-Length: %d",size);
-		response(rq->client,"");
+		char ibuf[20];
+    	snprintf (ibuf, sizeof(ibuf), "%d",size);
+		antd_response_header_t rhd;
+		rhd.cookie = NULL;
+		rhd.status = 200;
+		rhd.header = dict();
+		dput(rhd.header, "Content-Type", strdup(mime_type));
+		dput(rhd.header, "Content-Length", strdup(ibuf));
+		antd_send_header(rq->client, &rhd);
+
 		__f(rq->client, path);
 	}
 	
@@ -637,15 +688,15 @@ char *apply_rules(const char *host, char *url)
 void *decode_request_header(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
-	dictionary cookie = NULL;
+	dictionary_t cookie = NULL;
 	char *line;
 	char *token;
 	char *query = NULL;
 	char *host = NULL;
 	char buf[2 * BUFFLEN];
 	char *url = (char *)dvalue(rq->request, "REQUEST_QUERY");
-	dictionary xheader = dict();
-	dictionary request = dict();
+	dictionary_t xheader = dict();
+	dictionary_t request = dict();
 	dput(rq->request, "REQUEST_HEADER", xheader);
 	dput(rq->request, "REQUEST_DATA", request);
 	// first real all header
@@ -700,7 +751,7 @@ void *decode_request_header(void *data)
 void *decode_request(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
-	dictionary headers = dvalue(rq->request, "REQUEST_HEADER");
+	dictionary_t headers = dvalue(rq->request, "REQUEST_HEADER");
 	int ws = 0;
 	char *ws_key = NULL;
 	char *method = NULL;
@@ -736,7 +787,7 @@ void *decode_request(void *data)
 	}
 	else
 	{
-		unimplemented(rq->client);
+		antd_error(rq->client,501, "Request Method Not Implemented");
 		return task;
 	}
 }
@@ -744,8 +795,8 @@ void *decode_request(void *data)
 void *decode_post_request(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
-	dictionary request = dvalue(rq->request, "REQUEST_DATA");
-	dictionary headers = dvalue(rq->request, "REQUEST_HEADER");
+	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
+	dictionary_t headers = dvalue(rq->request, "REQUEST_HEADER");
 	char *ctype = NULL;
 	int clen = -1;
 	char *tmp;
@@ -762,8 +813,7 @@ void *decode_post_request(void *data)
 		return task;
 	if (ctype == NULL || clen == -1)
 	{
-		LOG("Bad request");
-		badrequest(rq->client);
+		antd_error(rq->client, 400, "Bad Request, missing content description");
 		return task;
 	}
 	// decide what to do with the data
@@ -787,8 +837,11 @@ void *decode_post_request(void *data)
 			key++;
 		else
 			key = ctype;
-		dput(request, key, strdup(pquery));
-		free(pquery);
+		if(pquery)
+		{
+			dput(request, key, strdup(pquery));
+			free(pquery);
+		}
 	}
 	return task;
 }
@@ -837,7 +890,7 @@ void ws_confirm_request(void *client, const char *key)
  * @param  client The client socket
  * @return        The Dictionary socket or NULL
  */
-dictionary decode_cookie(const char *line)
+dictionary_t decode_cookie(const char *line)
 {
 	char *token, *token1;
 	char *cpstr = strdup(line);
@@ -846,7 +899,7 @@ dictionary decode_cookie(const char *line)
 	trim(cpstr, '\n');
 	trim(cpstr, '\r');
 
-	dictionary dic = NULL;
+	dictionary_t dic = NULL;
 	while ((token = strsep(&cpstr, ";")))
 	{
 		trim(token, ' ');
@@ -915,7 +968,7 @@ void *decode_multi_part_request_data(void *data)
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
-	dictionary dic = (dictionary)dvalue(rq->request, "REQUEST_DATA");
+	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	char *boundend = __s("%s--", boundary);
 	// search for content disposition:
 	while ((line = read_line(rq->client)) &&
@@ -1063,7 +1116,7 @@ void *decode_multi_part_request_data(void *data)
  * @param  query : the query string
  * @return       a dictionary of key-value
  */
-void decode_url_request(const char *query, dictionary dic)
+void decode_url_request(const char *query, dictionary_t dic)
 {
 	if (query == NULL)
 		return;
@@ -1156,7 +1209,7 @@ void *execute_plugin(void *data, const char *pname)
 		pthread_mutex_unlock(&server_mux);
 		if (plugin == NULL)
 		{
-			unknow(rq->client);
+			antd_error(rq->client, 503, "Requested service not found");
 			return task;
 		}
 	}
@@ -1171,7 +1224,7 @@ void *execute_plugin(void *data, const char *pname)
 	if ((error = dlerror()) != NULL)
 	{
 		ERROR("Problem when finding %s method from %s : %s", PLUGIN_HANDLER, pname, error);
-		unknow(rq->client);
+		antd_error(rq->client, 503, "Requested service not found");
 		return task;
 	}
 	// check if we need the raw data or not
@@ -1195,3 +1248,8 @@ int usessl()
 	return server_config.usessl;
 }
 #endif
+
+dictionary_t mimes_list()
+{
+	return server_config.mimes;
+}

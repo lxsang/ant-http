@@ -22,19 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 #include "dictionary.h"
+#include "utils.h"
 
-dictionary dict()
+dictionary_t dict()
 {
-	dictionary d = (dictionary)malloc(DHASHSIZE*sizeof(association));
-	for(int i=0; i< DHASHSIZE;i++)
-		d[i] = NULL;
+	return dict_n(DHASHSIZE);
+}
+dictionary_t dict_n(unsigned int size)
+{
+	dictionary_t d = (dictionary_t) malloc(sizeof(struct __dict));
+	if(!d) return NULL;
+	d->map= (map_t)malloc(size*sizeof(chain_t));
+	if(!d->map)
+	{
+		free(d);
+		return NULL;
+	}
+	d->cap = size;
+	d->size = 0;
+	for(unsigned int i=0; i< size;i++)
+		d->map[i] = NULL;
 	return d;
 }
-association dlookup(dictionary dic,const char* key)
+chain_t dlookup(dictionary_t dic,const char* key)
 {
-	association np;
-	if(dic == NULL) return NULL;
-    for (np = dic[hash(key,DHASHSIZE)]; np != NULL; np = np->next)
+	chain_t np;
+	if(dic->map == NULL) return NULL;
+    for (np = dic->map[hash(key,dic->cap)]; np != NULL; np = np->next)
     {
     	if(!np || !np->key)
     	{
@@ -45,26 +59,27 @@ association dlookup(dictionary dic,const char* key)
     }
     return NULL; /* not found */
 }
-association __put_el_with_key(dictionary dic, const char* key)
+chain_t __put_el_with_key(dictionary_t dic, const char* key)
 {
-	association np;
+	chain_t np;
     unsigned hashval;
-	if(dic == NULL) return NULL;
+	if(dic->map == NULL) return NULL;
     if ((np = dlookup(dic,key)) == NULL) { /* not found */
-        np = (association) malloc(sizeof(*np));
-		np->value = NULL;
+        np = (chain_t) malloc(sizeof(*np));
         if (np == NULL || (np->key = strdup(key)) == NULL)
           return NULL;
-        hashval = hash(key, DHASHSIZE);
-        np->next = dic[hashval];
-        dic[hashval] = np;
+		np->value = NULL;
+        hashval = hash(key, dic->cap);
+        np->next = dic->map[hashval];
+        dic->map[hashval] = np;
+		dic->size++;
     }
 	// found
     return np;
 }
-association dput(dictionary dic,const char* key, void* value)
+chain_t dput(dictionary_t dic,const char* key, void* value)
 {
-	association np = __put_el_with_key(dic,key);
+	chain_t np = __put_el_with_key(dic,key);
 	if(np == NULL)
 	{
 		if(value) free(value);
@@ -74,38 +89,43 @@ association dput(dictionary dic,const char* key, void* value)
 	np->value = value;
     return np;
 }
-int dremove(dictionary dic, const char* key)
+chain_t dremove(dictionary_t dic, const char* key)
 {
-	if(dic == NULL) return 0;
-	int hashval = hash(key, DHASHSIZE);
-	association np = dic[hashval];
+	if(dic->map == NULL) return 0;
+	int hashval = hash(key, dic->cap);
+	chain_t np = dic->map[hashval];
 	if(np!=NULL && strcmp(key,np->key)==0)
 	{
-		dic[hashval] = np->next;
-		return 1;
+		dic->size--;
+		dic->map[hashval] = np->next;
+		np->next = NULL;
+		return np;
 	}
-    for (np= dic[hashval]; np != NULL; np = np->next)
+    for (np= dic->map[hashval]; np != NULL; np = np->next)
         if (np->next!=NULL&&strcmp(key, np->next->key) == 0)
         {
+			chain_t ret = np->next;
          	np->next = np->next->next; /* found */
-         	return 1;
+			dic->size--;
+			ret->next = NULL;
+         	return ret;
         }
-    return 0; /* not found */
+    return NULL; /* not found */
 
 }
-void* dvalue(dictionary dic, const char* key)
+void* dvalue(dictionary_t dic, const char* key)
 {
-	association as = dlookup(dic,key);
+	chain_t as = dlookup(dic,key);
 	if(as == NULL) return NULL;
 	return as->value;
 }
 
-void free_association(association * asoc)
+void free_association(chain_t * asoc)
 {
 	
 	while( (*asoc) != NULL )
 	{
-		association a = *asoc;
+		chain_t a = *asoc;
 		(* asoc) = (*asoc) ->next;
 		
 		if(a->key)
@@ -118,11 +138,11 @@ void free_association(association * asoc)
 
 }
 
-void freedict(dictionary dic){
-	for(int i = 0; i < DHASHSIZE; i++)
-		free_association(&(dic[i]));
+void freedict(dictionary_t dic){
+	for(unsigned int i = 0; i < dic->cap; i++)
+		free_association(&(dic->map[i]));
+	free(dic->map);
 	free(dic);
-
 }
 
 

@@ -224,6 +224,7 @@ int antd_send(void *src, const void* data, int len)
 			// clear the error queue
 			ERR_clear_error();
             count = SSL_write (source->ssl, ptr+written, writelen);
+			int err = SSL_get_error(source->ssl, count);
             if (count > 0)
             {
                 written += count;
@@ -232,7 +233,6 @@ int antd_send(void *src, const void* data, int len)
             else 
             {
                 //printf(" received equal to or less than 0\n")
-                int err = SSL_get_error(source->ssl, count);
                 switch (err)
                 {
                     case SSL_ERROR_NONE:
@@ -361,6 +361,7 @@ int antd_recv(void *src,  void* data, int len)
         {
 			ERR_clear_error();
             received = SSL_read (source->ssl, ptr+read, readlen);
+			int err = SSL_get_error(source->ssl, received);
             if (received > 0)
             {
                 read += received;
@@ -369,7 +370,6 @@ int antd_recv(void *src,  void* data, int len)
             else 
             {
                 //printf(" received equal to or less than 0\n")
-                int err = SSL_get_error(source->ssl, received);
                 switch (err)
                 {
                     case SSL_ERROR_NONE:

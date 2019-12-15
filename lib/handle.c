@@ -301,6 +301,8 @@ int antd_send(void *src, const void* data, int len)
                 }     
 
                 break;
+				if(written == 0)
+					written = count;
             }
 		}
 		//source->attempt = 0;
@@ -321,6 +323,8 @@ int antd_send(void *src, const void* data, int len)
             }
 			else if(count == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
 			{
+				if(written == 0)
+					written = count;
 				//ERROR("Error while writing: %s", strerror(errno));
 				break;
 				//return written;
@@ -432,7 +436,8 @@ int antd_recv(void *src,  void* data, int len)
                         break;
                     }
                 }     
-
+				if(read ==0)
+					read = received;
                 break;
             }
         }
@@ -475,6 +480,8 @@ int antd_recv(void *src,  void* data, int len)
 			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
 				ERROR("Error while writing: %s", strerror(errno));
+				if(read ==0)
+					read = received;
 				break;
 			}
 		}

@@ -250,10 +250,10 @@ void load_config(const char *file)
 		LOG("SSL enable %d", server_config.usessl);
 		LOG("SSL cert %s", server_config.sslcert);
 		LOG("SSL key %s", server_config.sslkey);
-		if(!server_config.ssl_cipher)
+		/*if(!server_config.ssl_cipher)
 			LOG("SSL Cipher suite: %s", "HIGH");
 		else
-			LOG("SSL Cipher suite: %s", server_config.ssl_cipher);
+			LOG("SSL Cipher suite: %s", server_config.ssl_cipher);*/
 #endif
 	}
 	LOG("%d mimes entries found", server_config.mimes->size);

@@ -26,8 +26,8 @@
 #define ws_f(c,f) (ws_send_file(c,f,0))
 #define ws_close(c,r) (ws_send_close(c,r,0))
 #define MAX_BUFF 1024
-#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
-#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+//#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+//#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
 
 typedef struct{
 	uint8_t fin;

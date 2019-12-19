@@ -299,10 +299,9 @@ int antd_send(void *src, const void* data, int len)
                         break;
                     }
                 }     
-
-                break;
 				if(written == 0)
 					written = count;
+				break;
             }
 		}
 		//source->attempt = 0;
@@ -436,7 +435,7 @@ int antd_recv(void *src,  void* data, int len)
                         break;
                     }
                 }     
-				if(read ==0)
+				if(read = 0)
 					read = received;
                 break;
             }

@@ -74,7 +74,6 @@ void server_log(const char* fmt, ...)
 #endif
 void destroy_config()
 {
-	list_free(&(server_config.rules));
 	freedict(server_config.handlers);
 	if (server_config.plugins_dir)
 		free(server_config.plugins_dir);
@@ -111,6 +110,7 @@ void destroy_config()
 			{
 				close(cnf->sock);
 			}
+			list_free(&(cnf->rules));
 		}
 		freedict(server_config.ports);
 	}
@@ -178,11 +178,6 @@ static int config_handler(void *conf, const char *section, const char *name,
 		pconfig->ssl_cipher = strdup(value);
 	}
 #endif
-	else if (strcmp(section, "RULES") == 0)
-	{
-		list_put_s(&pconfig->rules, name);
-		list_put_s(&pconfig->rules, value);
-	}
 	else if (strcmp(section, "FILEHANDLER") == 0)
 	{
 		dput(pconfig->handlers, name, strdup(value));
@@ -208,6 +203,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 			p = (port_config_t*) malloc( sizeof(port_config_t));
 			p->htdocs = NULL;
 			p->sock = -1;
+			p->rules = list_init();
 			dput(pconfig->ports,buf, p);
 			p->port = atoi(buf);
 		}
@@ -220,6 +216,12 @@ static int config_handler(void *conf, const char *section, const char *name,
 			p->usessl = atoi(value);
 			if(p->usessl)
 				pconfig->enable_ssl = 1;
+		}
+		else
+		{
+			// other thing should be rules
+			list_put_s(&p->rules, name);
+			list_put_s(&p->rules, value);
 		}
 	}
 	else
@@ -263,7 +265,6 @@ void load_config(const char *file)
 	server_config.tmpdir = "tmp/";
 	server_config.n_workers = 4;
 	server_config.backlog = 1000;
-	server_config.rules = list_init();
 	server_config.handlers = dict();
 	server_config.maxcon = 100;
 	server_config.connection = 0;
@@ -694,7 +695,7 @@ int startup(unsigned *port)
 	return (httpd);
 }
 
-char *apply_rules(const char *host, char *url)
+char *apply_rules(list_t rules, const char *host, char *url)
 {
 	// rule check
 	char *query_string = url;
@@ -706,12 +707,12 @@ char *apply_rules(const char *host, char *url)
 		query_string++;
 	}
 	//char* oldurl = strdup(url);
-	int size = list_size(server_config.rules);
+	int size = list_size(rules);
 	for (int i = 0; i < size; i += 2)
 	{
 		char *k, *v;
-		k = list_at(server_config.rules, i)->value.s;
-		v = list_at(server_config.rules, i + 1)->value.s;
+		k = list_at(rules, i)->value.s;
+		v = list_at(rules, i + 1)->value.s;
 		// 1 group
 		if (rule_check(k, v, host, url, query_string, url))
 		{
@@ -777,7 +778,7 @@ void *decode_request_header(void *data)
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
 	LOG("Original query: %s", url);
-	query = apply_rules(host, buf);
+	query = apply_rules(rq->client->port_config->rules, host, buf);
 	LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)

@@ -37,6 +37,7 @@ typedef struct {
     int usessl;
     char* htdocs;
     int sock;
+    list_t rules;
 } port_config_t;
 
 typedef struct{
@@ -73,7 +74,6 @@ typedef struct  {
     char *db_path;
     //char* htdocs;
     char* tmpdir;
-    list_t rules;
     dictionary_t handlers;
     int backlog;
     int maxcon;

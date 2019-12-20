@@ -41,7 +41,7 @@ void __init_plugin__(const char* pl,config_t* conf){
 	__plugin__.name = strdup(pl);
 	__plugin__.dbpath= conf->db_path;
 	__plugin__.pdir = conf->plugins_dir;
-	__plugin__.tmpdir = = sconf->tmpdir; 
+	__plugin__.tmpdir = conf->tmpdir; 
 	__plugin__.raw_body = 0;
 	init();
 }; 

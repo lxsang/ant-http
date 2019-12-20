@@ -301,7 +301,7 @@ int antd_send(void *src, const void* data, int len)
                 written += count;
 				writelen = (len - written) > BUFFLEN?BUFFLEN:(len-written);
             }
-			else if(count == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
 				if(written == 0)
 					written = count;
@@ -457,9 +457,9 @@ int antd_recv(void *src,  void* data, int len)
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
 				//LOG("Read len is %d\n", readlen);
             }
-			else if(received == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
-				ERROR("Error while reading: %s", strerror(errno));
+				//ERROR("Error while reading: %s", strerror(errno));
 				if(read ==0)
 					read = received;
 				break;

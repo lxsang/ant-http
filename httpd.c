@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
 		{
 			//ERROR("Reach max connection %d", conf->connection);
 			timeout.tv_sec = 0;
-			timeout.tv_usec = 5000; // 5 ms
+			timeout.tv_usec = 10000; // 5 ms
 			select(0, NULL, NULL, NULL, &timeout);
 			continue;
 		}
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
 				FD_ZERO(&write_flags);
 				FD_SET(pcnf->sock, &write_flags);
 				timeout.tv_sec = 0;
-				timeout.tv_usec = 5000; // 5 ms
+				timeout.tv_usec = 10000; // 10 ms
 				int sel = select(pcnf->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
 				if(sel > 0 && (FD_ISSET(pcnf->sock, &read_flags) || FD_ISSET(pcnf->sock, &write_flags)))
 				{

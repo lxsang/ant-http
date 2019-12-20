@@ -44,7 +44,6 @@ typedef struct{
     int sock;
     void* ssl;
     char* ip;
-    int port;
 //#ifdef USE_OPENSSL
     int status;
 //#endif

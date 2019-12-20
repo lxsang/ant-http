@@ -457,7 +457,7 @@ int antd_recv(void *src,  void* data, int len)
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
 				//LOG("Read len is %d\n", readlen);
             }
-			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			else if(received == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
 			{
 				ERROR("Error while reading: %s", strerror(errno));
 				if(read ==0)

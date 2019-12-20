@@ -113,7 +113,7 @@ void unload_plugin_by_name(const char* name)
 	}
 	else
 	{
-	    for (np ; np != NULL; np = np->next)
+	    for (np = plugin_table[hasval] ; np != NULL; np = np->next)
 		{
 	        if (np->next != NULL  && strcmp(name, np->next->pname) == 0)
 			{

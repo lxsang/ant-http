@@ -82,8 +82,6 @@ void destroy_config()
 		free(server_config.plugins_ext);
 	if (server_config.db_path)
 		free(server_config.db_path);
-	if (server_config.htdocs)
-		free(server_config.htdocs);
 	if (server_config.tmpdir)
 		free(server_config.tmpdir);
 	if(server_config.ssl_cipher)
@@ -100,19 +98,35 @@ void destroy_config()
 #endif
 	if(server_config.mimes)
 		freedict(server_config.mimes);
+	if(server_config.ports)
+	{
+		chain_t it;
+		port_config_t* cnf;
+		for_each_assoc(it, server_config.ports)
+		{
+			cnf = (port_config_t*)it->value;
+			if(cnf && cnf->htdocs)
+				free(cnf->htdocs);
+			if(cnf->sock > 0)
+			{
+				close(cnf->sock);
+			}
+		}
+		freedict(server_config.ports);
+	}
 	LOG("Unclosed connection: %d", server_config.connection);
 }
 
 static int config_handler(void *conf, const char *section, const char *name,
-						  const char *value)
+						 const char *value)
 {
 	config_t *pconfig = (config_t *)conf;
+	regmatch_t port_matches[2];
+	//trim(section, ' ');
+	//trim(value,' ');
+	//trim(name,' ');
 	//char * ppath = NULL;
-	if (MATCH("SERVER", "port"))
-	{
-		pconfig->port = atoi(value);
-	}
-	else if (MATCH("SERVER", "plugins"))
+	if (MATCH("SERVER", "plugins"))
 	{
 		pconfig->plugins_dir = strdup(value);
 	}
@@ -123,10 +137,6 @@ static int config_handler(void *conf, const char *section, const char *name,
 	else if (MATCH("SERVER", "database"))
 	{
 		pconfig->db_path = strdup(value);
-	}
-	else if (MATCH("SERVER", "htdocs"))
-	{
-		pconfig->htdocs = strdup(value);
 	}
 	else if (MATCH("SERVER", "tmpdir"))
 	{
@@ -155,10 +165,6 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 #endif
 #ifdef USE_OPENSSL
-	else if (MATCH("SERVER", "ssl.enable"))
-	{
-		pconfig->usessl = atoi(value);
-	}
 	else if (MATCH("SERVER", "ssl.cert"))
 	{
 		pconfig->sslcert = strdup(value);
@@ -191,6 +197,31 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		dput(pconfig->mimes,name,strdup(value));
 	}
+	else if( regex_match("PORT:\\s*([0-9]+)", section, 2, port_matches) )
+	{
+		char buf[20];
+		memset(buf, '\0', sizeof(buf));
+		memcpy(buf, section + port_matches[1].rm_so, port_matches[1].rm_eo - port_matches[1].rm_so);
+		port_config_t* p = dvalue(pconfig->ports,buf);
+		if(!p)
+		{
+			p = (port_config_t*) malloc( sizeof(port_config_t));
+			p->htdocs = NULL;
+			p->sock = -1;
+			dput(pconfig->ports,buf, p);
+			p->port = atoi(buf);
+		}
+		if(strcmp(name, "htdocs") == 0)
+		{
+			p->htdocs = strdup(value);
+		}
+		else if(strcmp(name, "ssl.enable") == 0)
+		{
+			p->usessl = atoi(value);
+			if(p->usessl)
+				pconfig->enable_ssl = 1;
+		}
+	}
 	else
 	{
 		return 0; /* unknown section/name, error */
@@ -200,14 +231,23 @@ static int config_handler(void *conf, const char *section, const char *name,
 void init_file_system()
 {
 	struct stat st;
+	port_config_t* pcnf;
+	chain_t it;
 	if (stat(server_config.plugins_dir, &st) == -1)
-		mkdir(server_config.plugins_dir, 0755);
+		mkdirp(server_config.plugins_dir, 0755);
 	if (stat(server_config.db_path, &st) == -1)
-		mkdir(server_config.db_path, 0755);
-	if (stat(server_config.htdocs, &st) == -1)
-		mkdir(server_config.htdocs, 0755);
+		mkdirp(server_config.db_path, 0755);
+	for_each_assoc(it, server_config.ports)
+	{
+		pcnf = (port_config_t*) it->value;
+		if (stat(pcnf->htdocs, &st) == -1)
+		{
+			mkdirp(pcnf->htdocs, 0755);
+		}
+
+	}
 	if (stat(server_config.tmpdir, &st) == -1)
-		mkdir(server_config.tmpdir, 0755);
+		mkdirp(server_config.tmpdir, 0755);
 	else
 	{
 		removeAll(server_config.tmpdir, 0);
@@ -215,22 +255,22 @@ void init_file_system()
 }
 void load_config(const char *file)
 {
-	server_config.port = 8888;
+	server_config.ports = dict();
 	server_config.plugins_dir = "plugins/";
 	server_config.plugins_ext = ".dylib";
 	server_config.db_path = "databases/";
-	server_config.htdocs = "htdocs/";
+	//server_config.htdocs = "htdocs/";
 	server_config.tmpdir = "tmp/";
 	server_config.n_workers = 4;
-	server_config.backlog = 100;
+	server_config.backlog = 1000;
 	server_config.rules = list_init();
 	server_config.handlers = dict();
-	server_config.maxcon = 1000;
+	server_config.maxcon = 100;
 	server_config.connection = 0;
 	server_config.errorfp = NULL;
 	server_config.logfp = NULL;
 	server_config.mimes = dict();
-	server_config.usessl = 0;
+	server_config.enable_ssl = 0;
 	server_config.sslcert = "cert.pem";
 	server_config.sslkey = "key.pem";
 	server_config.ssl_cipher = NULL;
@@ -247,7 +287,7 @@ void load_config(const char *file)
 	{
 		LOG("Using configuration : %s", file);
 #ifdef USE_OPENSSL
-		LOG("SSL enable %d", server_config.usessl);
+		LOG("SSL enable %d", server_config.enable_ssl);
 		LOG("SSL cert %s", server_config.sslcert);
 		LOG("SSL key %s", server_config.sslkey);
 		/*if(!server_config.ssl_cipher)
@@ -257,6 +297,7 @@ void load_config(const char *file)
 #endif
 	}
 	LOG("%d mimes entries found", server_config.mimes->size);
+	init_file_system();
 }
 
 void *accept_request(void *data)
@@ -303,7 +344,7 @@ void *accept_request(void *data)
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
 	int ret = -1, stat;
-	if (server_config.usessl == 1 && client->status == 0)
+	if (client->port_config->usessl == 1 && client->status == 0)
 	{
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
@@ -327,10 +368,10 @@ void *accept_request(void *data)
 				task->handle = accept_request;
 				return task;
 			default:
-				ERROR("Error performing SSL handshake %d %d %lu", stat, ret, ERR_get_error());
+				ERROR("Error performing SSL handshake %d %d %s", stat, ret, ERR_error_string(ERR_get_error(), NULL));
+				antd_error(rq->client, 400, "Invalid SSL request");
 				//server_config.connection++;
 				ERR_print_errors_fp(stderr);
-				antd_error(rq->client, 400, "Invalid SSL request");
 				return task;
 			}
 		}
@@ -405,7 +446,7 @@ void *resolve_request(void *data)
 	char *newurl = NULL;
 	char *rqp = NULL;
 	char *oldrqp = NULL;
-	strcpy(path, server_config.htdocs);
+	strcpy(path, rq->client->port_config->htdocs);
 	strcat(path, url);
 	//LOG("Path is : %s", path);
 	//if (path[strlen(path) - 1] == '/')
@@ -438,7 +479,7 @@ void *resolve_request(void *data)
 				{
 					newurl = __s("%s/index.%s", url, it->key);
 					memset(path, 0, sizeof(path));
-					strcat(path, server_config.htdocs);
+					strcat(path, rq->client->port_config->htdocs);
 					strcat(path, newurl);
 					if (stat(path, &st) != 0)
 					{
@@ -578,11 +619,6 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
 	return 1;
 }
 
-static void error_die(const char *sc)
-{
-	perror(sc);
-	exit(1);
-}
 void *serve_file(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
@@ -626,23 +662,35 @@ int startup(unsigned *port)
 
 	httpd = socket(PF_INET, SOCK_STREAM, 0);
 	if (httpd == -1)
-		error_die("socket");
+	{
+		ERROR("Port %d - socket: %s", *port, strerror(errno));
+		return -1;
+	}
 	memset(&name, 0, sizeof(name));
 	name.sin_family = AF_INET;
 	name.sin_port = htons(*port);
 	name.sin_addr.s_addr = htonl(INADDR_ANY);
 	if (bind(httpd, (struct sockaddr *)&name, sizeof(name)) < 0)
-		error_die("bind");
+	{
+		ERROR("Port %d -bind: %s", *port, strerror(errno));
+		return -1;
+	}
 	if (*port == 0) /* if dynamically allocating a port */
 	{
 		socklen_t namelen = sizeof(name);
 		if (getsockname(httpd, (struct sockaddr *)&name, &namelen) == -1)
-			error_die("getsockname");
+		{
+			ERROR("Port %d - getsockname: %s", *port, strerror(errno));
+			return -1;
+		}
 		*port = ntohs(name.sin_port);
 	}
-	//LOG("back log is %d", server_config.backlog);
+	LOG("back log is %d", server_config.backlog);
 	if (listen(httpd, server_config.backlog) < 0)
-		error_die("listen");
+	{
+		ERROR("Port %d - listen: %s", *port, strerror(errno));
+		return -1;
+	}
 	return (httpd);
 }
 
@@ -703,7 +751,7 @@ void *decode_request_header(void *data)
 	// this for check if web socket is enabled
 	// ip address
 	dput(xheader, "REMOTE_ADDR", (void *)strdup(((antd_client_t *)rq->client)->ip));
-	dput(xheader, "SERVER_PORT", (void *)__s("%d", server_config.port));
+	dput(xheader, "SERVER_PORT", (void *)__s("%d", ((antd_client_t *)rq->client)->port_config->port));
 	//while((line = read_line(client)) && strcmp("\r\n",line))
 	while ((read_buf(rq->client, buf, sizeof(buf))) && strcmp("\r\n", buf))
 	{
@@ -728,9 +776,9 @@ void *decode_request_header(void *data)
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
-	//LOG("Original query: %s", url);
+	LOG("Original query: %s", url);
 	query = apply_rules(host, buf);
-	//LOG("Processed query: %s", query);
+	LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{
@@ -1241,13 +1289,6 @@ void *execute_plugin(void *data, const char *pname)
 	}
 	return task;
 }
-
-#ifdef USE_OPENSSL
-int usessl()
-{
-	return server_config.usessl;
-}
-#endif
 
 dictionary_t mimes_list()
 {

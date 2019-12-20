@@ -25,7 +25,8 @@ static void stop(antd_scheduler_t* scheduler)
     // unlock all idle workers if any
     for (int i = 0; i < scheduler->n_workers; i++)
         sem_post(scheduler->worker_sem);
-    sem_post(scheduler->scheduler_sem);
+    if(scheduler->scheduler_sem)
+        sem_post(scheduler->scheduler_sem);
     for (int i = 0; i < scheduler->n_workers; i++)
         if(scheduler->workers[i].id != -1)
             pthread_join(scheduler->workers[i].tid, NULL);

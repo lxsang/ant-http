@@ -23,6 +23,22 @@ THE SOFTWARE.
 */
 #include "utils.h"
 
+
+void error_log(const char* fmt, ...)
+{
+	UNUSED(fmt);
+	return;
+}
+#ifdef DEBUG
+void server_log(const char* fmt, ...)
+{
+	UNUSED(fmt);
+	return;
+}
+#endif
+
+
+
 /**
  * Trim a string by a character on both ends
  * @param str   The target string
@@ -197,8 +213,8 @@ int regex_match(const char* expr,const char* search, int msize, regmatch_t* matc
     if( reti ){ 
     	//ERROR("Could not compile regex: %s",expr);
         regerror(reti, &regex, msgbuf, sizeof(msgbuf));
-        //ERROR("Regex match failed: %s", msgbuf);
-    	return 0; 
+        ERROR("Regex match failed: %s", msgbuf);
+    	//return 0; 
     }
 
 	/* Execute regular expression */
@@ -457,4 +473,32 @@ char* __s(const char* fstring,...)
         return data;
     } else
     	return "";
+}
+
+int mkdirp(const char* path, mode_t mode)
+{
+    char tmp[BUFFLEN];
+    if(strlen(path) > BUFFLEN)
+    {
+        ERROR("mkdirp: Path is too long %s", path);
+        return -1;
+    }
+    char *p = NULL;
+    size_t len;
+    int stat;
+    snprintf(tmp, sizeof(tmp),"%s",path);
+    len = strlen(tmp);
+    if(tmp[len - 1] == '/')
+            tmp[len - 1] = 0;
+    for(p = tmp + 1; *p; p++)
+    {
+        if(*p == '/') {
+            *p = 0;
+            stat = mkdir(tmp, mode);
+            if(stat == -1 && errno != EEXIST)
+                return stat;
+            *p = '/';
+        }
+    }
+    return mkdir(path, mode);
 }

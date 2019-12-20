@@ -29,22 +29,26 @@
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
 #define MAX_WAIT_S 2 // 1/3 minute
-#ifdef USE_OPENSSL
-int __attribute__((weak)) usessl();
-#endif
-void __attribute__((weak)) error_log(const char*, ...);
-#ifdef DEBUG
-void __attribute__((weak)) server_log(const char*, ...);
-#endif
+
 //extern config_t server_config;
+
+typedef struct {
+    unsigned int port;
+    int usessl;
+    char* htdocs;
+    int sock;
+} port_config_t;
+
 typedef struct{
     int sock;
     void* ssl;
     char* ip;
+    int port;
 //#ifdef USE_OPENSSL
     int status;
 //#endif
     time_t last_io;
+    port_config_t* port_config;
 } antd_client_t;
 
 typedef struct {
@@ -61,12 +65,13 @@ typedef struct
 } antd_response_header_t;
 
 
+
 typedef struct  { 
-	int port;
+	//int port;
     char *plugins_dir; 
     char *plugins_ext;
     char *db_path;
-    char* htdocs;
+    //char* htdocs;
     char* tmpdir;
     list_t rules;
     dictionary_t handlers;
@@ -79,24 +84,21 @@ typedef struct  {
     FILE* logfp;
 // #endif
 // #ifdef USE_OPENSSL
-    int usessl;
+    int enable_ssl;
     char* sslcert;
     char* sslkey;
     char* ssl_cipher;
     dictionary_t mimes;
+    dictionary_t ports;
 // #endif
 }config_t;
 
 typedef struct  { 
     char *name; 
     char *dbpath;
-    char * htdocs;
+    char *tmpdir;
     char*pdir;
-	int sport;
     int raw_body;
-//#ifdef USE_OPENSSL
-    int usessl;
-//#endif
 } plugin_header_t;
 
 void set_nonblock(int socket);

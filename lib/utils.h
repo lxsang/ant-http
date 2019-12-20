@@ -54,13 +54,14 @@ THE SOFTWARE.
 #define DIR_SEP "/"
 #define true 1
 #define false 0
+
 #ifdef DEBUG
-	#define LOG(a,...) server_log("[%s: %d]: " a "\n", __FILE__, \
+	#define LOG(a,...) server_log("%s: [%s: %d]: " a "\n",server_time(), __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 #else
     #define LOG(a,...) do{}while(0)
 #endif
-#define ERROR(a,...) error_log("[%s: %d]: " a "\n", __FILE__, \
+#define ERROR(a,...) error_log("%s: [%s: %d]: " a "\n", server_time() , __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 // add this to the utils
 #define UNUSED(x) (void)(x)
@@ -73,6 +74,11 @@ typedef struct{
 	const char* ext;
 } mime_t;
 
+
+void __attribute__((weak)) error_log(const char*, ...);
+#ifdef DEBUG
+void __attribute__((weak)) server_log(const char*, ...);
+#endif
 dictionary_t __attribute__((weak)) mimes_list();
 char* __s(const char*,...);
 void trim(char*,const char);
@@ -84,6 +90,7 @@ char* mime(const char*);
 int match_int(const char*);
 int match_float(const char*);
 int regex_match(const char*,const char*, int, regmatch_t*);
+int mkdirp(const char* path,mode_t mode);
 char *url_decode(const char *str);
 char *url_encode(const char *str);
 char from_hex(char ch);

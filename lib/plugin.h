@@ -39,13 +39,9 @@ static plugin_header_t __plugin__;
 // private function
 void __init_plugin__(const char* pl,config_t* conf){
 	__plugin__.name = strdup(pl);
-	__plugin__.dbpath= strdup(conf->db_path);
-	__plugin__.htdocs = strdup(conf->htdocs);
-	__plugin__.pdir = strdup(conf->plugins_dir);
-	__plugin__.sport = conf->port;
-#ifdef USE_OPENSSL
-	__plugin__.usessl = conf->usessl;
-#endif
+	__plugin__.dbpath= conf->db_path;
+	__plugin__.pdir = conf->plugins_dir;
+	__plugin__.tmpdir = = sconf->tmpdir; 
 	__plugin__.raw_body = 0;
 	init();
 }; 
@@ -72,13 +68,6 @@ sqldb getdb()
 }
 #endif
 
-/*#ifdef USE_OPENSSL
-int usessl()
- {
-	 LOG("CALLED from plugin \n");
-	 return __plugin__.usessl;
- }
- #endif*/
 plugin_header_t* meta()
 {
 	return &__plugin__;
@@ -99,12 +88,9 @@ char* route(const char* repath)
 	return path;
 }
 
-char* htdocs(const char* repath)
+const char* tmpdir()
 {
-	if(repath != NULL)
-		return __s("%s/%s",__plugin__.htdocs,repath);
-	else
-		return __s("%s",__plugin__.htdocs);
+	return (const char*) __plugin__.tmpdir;
 }
 
 char* config_dir()
@@ -121,9 +107,9 @@ void __release__()
 	destroy();
 	LOG("Releasing plugin\n");
 	if(__plugin__.name) free(__plugin__.name);
-	if(__plugin__.dbpath) free(__plugin__.dbpath);
-	if(__plugin__.htdocs) free(__plugin__.htdocs);
-	if(__plugin__.pdir) free(__plugin__.pdir);
+	//if(__plugin__.dbpath) free(__plugin__.dbpath);
+	//if(__plugin__.htdocs) free(__plugin__.htdocs);
+	//if(__plugin__.pdir) free(__plugin__.pdir);
 }
 #endif
 #endif

@@ -1,6 +1,5 @@
 #include "handle.h" 
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
-#ifdef USE_OPENSSL
 
 static const char* S_100 =  "Continue";
 static const char* S_101 =  "Switching Protocols";
@@ -70,24 +69,6 @@ static const char* S_510 =  "Not Extended";
 static const char* S_511 =  "Network Authentication Required";
 static const char* S_UNOF =  "Unofficial Status";
 
-int usessl()
-{
-	return 0;
-}
-#endif
-
-void error_log(const char* fmt, ...)
-{
-	UNUSED(fmt);
-	return;
-}
-#ifdef DEBUG
-void server_log(const char* fmt, ...)
-{
-	UNUSED(fmt);
-	return;
-}
-#endif
 
 const char* get_status_str(int stat)
 {
@@ -210,7 +191,7 @@ int antd_send(void *src, const void* data, int len)
 	int writelen = 0;
 	int  count;
 #ifdef USE_OPENSSL
-	if(usessl())
+	if(source->port_config->usessl)
 	{
 		//LOG("SSL WRITE\n");
 		//ret = SSL_write((SSL*) source->ssl, data, len);
@@ -246,7 +227,7 @@ int antd_send(void *src, const void* data, int len)
                     case SSL_ERROR_ZERO_RETURN: 
                     {
                         // peer disconnected...
-                        ERROR("SSLWRITE: SSL_ERROR_ZERO_RETURN: peer disconected: %d", source->sock);
+                        // ERROR("SSLWRITE: SSL_ERROR_ZERO_RETURN: peer disconected: %d", source->sock);
                         break;
                     }   
 
@@ -324,7 +305,7 @@ int antd_send(void *src, const void* data, int len)
 			{
 				if(written == 0)
 					written = count;
-				//ERROR("Error while writing: %s", strerror(errno));
+				ERROR("Error while writing: %s", strerror(errno));
 				break;
 				//return written;
 			}
@@ -349,7 +330,7 @@ int antd_recv(void *src,  void* data, int len)
 	int readlen=0;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(usessl())
+	if(source->port_config->usessl)
 	{
 		ptr = (char* )data;
 		readlen = len > BUFFLEN?BUFFLEN:len;
@@ -435,7 +416,7 @@ int antd_recv(void *src,  void* data, int len)
                         break;
                     }
                 }     
-				if(read = 0)
+				if(read == 0)
 					read = received;
                 break;
             }
@@ -478,7 +459,7 @@ int antd_recv(void *src,  void* data, int len)
             }
 			else if(errno != EAGAIN && errno != EWOULDBLOCK)
 			{
-				ERROR("Error while writing: %s", strerror(errno));
+				ERROR("Error while reading: %s", strerror(errno));
 				if(read ==0)
 					read = received;
 				break;
@@ -515,7 +496,7 @@ int antd_close(void* src)
 	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(source->ssl && usessl()){
+	if(source->port_config->usessl && source->ssl){
 		//printf("SSL:Shutdown ssl\n");
         //SSL_shutdown((SSL*) source->ssl);
 		SSL_set_shutdown((SSL*) source->ssl, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
@@ -727,7 +708,7 @@ void destroy_request(void *data)
 	if (!data)
 		return;
 	antd_request_t *rq = (antd_request_t *)data;
-	LOG("Close request %d", rq->client->sock);
+	//LOG("Close request %d", rq->client->sock);
 	// free all other thing
 	if (rq->request)
 	{

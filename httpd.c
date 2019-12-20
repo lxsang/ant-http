@@ -4,7 +4,6 @@
 #include "lib/ini.h"
 
 static  antd_scheduler_t scheduler;
-static int server_sock = -1;
 
 #ifdef USE_OPENSSL
 
@@ -63,23 +62,26 @@ void configure_context(SSL_CTX *ctx)
 	LOG("Cirpher suit used: %s", suit);
     if (SSL_CTX_set_cipher_list(ctx, suit) != 1)
     {
+		ERROR("Fail to set ssl cirpher suit: %s", suit);
        ERR_print_errors_fp(stderr);
        exit(EXIT_FAILURE);
     }
     /* Set the key and cert */
 	/* use the full chain bundle of certificate */
     //if (SSL_CTX_use_certificate_file(ctx, server_config->sslcert, SSL_FILETYPE_PEM) <= 0) {
-	if (SSL_CTX_use_certificate_chain_file(ctx, config()->sslcert) <= 0) {
+	if (SSL_CTX_use_certificate_chain_file(ctx, cnf->sslcert) <= 0) {
+		ERROR("Fail to read SSL certificate chain file: %s", cnf->sslcert);
 	    ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, config()->sslkey, SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, cnf->sslkey, SSL_FILETYPE_PEM) <= 0 ) {
+		ERROR("Fail to read SSL private file: %s", cnf->sslkey);
         ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
 	if (!SSL_CTX_check_private_key(ctx)) {
-        ERROR("Failed to validate cert");
+        ERROR("Failed to validate SSL certificate");
         ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
@@ -111,8 +113,6 @@ void stop_serve(int dummy) {
 	// DEPRECATED: ERR_remove_state(0);
 	ERR_free_strings();
 #endif
-	if(server_sock != -1)
-		close(server_sock);
 	destroy_config(); 
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
@@ -124,7 +124,6 @@ int main(int argc, char* argv[])
 		load_config(CONFIG_FILE);
 	else
 		load_config(argv[1]);
-	unsigned port = config()->port;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	socklen_t client_name_len = sizeof(client_name);
@@ -135,8 +134,10 @@ int main(int argc, char* argv[])
 	signal(SIGABRT, SIG_IGN);
 	signal(SIGINT, stop_serve);
 
+	config_t* conf = config();
+
 #ifdef USE_OPENSSL
-	if( config()->usessl == 1 )
+	if( conf->enable_ssl == 1 )
 	{
 		init_openssl();
     	ctx = create_context();
@@ -145,10 +146,36 @@ int main(int argc, char* argv[])
 	}
     
 #endif
-	server_sock = startup(&port);
-	LOG("httpd running on port %d", port);
+	// startup port
+	chain_t it;
+	port_config_t * pcnf;
+	int nlisten = 0;
+	for_each_assoc(it, conf->ports)
+	{
+		pcnf = (port_config_t*)it->value;
+		if(pcnf)
+		{
+			pcnf->sock = startup(&pcnf->port);
+			if(pcnf->sock>0)
+			{
+				nlisten++;
+				set_nonblock(pcnf->sock);
+				LOG("Listening on port %d", pcnf->port);
+			}
+			else
+			{
+				ERROR("Port %d is disabled", pcnf->port);
+			}
+		}
+	}
+	if(nlisten == 0)
+	{
+		ERROR("No port is listenned, quit!!");
+		stop_serve(0);
+		exit(1);
+	}
 	// default to 4 workers
-	antd_scheduler_init(&scheduler, config()->n_workers);
+	antd_scheduler_init(&scheduler, conf->n_workers);
 	scheduler.validate_data = 1;
 	scheduler.destroy_data = finish_request;
 	// use blocking server_sock
@@ -169,69 +196,99 @@ int main(int argc, char* argv[])
 		pthread_detach(scheduler_th);
 	}
 	antd_task_t* task = NULL;
+
+	fd_set read_flags, write_flags;
+	// first verify if the socket is ready
+	struct timeval timeout;
+	// select
+
 	while (scheduler.status)
 	{
-		client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len);
-		if (client_sock == -1)
+		if(conf->connection > conf->maxcon)
 		{
+			//ERROR("Reach max connection %d", conf->connection);
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 5000; // 5 ms
+			select(0, NULL, NULL, NULL, &timeout);
 			continue;
 		}
-		// just dump the scheduler when we have a connection
-		antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
-		antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
-		request->client = client;
-		request->request = dict();
-		/*
-			get the remote IP
-		*/
-		client->ip = NULL;
-		if (client_name.sin_family == AF_INET)
+		for_each_assoc(it, conf->ports)
 		{
-			client_ip =  inet_ntoa(client_name.sin_addr);
-			client->ip = strdup(client_ip);
-			LOG("Client IP: %s", client_ip);
-			//LOG("socket: %d\n", client_sock);
+			pcnf = (port_config_t*) it->value;
+			if(pcnf->sock > 0)
+			{
+				FD_ZERO(&read_flags);
+				FD_SET(pcnf->sock, &read_flags);
+				FD_ZERO(&write_flags);
+				FD_SET(pcnf->sock, &write_flags);
+				timeout.tv_sec = 0;
+				timeout.tv_usec = 5000; // 5 ms
+				int sel = select(pcnf->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
+				if(sel > 0 && (FD_ISSET(pcnf->sock, &read_flags) || FD_ISSET(pcnf->sock, &write_flags)))
+				{
+					client_sock = accept(pcnf->sock,(struct sockaddr *)&client_name,&client_name_len);
+					if (client_sock > 0)
+					{
+						// just dump the scheduler when we have a connection
+						antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+						antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
+						request->client = client;
+						request->request = dict();
+						client->port_config = pcnf;
+						/*
+							get the remote IP
+						*/
+						client->ip = NULL;
+						if (client_name.sin_family == AF_INET)
+						{
+							client_ip =  inet_ntoa(client_name.sin_addr);
+							client->ip = strdup(client_ip);
+							LOG("Connect to client IP: %s on port:%d", client_ip, pcnf->port);
+							//LOG("socket: %d\n", client_sock);
+						}
+
+						// set timeout to socket
+						set_nonblock(client_sock);
+						/*struct timeval timeout;      
+						timeout.tv_sec = 0;
+						timeout.tv_usec = 5000;
+
+						if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+							perror("setsockopt failed\n");
+
+						if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
+							perror("setsockopt failed\n");
+						*/
+						client->sock = client_sock;
+						time(&client->last_io);
+	#ifdef USE_OPENSSL
+						client->ssl = NULL;
+						client->status = 0;
+						if(pcnf->usessl == 1)
+						{
+							client->ssl = (void*)SSL_new(ctx);
+							if(!client->ssl) continue;
+							SSL_set_fd((SSL*)client->ssl, client->sock);
+
+							/*if (SSL_accept((SSL*)client->ssl) <= 0) {
+								LOG("EROOR accept\n");
+								ERR_print_errors_fp(stderr);
+								antd_close(client);
+								continue;
+							}*/
+						}
+	#endif
+						conf->connection++;
+						// create callback for the server
+						task = antd_create_task(accept_request,(void*)request, finish_request, client->last_io);
+						//task->type = LIGHT;
+						antd_add_task(&scheduler, task);
+					}
+				}
+			}
 		}
-
-		// set timeout to socket
-		set_nonblock(client_sock);
-		/*struct timeval timeout;      
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 5000;
-
-		if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-			perror("setsockopt failed\n");
-
-		if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-			perror("setsockopt failed\n");
-		*/
-		client->sock = client_sock;
-		time(&client->last_io);
-#ifdef USE_OPENSSL
-		client->ssl = NULL;
-		client->status = 0;
-		if(config()->usessl == 1)
-		{
-			client->ssl = (void*)SSL_new(ctx);
-			if(!client->ssl) continue;
-        	SSL_set_fd((SSL*)client->ssl, client->sock);
-
-        	/*if (SSL_accept((SSL*)client->ssl) <= 0) {
-				LOG("EROOR accept\n");
-            	ERR_print_errors_fp(stderr);
-				antd_close(client);
-				continue;
-        	}*/
-		}
-#endif
-		config()->connection++;
-		// create callback for the server
-		task = antd_create_task(accept_request,(void*)request, finish_request, client->last_io);
-		//task->type = LIGHT;
-		antd_add_task(&scheduler, task);
 	}
 
-	close(server_sock);
-
+	stop_serve(0);
 	return(0);
 }

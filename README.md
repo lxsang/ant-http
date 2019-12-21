@@ -56,6 +56,5 @@ make distcheck
 
 
 ### To do
-- variable size dictionary
-- refactoring libantd API, remove unused functions
+- max  upload file size should be configurable
 - remove static strings, replace it by configurations

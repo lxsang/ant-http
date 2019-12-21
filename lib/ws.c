@@ -1,3 +1,7 @@
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
 #include "ws.h"
 static void ws_gen_mask_key(ws_msg_header_t * header)
 {
@@ -69,13 +73,13 @@ ws_msg_header_t * ws_read_header(void* client)
 	switch(header->opcode){
 		case WS_CLOSE: // client requests to close the connection
 		// send back a close message
-		ws_close(client,1000);
+		ws_send_close(client,1000,header->mask?0:1);
 		//goto fail;
 		break;
 		
 		case WS_PING: // client send a ping
 		// send back a pong message
-		pong(client,header->plen);
+		ws_pong(client,header, header->mask?0:1 );
 		break;
 		
 		default: break;
@@ -208,7 +212,7 @@ void ws_send_file(void* client, const char* file, int mask)
 	ptr = fopen(file,"rb");
 	if(!ptr)
 	{
-		ws_close(client,1011);
+		ws_send_close(client,1011,mask);
 		return;
 	}
 
@@ -242,18 +246,19 @@ void ws_send_file(void* client, const char* file, int mask)
 * Not tested yet
 * but should work
 */
-void pong(void* client, int len)
+void ws_pong(void* client, ws_msg_header_t* oheader, int mask)
 {
-	//printf("PONG\n");
 	ws_msg_header_t pheader;
 	pheader.fin = 1;
 	pheader.opcode = WS_PONG;
-	pheader.plen = len;
-	pheader.mask = 0;
-	uint8_t *data = (uint8_t*)malloc(len);
+	pheader.plen = oheader->plen;
+	pheader.mask = mask;
+	uint8_t *data = (uint8_t*)malloc(oheader->plen);
 	if(!data) return;
-	if(antd_recv(client,data, len) < 0)
+	
+	if(ws_read_data(client, oheader, pheader.plen,data) == -1)
 	{
+		ERROR("Cannot read ping data %d", pheader.plen);
 		free(data);
 		return;
 	}
@@ -261,6 +266,15 @@ void pong(void* client, int len)
 	free(data);
 	//_send_header(client, pheader);
 	//send(client, data, len, 0);
+}
+void ws_ping(void* client, const char* echo, int mask)
+{
+	ws_msg_header_t pheader;
+	pheader.fin = 1;
+	pheader.opcode = WS_PING;
+	pheader.plen = strlen(echo);
+	pheader.mask = mask;
+	ws_send_frame(client,(uint8_t*)echo,pheader);
 }
 /*
 * Not tested yet, but should work
@@ -295,7 +309,7 @@ int ip_from_hostname(const char * hostname , char* ip)
     if ( (he = gethostbyname( hostname ) ) == NULL) 
     {
         // get the host info
-        herror("gethostbyname");
+        ERROR("gethostbyname:%s",strerror(errno));
         return -1;
     }
     addr_list = (struct in_addr **) he->h_addr_list;
@@ -323,14 +337,14 @@ int request_socket(const char* ip, int port)
 	timeout.tv_usec = 0;//3 s
 	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
 	{
-		perror("Socket");
+		ERROR("Socket: %s", strerror(errno));
 		return -1;
 	}
 	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-	        perror("setsockopt failed\n");
+	    ERROR("setsockopt failed:%s", strerror(errno));
 
     if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-        perror("setsockopt failed\n");
+        ERROR("setsockopt failed:%s",strerror(errno));
 	/*struct linger lingerStruct;
     lingerStruct.l_onoff = 0;  // turn lingering off for sockets
     setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &lingerStruct, sizeof(lingerStruct));*/
@@ -347,43 +361,192 @@ int request_socket(const char* ip, int port)
 	if ( connect(sockfd, (struct sockaddr*)&dest, sizeof(dest)) != 0 )
 	{
 		close(sockfd);
-		perror("Connect");
+		ERROR("Connect:%s",strerror(errno));
 		return -1;
 	}
 	return sockfd;
 }
 
-//TODO: The ping request
-/*
-this is for the client side, not use for now
-int ws_open_hand_shake(const char* host, int port, const char* resource)
+void ws_client_close(ws_client_t* wsclient)
+{
+	int usessl = wsclient->antdsock->port_config->usessl;
+	port_config_t *ptr = wsclient->antdsock->port_config;
+	antd_close(wsclient->antdsock);
+	if(ptr)
+		free(ptr);
+
+#ifdef USE_OPENSSL
+	if(usessl)
+	{
+		if(wsclient->ssl_ctx)
+			SSL_CTX_free(wsclient->ssl_ctx);
+		FIPS_mode_set(0);
+		// DEPRECATED: CONF_modules_unload(1);
+		EVP_cleanup();
+		EVP_PBE_cleanup();
+		// DEPRECATED:ENGINE_cleanup();
+		CRYPTO_cleanup_all_ex_data();
+		// DEPRECATED: ERR_remove_state(0);
+		ERR_free_strings();
+	}
+#else
+	UNUSED(usessl);
+#endif
+}
+
+//this is for the client side, not use for now
+int ws_client_connect(ws_client_t* wsclient)
 {
     char ip[100];
-	char buff[MAX_BUFF];
-    char* rq = NULL;
-    int size;
-    // request socket
-	ip_from_hostname(host ,ip);
-	int sock = request_socket(ip, port);
-	if(sock <= 0) return -1;
-    // now send ws request handshake 
-    rq = __s(CLIENT_RQ,resource,host);
-   //  printf("%s\n",rq);
-    size = send(sock, rq, strlen(rq),0);
-    if(size != strlen(rq))
+	int stat = ip_from_hostname(wsclient->host,ip);
+	if(stat == -1)
+		return -1;
+	int sock = request_socket(ip, wsclient->antdsock->port_config->port);
+	if(sock <= 0)
+	{
+		ERROR("Cannot request socket");
+		return -1;
+	}
+	// will be free
+	wsclient->antdsock->ip =  strdup(ip);
+	wsclient->antdsock->sock = sock;
+	wsclient->antdsock->status = 0;
+	wsclient->antdsock->last_io = time(NULL);
+	wsclient->antdsock->port_config->sock = -1;
+	wsclient->antdsock->port_config->rules = NULL;
+	wsclient->antdsock->port_config->htdocs = NULL;
+#ifdef USE_OPENSSL
+	if(wsclient->antdsock->port_config->usessl)
+	{
+		SSL_library_init();
+		SSL_load_error_strings();
+		ERR_load_crypto_strings();
+    	OpenSSL_add_ssl_algorithms();
+		const SSL_METHOD *method;
+		unsigned long ssl_err = 0;
+		method = SSLv23_client_method();
+		ssl_err = ERR_get_error();
+		if(!method)
+		{
+			ERROR("SSLv23_method: %s", ERR_error_string(ssl_err, NULL));
+			return -1;
+		}
+		wsclient->ssl_ctx = SSL_CTX_new(method);
+		ssl_err = ERR_get_error();
+    	if (!wsclient->ssl_ctx) {
+			ERROR("SSL_CTX_new: %s", ERR_error_string(ssl_err, NULL));
+			return -1;
+		}
+		// configure the context
+#if defined(SSL_CTX_set_ecdh_auto)
+    	SSL_CTX_set_ecdh_auto(wsclient->ssl_ctx, 1);
+#else
+    	SSL_CTX_set_tmp_ecdh(wsclient->ssl_ctx, EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
+#endif
+		SSL_CTX_set_options(wsclient->ssl_ctx, SSL_OP_NO_TLSv1|SSL_OP_NO_TLSv1_1|SSL_OP_NO_SSLv2|SSL_OP_NO_TICKET);
+		// set the cipher suit
+		const char* suit = wsclient->ciphersuit?wsclient->ciphersuit:PREFERRED_WS_CIPHERS;
+		//const char* suit = "AES128-SHA";
+		if (SSL_CTX_set_cipher_list(wsclient->ssl_ctx, suit) != 1)
+		{
+			ssl_err = ERR_get_error();
+			// TODO Close the context
+			ERROR("SSL_CTX_set_cipher_list: %s", ERR_error_string(ssl_err, NULL));
+			return -1;
+		}
+
+		if(wsclient->sslcert && wsclient->sslkey)
+		{
+			if (SSL_CTX_use_certificate_file(wsclient->ssl_ctx,wsclient->sslcert, SSL_FILETYPE_PEM) <= 0) {
+				ssl_err = ERR_get_error();
+				ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ssl_err, NULL));
+				return -1;
+			}
+			if(wsclient->sslpasswd)
+				SSL_CTX_set_default_passwd_cb_userdata(wsclient->ssl_ctx,(void*)wsclient->sslpasswd);
+			if (SSL_CTX_use_PrivateKey_file(wsclient->ssl_ctx,wsclient->sslkey, SSL_FILETYPE_PEM) <= 0) {
+				ssl_err = ERR_get_error();
+				ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ssl_err, NULL));
+				return -1;
+			}
+			if (SSL_CTX_check_private_key(wsclient->ssl_ctx) == 0) {
+				ssl_err = ERR_get_error();
+				ERROR("SSL_CTX_check_private_key: %s", ERR_error_string(ssl_err, NULL));
+				return -1;
+			}
+		}
+		//
+
+		// validate 
+		if(wsclient->verify_location)
+		{
+			SSL_CTX_set_verify(wsclient->ssl_ctx, SSL_VERIFY_PEER, NULL);
+        	SSL_CTX_set_verify_depth(wsclient->ssl_ctx, 5);
+			if(!SSL_CTX_load_verify_locations(wsclient->ssl_ctx, wsclient->verify_location, NULL))
+			{
+				ssl_err = ERR_get_error();
+				// TODO Close the context
+				ERROR("SSL_CTX_load_verify_locations: %s", ERR_error_string(ssl_err, NULL));
+				return -1;
+			}
+		}
+		else
+		{
+			SSL_CTX_set_verify(wsclient->ssl_ctx, SSL_VERIFY_NONE, NULL);	
+		}
+
+		wsclient->antdsock->ssl = (void*)SSL_new(wsclient->ssl_ctx);
+		if(!wsclient->antdsock->ssl)
+		{
+			ssl_err = ERR_get_error();
+			ERROR("SSL_new: %s", ERR_error_string(ssl_err, NULL));
+			return -1;
+		}
+		SSL_set_fd((SSL*)wsclient->antdsock->ssl, wsclient->antdsock->sock);
+		int stat, ret;
+		ERR_clear_error();
+		while( (ret = SSL_connect(wsclient->antdsock->ssl)) <= 0)
+		{
+			stat = SSL_get_error(wsclient->antdsock->ssl, ret);
+			switch (stat)
+			{
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE:
+				case SSL_ERROR_NONE:
+					continue;
+				default:
+					ERR_print_errors_fp(stderr);
+					ERROR("Error performing SSL handshake %d", stat);
+					return -1;
+			}
+		}
+	}
+#endif
+	return 0;
+}
+
+
+
+
+int ws_open_handshake(ws_client_t* client)
+{
+	char buf[MAX_BUFF];
+	// now send ws request handshake 
+   	sprintf(buf, CLIENT_RQ,client->resource,client->host);
+	//printf("Send %s\n", buf);
+    int size = antd_send(client->antdsock, buf, strlen(buf));
+    if(size != (int)strlen(buf))
     {
-        printf("Cannot send request \n");
-        close(sock);
+        ERROR("Cannot send request \n");
         return -1;
     }
     // now verify if server accept the socket 
-	 size  = read_buf(sock,buff,MAX_BUFF);
+	size  = read_buf(client->antdsock,buf,MAX_BUFF);
 	char* token;
     int done = 0;
-	while (size > 0 && strcmp("\r\n",buff))
+	while (size > 0 && strcmp("\r\n",buf))
 	{
-		char* line = strdup(buff);
-		//printf("LINE %s\n", line);
+		char* line = buf;
 		token = strsep(&line,":");
 		trim(token,' ');
 		if(token != NULL &&strcasecmp(token,"Sec-WebSocket-Accept") == 0)
@@ -392,25 +555,23 @@ int ws_open_hand_shake(const char* host, int port, const char* resource)
 			trim(token,' ');
 			trim(token,'\n');
 			trim(token,'\r');
-            //printf("Key found %s \n", token);
             if(strcasecmp(token, SERVER_WS_KEY) == 0)
             {
-               // printf("Handshake sucessfull\n");
+                //LOG("Handshake sucessfull\n");
                 done = 1;
             } else
             {
-                printf("Wrong key %s vs %s\n",token,SERVER_WS_KEY);
-                close(sock);
+                ERROR("WS handshake, Wrong key %s vs %s",token,SERVER_WS_KEY);
                 return -1;
             }
 		} 
 		//if(line) free(line);
-		size  = read_buf(sock,buff,MAX_BUFF);
+		size  = read_buf(client->antdsock,buf,MAX_BUFF);
 	}
-    if(done) return sock;
-    //printf("No server key found \n");
+    if(done) 
+		return 0;
     return -1;
-}*/
+}
 char* get_ip_address()
 {
 	struct ifaddrs* addrs;

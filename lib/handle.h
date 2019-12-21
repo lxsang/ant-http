@@ -78,6 +78,7 @@ typedef struct  {
     int maxcon;
     int connection;
     int n_workers;
+    int max_upload_size;
     FILE* errorfp;
 // #ifdef DEBUG
     FILE* logfp;

@@ -142,6 +142,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->tmpdir = strdup(value);
 	}
+	else if (MATCH("SERVER", "max_upload_size"))
+	{
+		pconfig->max_upload_size = atoi(value);
+	}
 	else if (MATCH("SERVER", "maxcon"))
 	{
 		pconfig->maxcon = atoi(value);
@@ -267,6 +271,7 @@ void load_config(const char *file)
 	server_config.backlog = 1000;
 	server_config.handlers = dict();
 	server_config.maxcon = 100;
+	server_config.max_upload_size = 10000000; //10Mb
 	server_config.connection = 0;
 	server_config.errorfp = NULL;
 	server_config.logfp = NULL;

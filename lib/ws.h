@@ -26,8 +26,10 @@
 #define ws_f(c,f) (ws_send_file(c,f,0))
 #define ws_close(c,r) (ws_send_close(c,r,0))
 #define MAX_BUFF 1024
-//#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
-//#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+
+#define PREFERRED_WS_CIPHERS "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS"
+#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
 
 typedef struct{
 	uint8_t fin;
@@ -37,9 +39,25 @@ typedef struct{
 	uint8_t mask_key[4];
 } ws_msg_header_t;
 
+typedef struct{
+	const char* host;
+	const char* resource;
+	antd_client_t* antdsock;
+	// ssl
+	const char* sslcert;
+	const char* sslkey;
+	const char* sslpasswd;
+	const char* ciphersuit;
+	const char* verify_location;
+	void * ssl_ctx;
+} ws_client_t;
+
+
 ws_msg_header_t * ws_read_header(void*);
 void ws_send_frame(void* , uint8_t* , ws_msg_header_t );
-void pong(void* client, int len);
+void ws_pong(void* client, ws_msg_header_t*, int mask);
+
+void ws_ping(void* client, const char* echo, int mask);
 
 void ws_send_text(void* client, const char* data,int mask);
 void ws_send_close(void* client, unsigned int status, int mask);
@@ -49,7 +67,12 @@ void ws_send_binary(void* client, uint8_t* data, int l, int mask);
 int ws_read_data(void* , ws_msg_header_t*, int, uint8_t*);
 int request_socket(const char* ip, int port);
 int ip_from_hostname(const char * hostname , char* ip);
-int sock_read_buf(void* sock, char*buf,int size);
 //int ws_open_hand_shake(const char* host, int port, const char* resource);
 char* get_ip_address();
+
+// client
+
+void ws_client_close(ws_client_t* wsclient);
+int ws_client_connect(ws_client_t* wsclient);
+int ws_open_handshake(ws_client_t* client);
 #endif

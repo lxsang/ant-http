@@ -210,9 +210,16 @@ int antd_send(void *src, const void* data, int len)
             {
                 written += count;
 				writelen = (len - written) > BUFFLEN?BUFFLEN:(len-written);
+				time(&source->last_io);
             }
             else 
             {
+				if(difftime( time(NULL), source->last_io) > MAX_IO_WAIT_TIME)
+				{
+					if(written == 0)
+						written = count;
+					break;
+				}
                 //printf(" received equal to or less than 0\n")
                 switch (err)
                 {
@@ -300,12 +307,13 @@ int antd_send(void *src, const void* data, int len)
             {
                 written += count;
 				writelen = (len - written) > BUFFLEN?BUFFLEN:(len-written);
+				time(&source->last_io);
             }
-			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			else if(difftime( time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (count == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
 			{
 				if(written == 0)
 					written = count;
-				ERROR("Error while writing: %s", strerror(errno));
+				//ERROR("Error while writing: %s", strerror(errno));
 				break;
 				//return written;
 			}
@@ -317,8 +325,6 @@ int antd_send(void *src, const void* data, int len)
 	{
 		antd_close(src);
 	}*/
-	if(written > 0)
-		time(&source->last_io);
 	return written;
 }
 int antd_recv(void *src,  void* data, int len)
@@ -346,9 +352,17 @@ int antd_recv(void *src,  void* data, int len)
             {
                 read += received;
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+				time(&source->last_io);
             }
             else 
             {
+				// Timeout, quit
+				if(difftime( time(NULL), source->last_io) > MAX_IO_WAIT_TIME)
+				{
+					if(read == 0)
+						read = received;
+					break;
+				}
                 //printf(" received equal to or less than 0\n")
                 switch (err)
                 {
@@ -447,7 +461,7 @@ int antd_recv(void *src,  void* data, int len)
 		ptr = (char* )data;
 		readlen = len > BUFFLEN?BUFFLEN:len;
 		read = 0;
-		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
+		while (readlen > 0 )
         {
             received = recv(((int) source->sock), ptr+read, readlen, 0);
 			//LOG("Read : %c\n", *ptr);
@@ -455,9 +469,10 @@ int antd_recv(void *src,  void* data, int len)
             {
                 read += received;
 				readlen = (len - read) > BUFFLEN?BUFFLEN:(len-read);
+				time(&source->last_io);
 				//LOG("Read len is %d\n", readlen);
             }
-			else if(errno != EAGAIN && errno != EWOULDBLOCK)
+			else if( difftime( time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (errno != EAGAIN && errno != EWOULDBLOCK))
 			{
 				//ERROR("Error while reading: %s", strerror(errno));
 				if(read ==0)
@@ -474,8 +489,6 @@ int antd_recv(void *src,  void* data, int len)
 	{
 		antd_close(src);
 	}*/
-	if(read > 0)
-		time(&source->last_io);
 	return read;
 }
 void set_nonblock(int socket) {

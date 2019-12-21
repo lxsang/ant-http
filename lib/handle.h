@@ -28,7 +28,7 @@
 #define __RESULT__ "{\"result\":%d,\"msg\":\"%s\"}"
 #define FORM_URL_ENCODE  "application/x-www-form-urlencoded"
 #define FORM_MULTI_PART  "multipart/form-data"
-#define MAX_WAIT_S 2 // 1/3 minute
+#define MAX_IO_WAIT_TIME 5 // second
 
 //extern config_t server_config;
 

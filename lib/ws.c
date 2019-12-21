@@ -250,9 +250,15 @@ void pong(void* client, int len)
 	pheader.opcode = WS_PONG;
 	pheader.plen = len;
 	pheader.mask = 0;
-	uint8_t data[len];
-	if(antd_recv(client,data, len) < 0) return;
+	uint8_t *data = (uint8_t*)malloc(len);
+	if(!data) return;
+	if(antd_recv(client,data, len) < 0)
+	{
+		free(data);
+		return;
+	}
 	ws_send_frame(client,data,pheader);
+	free(data);
 	//_send_header(client, pheader);
 	//send(client, data, len, 0);
 }

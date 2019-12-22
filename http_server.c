@@ -110,7 +110,7 @@ void destroy_config()
 			{
 				close(cnf->sock);
 			}
-			list_free(&(cnf->rules));
+			freedict(cnf->rules);
 		}
 		freedict(server_config.ports);
 	}
@@ -207,7 +207,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 			p = (port_config_t*) malloc( sizeof(port_config_t));
 			p->htdocs = NULL;
 			p->sock = -1;
-			p->rules = list_init();
+			p->rules = dict();
 			dput(pconfig->ports,buf, p);
 			p->port = atoi(buf);
 		}
@@ -224,8 +224,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 		else
 		{
 			// other thing should be rules
-			list_put_s(&p->rules, name);
-			list_put_s(&p->rules, value);
+			dput(p->rules, name, strdup(value));
 		}
 	}
 	else
@@ -703,7 +702,7 @@ int startup(unsigned *port)
 	return (httpd);
 }
 
-char *apply_rules(list_t rules, const char *host, char *url)
+char *apply_rules(dictionary_t rules, const char *host, char *url)
 {
 	// rule check
 	char *query_string = url;
@@ -715,12 +714,13 @@ char *apply_rules(list_t rules, const char *host, char *url)
 		query_string++;
 	}
 	//char* oldurl = strdup(url);
-	int size = list_size(rules);
-	for (int i = 0; i < size; i += 2)
+	chain_t it;
+	char* k;
+	char* v;
+	for_each_assoc(it, rules)
 	{
-		char *k, *v;
-		k = list_at(rules, i)->value.s;
-		v = list_at(rules, i + 1)->value.s;
+		k = it->key;
+		v = (char*)it->value;
 		// 1 group
 		if (rule_check(k, v, host, url, query_string, url))
 		{

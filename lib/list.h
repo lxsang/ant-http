@@ -25,25 +25,21 @@ THE SOFTWARE.
 #define LIST_H
 #include "utils.h"
 
-#define LIST_TYPE_ARRAY	601//hash("array")
-#define LIST_TYPE_BASE64	335//hash("base64")
-#define LIST_TYPE_BOOL	40//hash("boolean")
-#define LIST_TYPE_DOUBLE	977//hash("double")
-#define LIST_TYPE_DATE	49//hash("dateTime.iso8601")
-#define LIST_TYPE_INT	1007//hash("int")
-#define LIST_TYPE_I4		235//hash("i4")
-#define LIST_TYPE_STRING	17//hash("string")
-#define LIST_TYPE_NIL	529//hash("nil")
+#define LIST_TYPE_ARRAY		0x5
+#define LIST_TYPE_POINTER	0x4
+#define LIST_TYPE_DOUBLE	0x2
+#define LIST_TYPE_INT		0x1
+#define LIST_TYPE_NIL		0x0
+
+#define list_for_each(item, list) \
+            for(item = list;item!= NULL && item->type != LIST_TYPE_NIL; item = item->next)
 
 typedef struct __item{
 	int type;
 	union{
 		int 			i;
-		int 			b;
-		char* 			s;
 		double 			d;
-		char* 			date;
-		char* 			b64;
+		void* 			ptr;
 		struct __item* 	array;
 	} value;
 	struct __item* next;
@@ -53,19 +49,16 @@ list_t list_init();
 void list_put(list_t*,item_t);
 void list_put_i(list_t*,int);
 void list_put_d(list_t*,double);
-void list_put_b(list_t*,int);
-void list_put_b64(list_t*,const char*);
-void list_put_date(list_t*,const char*);
-void list_put_s(list_t*,const char*);
+void list_put_ptr(list_t*,void*);
 void list_put_array(list_t*,list_t);
+
 item_t list_last(list_t);
-int list_remove(list_t,int);
+int list_remove(list_t*,int);
 int list_size(list_t);
 item_t list_at(list_t,int);
 int list_empty(list_t);
 item_t list_item(int type);
 list_t split(const char*, const char*);
-char* as_string(list_t);
 void list_put_special(list_t*, const char*);
 void list_free(list_t *);
 #endif

@@ -159,10 +159,13 @@ void antd_send_header(void* client, antd_response_header_t* res)
 	// send out cookie
 	if(res->cookie)
 	{
-		int size = list_size(res->cookie);
-		for (int i = 0; i < size; i++)
+		item_t el;
+		list_for_each(el, res->cookie)
 		{
-			__t(client,"Set-Cookie: %s", list_at(res->cookie, i)->value.s);
+			if(el->type == LIST_TYPE_POINTER && el->value.ptr)
+			{
+				__t(client,"Set-Cookie: %s", (char*)el->value.ptr);
+			}
 		}
 		list_free(&res->cookie);
 		res->cookie = NULL;

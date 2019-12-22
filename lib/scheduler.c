@@ -53,7 +53,7 @@ static antd_task_item_t dequeue(antd_task_queue_t* q)
 }
 
 
-static antd_callback_t* callback_of( void* (*callback)(void*) )
+antd_callback_t* callback_of( void* (*callback)(void*) )
 {
     antd_callback_t* cb = NULL;
     if(callback)

@@ -135,4 +135,5 @@ wait for event
 */
 void antd_wait(antd_scheduler_t *);
 
+antd_callback_t* callback_of( void* (*callback)(void*) );
 #endif

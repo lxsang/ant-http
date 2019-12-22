@@ -56,5 +56,4 @@ make distcheck
 
 
 ### To do
-- max  upload file size should be configurable
 - remove static strings, replace it by configurations

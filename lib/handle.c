@@ -670,17 +670,7 @@ int ws_enable(dictionary_t dic)
 	if(!v) return 0;
 	return atoi(v) == 1;
 }
-/**
- * read the request as a string line format
- * @param  sock socket
- * @return      a request string
- */
-char* read_line(void* sock)
-{
-	char buf[BUFFLEN];
-	read_buf(sock,buf,sizeof(buf));
-	return strdup(buf);
-}
+
 /**
  * Read the socket request in to a buffer or size
  * The data is read until the buffer is full or

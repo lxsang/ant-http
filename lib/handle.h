@@ -116,7 +116,6 @@ int upload(const char*, const char*);
 void antd_error(void* client, int status, const char* msg);
 
 int ws_enable(dictionary_t);
-char* read_line(void* sock);
 int read_buf(void* sock,char* buf,int i);
 int antd_send( void *source, const void* data, int len);
 int antd_recv( void *source,  void* data, int len);

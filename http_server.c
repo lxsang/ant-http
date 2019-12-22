@@ -494,7 +494,7 @@ void *resolve_request(void *data)
 					}
 					else
 					{
-						i = HASHSIZE;
+						i = server_config.handlers->cap;
 						break;
 					}
 				}
@@ -536,6 +536,8 @@ void *resolve_request(void *data)
 		else
 		{
 			task->type = HEAVY;
+			//TODO empty the buff
+			while (read_buf(rq->client, path, sizeof(path)) > 0);;
 			task->handle = serve_file;
 		}
 		return task;
@@ -638,6 +640,7 @@ void *serve_file(void *data)
 	else*/
 	struct stat st;
 	int s = stat(path, &st);
+	
 	if(s == -1)
 	{
 		antd_error(rq->client, 404, "File not found");
@@ -758,7 +761,6 @@ void *decode_request_header(void *data)
 	// ip address
 	dput(xheader, "REMOTE_ADDR", (void *)strdup(((antd_client_t *)rq->client)->ip));
 	dput(xheader, "SERVER_PORT", (void *)__s("%d", ((antd_client_t *)rq->client)->port_config->port));
-	//while((line = read_line(client)) && strcmp("\r\n",line))
 	while ((read_buf(rq->client, buf, sizeof(buf))) && strcmp("\r\n", buf))
 	{
 		line = buf;
@@ -777,6 +779,20 @@ void *decode_request_header(void *data)
 		else if (token != NULL && strcasecmp(token, "Host") == 0)
 		{
 			host = strdup(line);
+		}
+	}
+	// check for content length size
+	line = (char *)dvalue(xheader, "Content-Length");
+	if (line)
+	{
+		int clen = atoi(line);
+		if(clen > server_config.max_upload_size)
+		{
+			antd_error(rq->client, 413, "Request body data is too large");
+			// dirty fix, wait for message to be sent
+			// 100 ms sleep
+			usleep(100000);
+			return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);;
 		}
 	}
 	//if(line) free(line);
@@ -879,7 +895,6 @@ void *decode_post_request(void *data)
 	}
 	else if (strstr(ctype, FORM_MULTI_PART))
 	{
-		//printf("Multi part form : %s\n", ctype);
 		free(task);
 		return decode_multi_part_request(rq, ctype);
 	} 
@@ -975,9 +990,9 @@ dictionary_t decode_cookie(const char *line)
 void *decode_multi_part_request(void *data, const char *ctype)
 {
 	char *boundary;
-	char *line;
-	char *str_copy = strdup(ctype);
-	char *orgcpy = str_copy;
+	char line[BUFFLEN];
+	char *str_copy = (char*)ctype;
+	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	task->priority++;
@@ -990,18 +1005,12 @@ void *decode_multi_part_request(void *data, const char *ctype)
 		trim(boundary, ' ');
 		dput(rq->request, "MULTI_PART_BOUNDARY", strdup(boundary));
 		//find first boundary
-		while ((line = read_line(rq->client)) && !strstr(line, boundary))
-		{
-			if (line)
-				free(line);
-		}
-		if (line)
+		while (( (len = read_buf(rq->client, line, sizeof(line))) > 0 ) && !strstr(line, boundary));
+		if (len > 0)
 		{
 			task->handle = decode_multi_part_request_data;
-			free(line);
 		}
 	}
-	free(orgcpy);
 	task->type = HEAVY;
 	return task;
 }
@@ -1009,12 +1018,12 @@ void *decode_multi_part_request_data(void *data)
 {
 	// loop through each part separated by the boundary
 	char *line;
-	char *orgline;
 	char *part_name = NULL;
 	char *part_file = NULL;
 	char *file_path;
 	char buf[BUFFLEN];
 	char *field;
+	int len;
 	//dictionary dic = NULL;
 	FILE *fp = NULL;
 	char *token, *keytoken, *valtoken;
@@ -1023,22 +1032,15 @@ void *decode_multi_part_request_data(void *data)
 	task->priority++;
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
-	char *boundend = __s("%s--", boundary);
 	// search for content disposition:
-	while ((line = read_line(rq->client)) &&
-		   !strstr(line, "Content-Disposition:"))
+	while ( ( (len = read_buf(rq->client, buf, sizeof(buf))) > 0 ) && !strstr(buf, "Content-Disposition:"));;
+
+	if (len <= 0 || !strstr(buf, "Content-Disposition:"))
 	{
-		free(line);
-		line = NULL;
-	}
-	if (!line || !strstr(line, "Content-Disposition:"))
-	{
-		if (line)
-			free(line);
-		free(boundend);
 		return task;
 	}
-	orgline = line;
+	char *boundend = __s("%s--", boundary);
+	line = buf;
 	// extract parameters from header
 	while ((token = strsep(&line, ";")))
 	{
@@ -1064,40 +1066,36 @@ void *decode_multi_part_request_data(void *data)
 			}
 		}
 	}
-	free(orgline);
 	line = NULL;
 	// get the binary data
 	if (part_name != NULL)
 	{
 		// go to the beginning of data bock
-		while ((line = read_line(rq->client)) && strcmp(line, "\r\n") != 0)
-		{
-			free(line);
-			line = NULL;
-		}
-		if (line)
-		{
-			free(line);
-			line = NULL;
-		}
+		while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && strcmp(buf, "\r\n") != 0);;
+
 		if (part_file == NULL)
 		{
 			/**
+			 *  WARNING:
 			 * This allow only 1024 bytes of data (max),
 			 * out of this range, the data is cut out.
 			 * Need an efficient way to handle this
 			 */
-			line = read_line(rq->client);
-			trim(line, '\n');
-			trim(line, '\r');
-			trim(line, ' ');
-			dput(dic, part_name, line);
-			// find the next boundary
-			while ((line = read_line(rq->client)) && !strstr(line, boundary))
+			len = read_buf(rq->client, buf, sizeof(buf));
+			if(len > 0)
 			{
-				free(line);
-				line = NULL;
+				line = buf;
+				trim(line, '\n');
+				trim(line, '\r');
+				trim(line, ' ');
+				dput(dic, part_name, strdup(line));
 			}
+			// find the next boundary
+			while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0  && !strstr(buf, boundary))
+			{
+				line = buf;
+			}
+
 		}
 		else
 		{
@@ -1121,7 +1119,7 @@ void *decode_multi_part_request_data(void *data)
 				int stat = ftruncate(fileno(fp), totalsize);
 				UNUSED(stat);
 				fclose(fp);
-				line = strdup(buf);
+				line = buf;
 
 				field = __s("%s.file", part_name);
 				dput(dic, field, strdup(part_file));
@@ -1150,7 +1148,6 @@ void *decode_multi_part_request_data(void *data)
 	if (line && strstr(line, boundend))
 	{
 		//LOG("End request %s", boundend);
-		free(line);
 		free(boundend);
 		return task;
 	}
@@ -1160,7 +1157,6 @@ void *decode_multi_part_request_data(void *data)
 		task->type = HEAVY;
 		task->handle = decode_multi_part_request_data;
 	}
-	free(line);
 	free(boundend);
 	return task;
 }

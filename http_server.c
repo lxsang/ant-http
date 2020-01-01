@@ -517,9 +517,13 @@ void *resolve_request(void *data)
 		if (strcmp(mime_type, "application/octet-stream") == 0)
 		{
 			char *ex = ext(path);
-			char *h = dvalue(server_config.handlers, ex);
+			//printf("Path: %s\n", path);
+			char *h = NULL;
 			if (ex)
+			{
+				h = dvalue(server_config.handlers, ex);
 				free(ex);
+			}
 			if (h)
 			{
 				//sprintf(path,"/%s%s",h,url);

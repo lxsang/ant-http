@@ -131,7 +131,7 @@ item_t list_item(int type)
 list_t split(const char* str, const char* delim)
 {
 	if(str == NULL || delim == NULL) return NULL;
-	char* str_cpy = str;
+	char* str_cpy = (char*)str;
 	char* token;
 	list_t l = list_init();
 	while((token = strsep(&str_cpy,delim)))

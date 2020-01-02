@@ -539,8 +539,27 @@ void *resolve_request(void *data)
 		else
 		{
 			task->type = HEAVY;
-			//TODO empty the buff
-			while (read_buf(rq->client, path, sizeof(path)) > 0);;
+		
+			// discard all request data
+			dictionary_t headers = (dictionary_t) dvalue(rq->request, "REQUEST_HEADER");
+			if(headers)
+			{
+				char * sclen = (char *)dvalue(headers, "Content-Length");
+				unsigned clen = 0;
+				unsigned read = 0;
+				int count;
+				if(sclen)
+				{
+					clen = atoi(sclen);
+					while (read < clen)
+					{
+						count = antd_recv(rq->client, path, sizeof(path) < clen ? sizeof(path): clen );
+						if(count <= 0)
+							break;
+						read += count;
+					}
+				}
+			}
 			task->handle = serve_file;
 		}
 		return task;

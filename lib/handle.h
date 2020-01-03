@@ -101,6 +101,10 @@ typedef struct  {
     int raw_body;
 } plugin_header_t;
 
+
+int __attribute__((weak)) require_plugin(const char*);
+
+
 void set_nonblock(int socket);
 //void set_block(int socket);
 

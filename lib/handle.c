@@ -70,6 +70,12 @@ static const char* S_511 =  "Network Authentication Required";
 static const char* S_UNOF =  "Unofficial Status";
 
 
+int require_plugin(const char* name)
+{
+	UNUSED(name);
+	return 0;
+}
+
 const char* get_status_str(int stat)
 {
 	switch(stat)

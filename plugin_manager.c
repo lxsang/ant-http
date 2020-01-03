@@ -18,6 +18,12 @@ struct plugin_entry *plugin_lookup(char *s)
     return NULL; /* not found */
 }
 
+int require_plugin(const char* name)
+{
+	struct plugin_entry* ptr = plugin_load((char*)name);
+	return ptr != NULL;
+}
+
 /**
  * Load a plugin to the plugin table
  * Only load when not available in the plugin table

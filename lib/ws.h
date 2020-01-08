@@ -73,6 +73,6 @@ char* get_ip_address();
 // client
 
 void ws_client_close(ws_client_t* wsclient);
-int ws_client_connect(ws_client_t* wsclient);
+int ws_client_connect(ws_client_t* wsclient,  port_config_t pcnf);
 int ws_open_handshake(ws_client_t* client);
 #endif

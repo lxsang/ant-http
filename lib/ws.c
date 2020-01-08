@@ -369,14 +369,10 @@ int request_socket(const char* ip, int port)
 
 void ws_client_close(ws_client_t* wsclient)
 {
-	int usessl = wsclient->antdsock->port_config->usessl;
-	port_config_t *ptr = wsclient->antdsock->port_config;
 	antd_close(wsclient->antdsock);
-	if(ptr)
-		free(ptr);
 
 #ifdef USE_OPENSSL
-	if(usessl)
+	if(wsclient->ssl_ctx)
 	{
 		if(wsclient->ssl_ctx)
 			SSL_CTX_free(wsclient->ssl_ctx);
@@ -389,34 +385,29 @@ void ws_client_close(ws_client_t* wsclient)
 		// DEPRECATED: ERR_remove_state(0);
 		ERR_free_strings();
 	}
-#else
-	UNUSED(usessl);
 #endif
 }
 
 //this is for the client side, not use for now
-int ws_client_connect(ws_client_t* wsclient)
+int ws_client_connect(ws_client_t* wsclient, port_config_t pcnf)
 {
     char ip[100];
 	int stat = ip_from_hostname(wsclient->host,ip);
 	if(stat == -1)
 		return -1;
-	int sock = request_socket(ip, wsclient->antdsock->port_config->port);
+	int sock = request_socket(ip, pcnf.port);
 	if(sock <= 0)
 	{
 		ERROR("Cannot request socket");
 		return -1;
 	}
 	// will be free
-	wsclient->antdsock->ip =  strdup(ip);
 	wsclient->antdsock->sock = sock;
 	wsclient->antdsock->status = 0;
 	wsclient->antdsock->last_io = time(NULL);
-	wsclient->antdsock->port_config->sock = -1;
-	wsclient->antdsock->port_config->rules = NULL;
-	wsclient->antdsock->port_config->htdocs = NULL;
+	wsclient->antdsock->zstream = NULL;
 #ifdef USE_OPENSSL
-	if(wsclient->antdsock->port_config->usessl)
+	if(pcnf.usessl)
 	{
 		SSL_library_init();
 		SSL_load_error_strings();

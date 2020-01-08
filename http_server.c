@@ -85,6 +85,8 @@ void destroy_config()
 		free(server_config.tmpdir);
 	if(server_config.ssl_cipher)
 		free(server_config.ssl_cipher);
+	if(server_config.gzip_types)
+		list_free(&server_config.gzip_types);
 	if(server_config.errorfp)
 	{
 		fclose(server_config.errorfp);
@@ -162,6 +164,16 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->errorfp = fopen(value, "w");
 	}
+#ifdef USE_ZLIB
+	else if (MATCH("SERVER", "gzip_enable"))
+	{
+		pconfig->gzip_enable = atoi(value);
+	}
+	else if (MATCH("SERVER", "gzip_types"))
+	{
+		pconfig->gzip_types = split(value,",");
+	}
+#endif
 #ifdef DEBUG
 	else if (MATCH("SERVER", "server_log"))
 	{
@@ -279,6 +291,8 @@ void load_config(const char *file)
 	server_config.sslcert = "cert.pem";
 	server_config.sslkey = "key.pem";
 	server_config.ssl_cipher = NULL;
+	server_config.gzip_enable = 0;
+	server_config.gzip_types = NULL;
 	// put it default mimes
 	for(int i = 0; _mimes[i].type != NULL; i++)
 	{
@@ -349,7 +363,7 @@ void *accept_request(void *data)
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
 	int ret = -1, stat;
-	if (client->port_config->usessl == 1 && client->status == 0)
+	if (client->ssl && client->status == 0)
 	{
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
@@ -451,7 +465,7 @@ void *resolve_request(void *data)
 	char *newurl = NULL;
 	char *rqp = NULL;
 	char *oldrqp = NULL;
-	strcpy(path, rq->client->port_config->htdocs);
+	htdocs(rq, path);
 	strcat(path, url);
 	//LOG("Path is : %s", path);
 	//if (path[strlen(path) - 1] == '/')
@@ -484,7 +498,7 @@ void *resolve_request(void *data)
 				{
 					newurl = __s("%s/index.%s", url, it->key);
 					memset(path, 0, sizeof(path));
-					strcat(path, rq->client->port_config->htdocs);
+					htdocs(rq,path);
 					strcat(path, newurl);
 					if (stat(path, &st) != 0)
 					{
@@ -775,15 +789,12 @@ void *decode_request_header(void *data)
 	char *host = NULL;
 	char buf[2 * BUFFLEN];
 	char *url = (char *)dvalue(rq->request, "REQUEST_QUERY");
-	dictionary_t xheader = dict();
-	dictionary_t request = dict();
-	dput(rq->request, "REQUEST_HEADER", xheader);
-	dput(rq->request, "REQUEST_DATA", request);
+	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
+	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
+	char* port_s = (char*) dvalue(xheader, "SERVER_PORT");
+	port_config_t* pcnf = (port_config_t*)dvalue(server_config.ports, port_s);
 	// first real all header
 	// this for check if web socket is enabled
-	// ip address
-	dput(xheader, "REMOTE_ADDR", (void *)strdup(((antd_client_t *)rq->client)->ip));
-	dput(xheader, "SERVER_PORT", (void *)__s("%d", ((antd_client_t *)rq->client)->port_config->port));
 	while ((read_buf(rq->client, buf, sizeof(buf))) && strcmp("\r\n", buf))
 	{
 		line = buf;
@@ -796,8 +807,11 @@ void *decode_request_header(void *data)
 			dput(xheader, token, strdup(line));
 		if (token != NULL && strcasecmp(token, "Cookie") == 0)
 		{
-			if (!cookie)
-				cookie = decode_cookie(line);
+			if(!cookie)
+			{
+				cookie = dict();
+			}
+			decode_cookie(line, cookie);
 		}
 		else if (token != NULL && strcasecmp(token, "Host") == 0)
 		{
@@ -818,11 +832,35 @@ void *decode_request_header(void *data)
 			return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);;
 		}
 	}
+
+#ifdef USE_ZLIB
+	// check for gzip
+	line = (char *)dvalue(xheader, "Accept-Encoding");
+	if(line)
+	{
+		if(regex_match("gzip",line,0, NULL))
+		{
+			rq->client->z_level = ANTD_CGZ;
+		}
+		else if(regex_match("deflate", line, 0, NULL))
+		{
+			rq->client->z_level = ANTD_CDEFL;
+		}
+		else
+		{
+			rq->client->z_level = ANTD_CNONE;
+		}
+	}
+	else
+	{
+		rq->client->z_level = ANTD_CNONE;
+	}
+#endif
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
 	LOG("Original query: %s", url);
-	query = apply_rules(rq->client->port_config->rules, host, buf);
+	query = apply_rules(pcnf->rules, host, buf);
 	LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
@@ -982,7 +1020,7 @@ void ws_confirm_request(void *client, const char *key)
  * @param  client The client socket
  * @return        The Dictionary socket or NULL
  */
-dictionary_t decode_cookie(const char *line)
+void decode_cookie(const char *line, dictionary_t dic)
 {
 	char *token, *token1;
 	char *cpstr = strdup(line);
@@ -991,20 +1029,16 @@ dictionary_t decode_cookie(const char *line)
 	trim(cpstr, '\n');
 	trim(cpstr, '\r');
 
-	dictionary_t dic = NULL;
 	while ((token = strsep(&cpstr, ";")))
 	{
 		trim(token, ' ');
 		token1 = strsep(&token, "=");
 		if (token1 && token && strlen(token) > 0)
 		{
-			if (dic == NULL)
-				dic = dict();
 			dput(dic, token1, strdup(token));
 		}
 	}
 	free(orgcpy);
-	return dic;
 }
 /**
  * Decode the multi-part form data from the POST request
@@ -1319,3 +1353,34 @@ dictionary_t mimes_list()
 {
 	return server_config.mimes;
 }
+
+
+void  dbdir(char* dest)
+{
+	strcpy(dest,server_config.db_path);
+}
+void  tmpdir(char* dest)
+{
+	strcpy(dest, server_config.tmpdir);
+}
+void  plugindir(char* dest)
+{
+	strcpy(dest, server_config.plugins_dir);
+}
+
+#ifdef USE_ZLIB
+int  compressable(char* ctype)
+{
+	if(!server_config.gzip_enable || server_config.gzip_types == NULL)
+		return ANTD_CNONE;
+	item_t it;
+	list_for_each(it, server_config.gzip_types)
+	{
+		if(it->type == LIST_TYPE_POINTER && it->value.ptr && regex_match((const char*)it->value.ptr, ctype, 0, NULL))
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+#endif

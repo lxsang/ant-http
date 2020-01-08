@@ -39,7 +39,7 @@ void* decode_post_request(void* data);
 void* resolve_request(void* data);
 void* decode_multi_part_request(void*,const char*);
 void* decode_multi_part_request_data(void* data);
-dictionary_t decode_cookie(const char*);
+void decode_cookie(const char*, dictionary_t d);
 char* post_data_decode(void*,int);
 void set_nonblock(int);
 void* execute_plugin(void* data, const char *path);

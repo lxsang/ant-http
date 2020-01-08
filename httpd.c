@@ -234,16 +234,23 @@ int main(int argc, char* argv[])
 						antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
 						request->client = client;
 						request->request = dict();
-						client->port_config = pcnf;
+						client->zstream = NULL;
+						client->z_level = ANTD_CNONE;
+						
+						dictionary_t xheader = dict();
+						dput(request->request, "REQUEST_HEADER", xheader);
+						dput(request->request, "REQUEST_DATA", dict());
+						dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
+						dput(xheader, "SERVER_WWW_ROOT", (void*)strdup(pcnf->htdocs));
 						/*
 							get the remote IP
 						*/
-						client->ip = NULL;
 						if (client_name.sin_family == AF_INET)
 						{
 							client_ip =  inet_ntoa(client_name.sin_addr);
-							client->ip = strdup(client_ip);
 							LOG("Connect to client IP: %s on port:%d", client_ip, pcnf->port);
+							// ip address
+							dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
 							//LOG("socket: %d\n", client_sock);
 						}
 
@@ -261,8 +268,8 @@ int main(int argc, char* argv[])
 						*/
 						client->sock = client_sock;
 						time(&client->last_io);
-	#ifdef USE_OPENSSL
 						client->ssl = NULL;
+	#ifdef USE_OPENSSL
 						client->status = 0;
 						if(pcnf->usessl == 1)
 						{

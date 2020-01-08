@@ -76,6 +76,34 @@ int require_plugin(const char* name)
 	return 0;
 }
 
+int  compressable(char* ctype)
+{
+	UNUSED(ctype);
+	return 0;
+}
+
+void htdocs(antd_request_t* rq, char* dest)
+{
+	dictionary_t xheader = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
+	char* www = (char*)dvalue(xheader, "SERVER_WWW_ROOT");
+	if(www)
+	{
+		strcpy(dest,www);
+	}
+}
+void  dbdir(char* dest)
+{
+	UNUSED(dest);
+}
+void  tmpdir(char* dest)
+{
+	UNUSED(dest);
+}
+void  plugindir(char* dest)
+{
+	UNUSED(dest);
+}
+
 const char* get_status_str(int stat)
 {
 	switch(stat)
@@ -150,10 +178,72 @@ const char* get_status_str(int stat)
 	}
 }
 
-void antd_send_header(void* client, antd_response_header_t* res)
+void antd_send_header(void* cl, antd_response_header_t* res)
 {
 	if(!res->header)
 		res->header = dict();
+	antd_client_t* client = (antd_client_t*) cl;
+#ifdef USE_ZLIB
+	char* str = dvalue(res->header,"Content-Encoding");
+	if(!str)
+	{
+		// check for compress
+		str = dvalue(res->header,"Content-Type");
+		if(str)
+		{
+			if(compressable(str))
+			{
+				switch (client->z_level)
+				{
+				case ANTD_CGZ:
+					client->zstream = (z_stream *) malloc(sizeof(z_stream));
+					if(client->zstream)
+					{
+						((z_stream*)client->zstream)->zalloc = Z_NULL;
+						((z_stream*)client->zstream)->zfree = Z_NULL;
+						((z_stream*)client->zstream)->opaque = Z_NULL;
+						if(deflateInit2(client->zstream,Z_BEST_COMPRESSION,Z_DEFLATED,15 | 16, 8,Z_DEFAULT_STRATEGY) != Z_OK)
+						{
+							ERROR("Cannot init gzip stream");
+							free(client->zstream);
+							client->zstream = NULL;
+						}
+						else
+						{
+							client->status = Z_NO_FLUSH;
+							dput(res->header,"Content-Encoding", strdup("gzip"));
+						}
+					}
+					break;
+				
+				case ANTD_CDEFL:
+					client->zstream = (z_stream *) malloc(sizeof(z_stream));
+					if(client->zstream)
+					{
+						((z_stream*)client->zstream)->zalloc = Z_NULL;
+						((z_stream*)client->zstream)->zfree = Z_NULL;
+						((z_stream*)client->zstream)->opaque = Z_NULL;
+						if(deflateInit(client->zstream, Z_BEST_COMPRESSION) != Z_OK)
+						{
+							ERROR("Cannot init deflate stream");
+							free(client->zstream);
+							client->zstream = NULL;
+						}
+						else
+						{
+							client->status = Z_NO_FLUSH;
+							dput(res->header,"Content-Encoding", strdup("deflate"));
+						}
+					}
+					break;
+
+				default:
+					break;
+				}
+			}
+		}
+	}
+#endif
 	dput(res->header,"Server", strdup(SERVER_NAME));
 	const char* stat_str = get_status_str(res->status);
 	__t(client, "HTTP/1.1 %d %s", res->status, stat_str);
@@ -191,16 +281,57 @@ void octstream(void* client, char* name)
 	//Content-Disposition: attachment; filename="fname.ext"
 }*/
 
-int antd_send(void *src, const void* data, int len)
+#ifdef USE_ZLIB
+int zcompress(antd_client_t * cl, uint8_t* data, int len, uint8_t* dest)
 {
-	if(!src || !data) return -1;
-	int written;
+	z_stream* zstream = (z_stream*) cl->zstream;
+	zstream->avail_in = (uInt)len;
+	zstream->next_in = (Bytef *)data;
+	zstream->avail_out = len;
+	zstream->next_out = dest;
+	if(deflate(zstream, cl->status) == Z_STREAM_ERROR)
+	{
+		free(dest);
+		return -1;
+	}
+	return zstream->total_out;
+}
+#endif
+
+
+int antd_send(void *src, const void* data_in, int len_in)
+{
+	uint8_t* data = (uint8_t*)data_in;
+	int len = len_in;
 	antd_client_t * source = (antd_client_t *) src;
+
+#ifdef USE_ZLIB
+
+	if(source->zstream && source->z_level != ANTD_CNONE)
+	{
+		data = (uint8_t*) malloc(len);
+		if(data)
+		{
+			len = zcompress(source,data_in, len, data);
+		}
+	}
+#endif
+
+	if(!src || !data)
+	{
+#ifdef USE_ZLIB
+	if(source->zstream && source->z_level != ANTD_CNONE && data)
+		free(data);
+#endif	
+		return -1;
+	}
+	int written;
 	char* ptr;
 	int writelen = 0;
 	int  count;
+
 #ifdef USE_OPENSSL
-	if(source->port_config->usessl)
+	if(source->ssl)
 	{
 		//LOG("SSL WRITE\n");
 		//ret = SSL_write((SSL*) source->ssl, data, len);
@@ -334,6 +465,10 @@ int antd_send(void *src, const void* data, int len)
 	{
 		antd_close(src);
 	}*/
+#ifdef USE_ZLIB
+	if(source->zstream && source->z_level != ANTD_CNONE && data)
+		free(data);
+#endif
 	return written;
 }
 int antd_recv(void *src,  void* data, int len)
@@ -345,7 +480,7 @@ int antd_recv(void *src,  void* data, int len)
 	int readlen=0;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(source->port_config->usessl)
+	if(source->ssl)
 	{
 		ptr = (char* )data;
 		readlen = len > BUFFLEN?BUFFLEN:len;
@@ -517,8 +652,32 @@ int antd_close(void* src)
 {
 	if(!src) return -1;
 	antd_client_t * source = (antd_client_t *) src;
+#ifdef USE_ZLIB
+	//TODO: send finish data to the socket before quit
+	if(source->zstream)
+	{
+		printf("Close the stream now\n");
+		if(source->status == Z_NO_FLUSH)
+		{
+			uint8_t buf[512];
+			// send finish data
+			z_stream* zstream = (z_stream*) cl->zstream;
+			source->status = Z_FINISH;
+
+			zstream->avail_in = 0;
+			zstream->next_in = "";
+			zstream->avail_out = 512;
+			zstream->next_out = buf;
+			
+			antd_send(source,"", 0);
+			deflateEnd(source->zstream);	
+		}
+		deflateEnd(source->zstream);
+		free(source->zstream);
+	}
+#endif
 #ifdef USE_OPENSSL
-	if(source->port_config->usessl && source->ssl){
+	if(source->ssl){
 		//printf("SSL:Shutdown ssl\n");
         //SSL_shutdown((SSL*) source->ssl);
 		SSL_set_shutdown((SSL*) source->ssl, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
@@ -536,7 +695,6 @@ int antd_close(void* src)
 #endif
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->sock);
-	if(source->ip) free(source->ip);	
 	free(src);
 	src = NULL;
 	return ret;

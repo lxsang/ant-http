@@ -9,9 +9,13 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
+#ifdef USE_ZLIB
+#include <zlib.h>
+#endif
 #ifdef USE_DB
 #include "dbhelper.h"
 #endif
+
 #include <fcntl.h>
 #include <stdlib.h>
 #include "dictionary.h"
@@ -30,6 +34,9 @@
 #define FORM_MULTI_PART  "multipart/form-data"
 #define MAX_IO_WAIT_TIME 5 // second
 
+
+typedef enum {ANTD_CGZ, ANTD_CDEFL, ANTD_CNONE} antd_compress_t;
+
 //extern config_t server_config;
 
 typedef struct {
@@ -43,12 +50,11 @@ typedef struct {
 typedef struct{
     int sock;
     void* ssl;
-    char* ip;
-//#ifdef USE_OPENSSL
     int status;
-//#endif
     time_t last_io;
-    port_config_t* port_config;
+    // compress
+    antd_compress_t z_level;
+    void* zstream;
 } antd_client_t;
 
 typedef struct {
@@ -79,31 +85,37 @@ typedef struct  {
     int connection;
     int n_workers;
     int max_upload_size;
+    // log
     FILE* errorfp;
-// #ifdef DEBUG
     FILE* logfp;
-// #endif
-// #ifdef USE_OPENSSL
+    // ssl
     int enable_ssl;
     char* sslcert;
     char* sslkey;
     char* ssl_cipher;
+    int gzip_enable;
+    list_t gzip_types;
     dictionary_t mimes;
     dictionary_t ports;
 // #endif
 }config_t;
 
 typedef struct  { 
-    char *name; 
-    char *dbpath;
-    char *tmpdir;
-    char*pdir;
+    char name[128]; 
+    char dbpath[512];
+    char tmpdir[512];
+    char pdir[512];
     int raw_body;
 } plugin_header_t;
 
 
 int __attribute__((weak)) require_plugin(const char*);
+void __attribute__((weak)) htdocs(antd_request_t* rq, char* dest);
+void __attribute__((weak)) dbdir(char* dest);
+void __attribute__((weak)) tmpdir(char* dest);
+void __attribute__((weak)) plugindir(char* dest);
 
+int __attribute__((weak)) compressable(char* ctype);
 
 void set_nonblock(int socket);
 //void set_block(int socket);

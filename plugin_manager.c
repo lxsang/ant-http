@@ -66,7 +66,7 @@ void * plugin_from_file(char* name)
 	void *lib_handle;
   char* error;
   char* path = __s("%s%s%s",config()->plugins_dir,name,config()->plugins_ext);
-  void (*fn)(const char*, config_t*);
+  void (*fn)(const char*);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 
    {
@@ -76,11 +76,11 @@ void * plugin_from_file(char* name)
       return NULL;
    }
    // set database path
-   fn = (void (*)(const char *, config_t*))dlsym(lib_handle, "__init_plugin__");
+   fn = (void (*)(const char *))dlsym(lib_handle, "__init_plugin__");
   if ((error = dlerror()) != NULL)  
   		ERROR("Problem when finding plugin init function for %s : %s", name,error);
   else
-	(*fn)(name,config()); 
+	(*fn)(name); 
   if(path)
 	free(path);
    return lib_handle;

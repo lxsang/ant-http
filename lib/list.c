@@ -136,9 +136,10 @@ list_t split(const char* str, const char* delim)
 	list_t l = list_init();
 	while((token = strsep(&str_cpy,delim)))
 	{
+		trim(token, ' ');
 		if(strlen(token) > 0) 
 		{
-			list_put_special(&l,token);
+			list_put_special(&l, token);
 		}
 	}
 	if(l->type== LIST_TYPE_NIL)

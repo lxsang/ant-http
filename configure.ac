@@ -50,6 +50,22 @@ AC_CHECK_LIB([dl], [dlopen], [], [
   AC_MSG_ERROR([unable to find dlopen()])
 ])
 
+
+# check for zlib
+use_zlib=no
+# check if libssl header exists
+AC_CHECK_HEADER([zlib.h],[
+    # check if the library exists
+    AC_DEFINE([USE_ZLIB], [1],[Use zlib])
+    use_zlib=yes
+], [])
+AC_CHECK_LIB([z],[deflate],[], [
+    if test "$use_zlib" = "yes"; then
+        AC_MSG_ERROR([Unable to find zlib shared library])
+    fi
+])
+
+
 AC_DEFINE([_GNU_SOURCE], [1],[Use GNU source])
 # AC_CANONICAL_HOST is needed to access the 'host_os' variable    
 

@@ -20,8 +20,6 @@ sqldb getdb();
 sqldb __getdb(char *name);
 #endif
 
-char* route(const char*);
-char* htdocs(const char*);
 char* config_dir();
 /*Default function for plugin*/
 // init the plugin
@@ -37,11 +35,11 @@ STATIC PART, should be included in any plugin
 #ifdef PLUGIN_IMPLEMENT
 static plugin_header_t __plugin__;
 // private function
-void __init_plugin__(const char* pl,config_t* conf){
-	__plugin__.name = strdup(pl);
-	__plugin__.dbpath= conf->db_path;
-	__plugin__.pdir = conf->plugins_dir;
-	__plugin__.tmpdir = conf->tmpdir; 
+void __init_plugin__(const char* pl){
+	strcpy(__plugin__.name,pl);
+	dbdir(__plugin__.dbpath);
+	plugindir(__plugin__.pdir);
+	tmpdir(__plugin__.tmpdir); 
 	__plugin__.raw_body = 0;
 	init();
 }; 
@@ -72,26 +70,6 @@ plugin_header_t* meta()
 {
 	return &__plugin__;
 }
-char* route(const char* repath)
-{
-	int len = strlen(__plugin__.name) + 2;
-	if(repath != NULL)
-		len += strlen(repath)+1;
-	char * path = (char*) malloc(len*sizeof(char));
-	strcpy(path,"/");
-	strcat(path,__plugin__.name);
-	if(repath != NULL)
-	{
-		strcat(path,"/");
-		strcat(path,repath);
-	}
-	return path;
-}
-
-const char* tmpdir()
-{
-	return (const char*) __plugin__.tmpdir;
-}
 
 char* config_dir()
 {
@@ -105,11 +83,6 @@ char* config_dir()
 void __release__()
 {
 	destroy();
-	LOG("Releasing plugin\n");
-	if(__plugin__.name) free(__plugin__.name);
-	//if(__plugin__.dbpath) free(__plugin__.dbpath);
-	//if(__plugin__.htdocs) free(__plugin__.htdocs);
-	//if(__plugin__.pdir) free(__plugin__.pdir);
 }
 #endif
 #endif

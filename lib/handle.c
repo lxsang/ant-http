@@ -456,14 +456,7 @@ int antd_send(void *src, const void* data_in, int len_in)
 #ifdef USE_OPENSSL
 	}
 #endif
-	/*if(ret <= 0)
-	{
-		antd_close(src);
-	}*/
-#ifdef USE_ZLIB
-	if(source->zstream && source->z_level != ANTD_CNONE && data)
-		free(data);
-#endif
+	
 	return written;
 }
 int antd_recv(void *src,  void* data, int len)

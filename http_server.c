@@ -691,7 +691,8 @@ void *serve_file(void *data)
 		rhd.status = 200;
 		rhd.header = dict();
 		dput(rhd.header, "Content-Type", strdup(mime_type));
-		dput(rhd.header, "Content-Length", strdup(ibuf));
+		if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
+			dput(rhd.header, "Content-Length", strdup(ibuf));
 		antd_send_header(rq->client, &rhd);
 
 		__f(rq->client, path);
@@ -1372,7 +1373,7 @@ void  plugindir(char* dest)
 int  compressable(char* ctype)
 {
 	if(!server_config.gzip_enable || server_config.gzip_types == NULL)
-		return ANTD_CNONE;
+		return 0;
 	item_t it;
 	list_for_each(it, server_config.gzip_types)
 	{

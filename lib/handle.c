@@ -184,6 +184,7 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 		res->header = dict();
 	antd_client_t* client = (antd_client_t*) cl;
 #ifdef USE_ZLIB
+	antd_compress_t current_zlevel = client->z_level;
 	char* str = dvalue(res->header,"Content-Encoding");
 	if(!str)
 	{
@@ -191,17 +192,16 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 		str = dvalue(res->header,"Content-Type");
 		if(str)
 		{
-			if(compressable(str))
+			if(compressable(str) && client->z_level != ANTD_CNONE)
 			{
-				switch (client->z_level)
+				client->zstream = (z_stream *) malloc(sizeof(z_stream));
+				if(client->zstream)
 				{
-				case ANTD_CGZ:
-					client->zstream = (z_stream *) malloc(sizeof(z_stream));
-					if(client->zstream)
+					((z_stream*)client->zstream)->zalloc = Z_NULL;
+					((z_stream*)client->zstream)->zfree = Z_NULL;
+					((z_stream*)client->zstream)->opaque = Z_NULL;
+					if(client->z_level == ANTD_CGZ)
 					{
-						((z_stream*)client->zstream)->zalloc = Z_NULL;
-						((z_stream*)client->zstream)->zfree = Z_NULL;
-						((z_stream*)client->zstream)->opaque = Z_NULL;
 						if(deflateInit2(client->zstream,Z_BEST_COMPRESSION,Z_DEFLATED,15 | 16, 8,Z_DEFAULT_STRATEGY) != Z_OK)
 						{
 							ERROR("Cannot init gzip stream");
@@ -214,15 +214,8 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 							dput(res->header,"Content-Encoding", strdup("gzip"));
 						}
 					}
-					break;
-				
-				case ANTD_CDEFL:
-					client->zstream = (z_stream *) malloc(sizeof(z_stream));
-					if(client->zstream)
+					else
 					{
-						((z_stream*)client->zstream)->zalloc = Z_NULL;
-						((z_stream*)client->zstream)->zfree = Z_NULL;
-						((z_stream*)client->zstream)->opaque = Z_NULL;
 						if(deflateInit(client->zstream, Z_BEST_COMPRESSION) != Z_OK)
 						{
 							ERROR("Cannot init deflate stream");
@@ -235,14 +228,11 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 							dput(res->header,"Content-Encoding", strdup("deflate"));
 						}
 					}
-					break;
-
-				default:
-					break;
 				}
 			}
 		}
 	}
+	client->z_level  = ANTD_CNONE;
 #endif
 	dput(res->header,"Server", strdup(SERVER_NAME));
 	const char* stat_str = get_status_str(res->status);
@@ -267,6 +257,9 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 		res->cookie = NULL;
 	}
 	__b(client, (unsigned char*)"\r\n", 2);
+#ifdef USE_ZLIB
+	client->z_level = current_zlevel;
+#endif
 	freedict(res->header);
 	res->header = NULL;
 }
@@ -281,23 +274,6 @@ void octstream(void* client, char* name)
 	//Content-Disposition: attachment; filename="fname.ext"
 }*/
 
-#ifdef USE_ZLIB
-int zcompress(antd_client_t * cl, uint8_t* data, int len, uint8_t* dest)
-{
-	z_stream* zstream = (z_stream*) cl->zstream;
-	zstream->avail_in = (uInt)len;
-	zstream->next_in = (Bytef *)data;
-	zstream->avail_out = len;
-	zstream->next_out = dest;
-	if(deflate(zstream, cl->status) == Z_STREAM_ERROR)
-	{
-		free(dest);
-		return -1;
-	}
-	return zstream->total_out;
-}
-#endif
-
 
 int antd_send(void *src, const void* data_in, int len_in)
 {
@@ -306,25 +282,44 @@ int antd_send(void *src, const void* data_in, int len_in)
 	antd_client_t * source = (antd_client_t *) src;
 
 #ifdef USE_ZLIB
-
 	if(source->zstream && source->z_level != ANTD_CNONE)
 	{
-		data = (uint8_t*) malloc(len);
-		if(data)
+		antd_compress_t current_zlevel = source->z_level;
+		source->z_level = ANTD_CNONE;
+		uint8_t buf[BUFFLEN];
+		z_stream* zstream = (z_stream*) source->zstream;
+		zstream->avail_in = (uInt)len;
+		zstream->next_in = (Bytef *)data_in;
+		len = 0;
+		int have = 0;
+		do
 		{
-			len = zcompress(source,data_in, len, data);
-		}
+			zstream->avail_out = BUFFLEN;
+			zstream->next_out = buf;
+			if(deflate(zstream, source->status) == Z_STREAM_ERROR)
+			{
+				source->z_level = current_zlevel;
+				data = NULL;
+				return -1;
+			}
+			else
+			{
+				have = BUFFLEN - zstream->avail_out;
+				antd_send(source, buf, have);
+				len += have;
+			}
+		} while(zstream->avail_out == 0);
+		source->z_level = current_zlevel;
+		//printf("data length %d\n", len);
+		return len;
 	}
 #endif
 
 	if(!src || !data)
-	{
-#ifdef USE_ZLIB
-	if(source->zstream && source->z_level != ANTD_CNONE && data)
-		free(data);
-#endif	
+	{	
 		return -1;
 	}
+
 	int written;
 	char* ptr;
 	int writelen = 0;
@@ -656,24 +651,15 @@ int antd_close(void* src)
 	//TODO: send finish data to the socket before quit
 	if(source->zstream)
 	{
-		printf("Close the stream now\n");
-		if(source->status == Z_NO_FLUSH)
+		if(source->status == Z_NO_FLUSH && source->z_level != ANTD_CNONE)
 		{
-			uint8_t buf[512];
-			// send finish data
-			z_stream* zstream = (z_stream*) cl->zstream;
 			source->status = Z_FINISH;
-
-			zstream->avail_in = 0;
-			zstream->next_in = "";
-			zstream->avail_out = 512;
-			zstream->next_out = buf;
-			
-			antd_send(source,"", 0);
-			deflateEnd(source->zstream);	
+			antd_send(source, "", 0);
 		}
 		deflateEnd(source->zstream);
 		free(source->zstream);
+		source->zstream = NULL;
+		source->z_level = ANTD_CNONE;
 	}
 #endif
 #ifdef USE_OPENSSL
@@ -725,11 +711,10 @@ int __t(void* client, const char* fstring,...)
 }
 int __b(void* client, const unsigned char* data, int size)
 {
-	char buf[BUFFLEN];
 	int sent = 0;
 	int buflen = 0;
 	int nbytes = 0;
-
+	char* ptr = (char*)data;
 	/*if(size <= BUFFLEN)
 	{
 		nbytes = antd_send(client,data,size);
@@ -743,13 +728,13 @@ int __b(void* client, const unsigned char* data, int size)
 				buflen = BUFFLEN;
 			else
 				buflen = size - sent;
-			memcpy(buf,data+sent,buflen);
-			nbytes = antd_send(client,buf,buflen);
+			nbytes = antd_send(client,ptr,buflen);
 			if(nbytes == -1)
 			{
 				return 0;
 			}
-			sent += nbytes;
+			sent += buflen;
+			ptr += buflen;
 		}	
 	//}
 	return 1;
@@ -768,7 +753,7 @@ int __f(void* client, const char* file)
 	while(!feof(ptr))
 	{
 		size = fread(buffer,1,BUFFLEN,ptr);
-		if(!__b(client,buffer,size)) return 0;
+		if(antd_send(client,buffer,size) == -1) return 0;
 	}
 	fclose(ptr);
 	return 1;
@@ -809,7 +794,8 @@ void antd_error(void* client, int status, const char* msg)
 	rsh.cookie = NULL;
 	const char* stat_str = get_status_str(status);
 	rsh.status = status;
-	dput(rsh.header, "Content-Type", strdup("text/html; charset=utf-8"));
+	char* ctype = "text/html; charset=utf-8";
+	dput(rsh.header, "Content-Type", strdup(ctype));
 	char * res_str = __s(HTML_TPL, stat_str, msg);
 	int clen = 0;
 	if(res_str)
@@ -818,7 +804,8 @@ void antd_error(void* client, int status, const char* msg)
 	}
 	char ibuf[20];
     snprintf (ibuf, sizeof(ibuf), "%d",clen);
-	dput(rsh.header, "Content-Length", strdup(ibuf));
+	if(((antd_client_t*)client)->z_level == ANTD_CNONE || !compressable(ctype))
+		dput(rsh.header, "Content-Length", strdup(ibuf));
 	antd_send_header(client, &rsh);
 	if(res_str)
 	{

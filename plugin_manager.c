@@ -36,13 +36,15 @@ struct plugin_entry *plugin_load(char *name)
     unsigned hashval;
     if ((np = plugin_lookup(name)) == NULL) { /* not found */
         np = (struct plugin_entry *) malloc(sizeof(*np));
-        if (np == NULL || (np->pname = strdup(name)) == NULL)
+        if (np == NULL || name == NULL)
         {
 			if(np) free(np);
 			return NULL;
 		}
+		np->pname = strdup(name);
         if ((np->handle = plugin_from_file(name)) == NULL)
 		{
+			if(np->pname) free(np->pname);
 			if(np) free(np);
        		return NULL;
 		}
@@ -102,7 +104,8 @@ void unload_plugin(struct plugin_entry* np)
 	}
 	dlclose(np->handle);
 	//free((void *) np->handle);
-	free((void *) np->pname);
+	if(np->pname)
+		free((void *) np->pname);
 }
 /*
 	Unload a plugin by its name

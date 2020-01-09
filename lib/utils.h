@@ -105,4 +105,5 @@ int _exist(const char* f);
 void md5(uint8_t *, size_t , char*);
 void sha1(const char*, char*);
 void digest_to_hex(const uint8_t *, char *);
+void verify_header(char* k);
 #endif

@@ -805,7 +805,10 @@ void *decode_request_header(void *data)
 		trim(token, ' ');
 		trim(line, ' ');
 		if (token && line && strlen(line) > 0)
+		{
+			verify_header(token);
 			dput(xheader, token, strdup(line));
+		}
 		if (token != NULL && strcasecmp(token, "Cookie") == 0)
 		{
 			if(!cookie)

@@ -187,7 +187,7 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 	antd_compress_t current_zlevel = client->z_level;
 	char* str = dvalue(res->header,"Content-Encoding");
 	if(!str)
-	{
+	{		
 		// check for compress
 		str = dvalue(res->header,"Content-Type");
 		if(str)
@@ -310,7 +310,6 @@ int antd_send(void *src, const void* data_in, int len_in)
 			}
 		} while(zstream->avail_out == 0);
 		source->z_level = current_zlevel;
-		//printf("data length %d\n", len);
 		return len;
 	}
 #endif

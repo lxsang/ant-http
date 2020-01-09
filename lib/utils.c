@@ -149,6 +149,21 @@ mime_t mime_from_ext(const char* ex)
     }
     return ret;
 }
+
+void verify_header(char* k)
+{
+    k[0] = toupper(k[0]);
+    int len = strlen(k);
+    for (int i = 0; i < len; i++)
+    {
+        if(k[i] == '-' && i < len-1)
+        {
+            k[i+1] = toupper(k[i+1]);
+        }
+    }
+    
+}
+
 dictionary_t mimes_list()
 {
     return NULL;

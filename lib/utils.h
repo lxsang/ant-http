@@ -56,12 +56,12 @@ THE SOFTWARE.
 #define false 0
 
 #ifdef DEBUG
-	#define LOG(a,...) server_log("%s: [%s: %d]: " a "\n",server_time(), __FILE__, \
+	#define LOG(a,...) server_log(": [%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 #else
     #define LOG(a,...) do{}while(0)
 #endif
-#define ERROR(a,...) error_log("%s: [%s: %d]: " a "\n", server_time() , __FILE__, \
+#define ERROR(a,...) error_log(": [%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 // add this to the utils
 #define UNUSED(x) (void)(x)
@@ -83,8 +83,8 @@ dictionary_t __attribute__((weak)) mimes_list();
 char* __s(const char*,...);
 void trim(char*,const char);
 void removeAll(const char* path,int mode);
-char* __time(time_t time);
-char* server_time();
+void timestr(time_t time, char* buf,int len,char* format, int gmt);
+void server_time(char* , int );
 char* ext(const char*);
 char* mime(const char*);
 int match_int(const char*);

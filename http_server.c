@@ -39,6 +39,9 @@ void error_log(const char* fmt, ...)
     	va_end(arguments); 
     	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
     	{
+			char buf[64];
+			server_time(buf,64);
+			fwrite(buf,strlen(buf),1,server_config.errorfp);
 			va_start(arguments, fmt);
 			vsnprintf(data, dlen, fmt, arguments);
 			va_end(arguments);
@@ -62,6 +65,9 @@ void server_log(const char* fmt, ...)
     	va_end(arguments); 
     	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
     	{
+			char buf[64];
+			server_time(buf,64);
+			fwrite(buf,strlen(buf),1,server_config.logfp);
 			va_start(arguments, fmt);
 			vsnprintf(data, dlen, fmt, arguments);
 			va_end(arguments);
@@ -670,10 +676,7 @@ void *serve_file(void *data)
 	task->priority++;
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
-	// find content length
-	/*if (is_bin(path))
-		__fb(rq->client, path);
-	else*/
+
 	struct stat st;
 	int s = stat(path, &st);
 	
@@ -683,19 +686,43 @@ void *serve_file(void *data)
 	}
 	else
 	{
-		int size = (int)st.st_size;
-		char ibuf[20];
-    	snprintf (ibuf, sizeof(ibuf), "%d",size);
-		antd_response_header_t rhd;
-		rhd.cookie = NULL;
-		rhd.status = 200;
-		rhd.header = dict();
-		dput(rhd.header, "Content-Type", strdup(mime_type));
-		if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
-			dput(rhd.header, "Content-Length", strdup(ibuf));
-		antd_send_header(rq->client, &rhd);
+		// check if it is modified
+		dictionary_t header = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
+		char * last_modif_since = (char*)dvalue(header, "If-Modified-Since");
+		time_t t = st.st_ctime;
+		struct tm tm;
+		if(last_modif_since)
+		{
+			strptime(last_modif_since, "%a, %d %b %Y %H:%M:%S GMT", &tm);
+			t = timegm(&tm);
+			//t = mktime(localtime(&t));
+		}
 
-		__f(rq->client, path);
+		if(last_modif_since && st.st_ctime == t)
+		{
+			// return the not changed
+			antd_error(rq->client,304, "");
+		}
+		else
+		{
+			int size = (int)st.st_size;
+			char ibuf[64];
+			snprintf (ibuf, sizeof(ibuf), "%d",size);
+			antd_response_header_t rhd;
+			rhd.cookie = NULL;
+			rhd.status = 200;
+			rhd.header = dict();
+			dput(rhd.header, "Content-Type", strdup(mime_type));
+			if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
+				dput(rhd.header, "Content-Length", strdup(ibuf));
+			gmtime_r(&st.st_ctime, &tm);
+			strftime(ibuf, 255, "%a, %d %b %Y %H:%M:%S GMT", &tm);
+			dput(rhd.header, "Last-Modified", strdup(ibuf));
+			dput(rhd.header, "Cache-Control", strdup("no-cache"));
+			antd_send_header(rq->client, &rhd);
+
+			__f(rq->client, path);
+		}
 	}
 	
 	return task;

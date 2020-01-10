@@ -85,19 +85,26 @@ void removeAll(const char* path,int mode)
 	
 }
 
-char* __time(time_t time)
-{
-	struct tm *t = localtime(&time);
-	char * buf = asctime(t);
-	char* pos = strchr(buf,'\n');
-	if(pos) *pos = '\0';
-	return buf;
-}
-char* server_time()
-{
-	return __time(time(NULL));
-}
+// WARNING:
+// TODO: remove it, this function is not thread-safe
 
+void timestr(time_t time, char* buf,int len,char* format, int gmt)
+{
+	struct tm t;
+    if(gmt)
+    {
+        gmtime_r(&time, &t);
+    }
+    else
+    {
+        localtime_r(&time, &t);
+    }
+	strftime(buf, len, format, &t);
+}
+void server_time(char* buf, int len)
+{
+	timestr(time(NULL), buf, len ,"%a, %d %b %Y %H:%M:%S", 0);
+}
 /**
  * Get extension of a file name
  * @param  file The file name

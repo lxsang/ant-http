@@ -713,7 +713,9 @@ void *serve_file(void *data)
 			rhd.status = 200;
 			rhd.header = dict();
 			dput(rhd.header, "Content-Type", strdup(mime_type));
+#ifdef USE_ZLIB
 			if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
+#endif
 				dput(rhd.header, "Content-Length", strdup(ibuf));
 			gmtime_r(&st.st_ctime, &tm);
 			strftime(ibuf, 255, "%a, %d %b %Y %H:%M:%S GMT", &tm);

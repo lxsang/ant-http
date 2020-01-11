@@ -796,7 +796,9 @@ void antd_error(void* client, int status, const char* msg)
 	}
 	char ibuf[20];
     snprintf (ibuf, sizeof(ibuf), "%d",clen);
+#ifdef USE_ZLIB
 	if(((antd_client_t*)client)->z_level == ANTD_CNONE || !compressable(ctype))
+#endif
 		dput(rsh.header, "Content-Length", strdup(ibuf));
 	antd_send_header(client, &rsh);
 	if(res_str)

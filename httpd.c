@@ -40,7 +40,34 @@ SSL_CTX *create_context()
 
     return ctx;
 }
-
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+static unsigned char antd_protocols[] = {
+	//TODO: add support to HTTP/2 protocol: 2,'h', '2',
+    8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+};
+static int alpn_advertise_protos_cb(SSL *ssl, const unsigned char **out, unsigned int *outlen,void *arg)
+{
+	UNUSED(ssl);
+	UNUSED(arg);
+	*out = antd_protocols;
+	*outlen = sizeof(antd_protocols);
+	return SSL_TLSEXT_ERR_OK;
+}
+static int alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen, const unsigned char *in, unsigned int inlen, void *arg)
+{
+	UNUSED(ssl);
+	UNUSED(arg);
+	if(SSL_select_next_proto((unsigned char **)out, outlen,antd_protocols,sizeof(antd_protocols),in, inlen) == OPENSSL_NPN_NEGOTIATED)
+	{
+		return SSL_TLSEXT_ERR_OK;
+	}
+	else
+	{
+		ERROR("No protocol support overlap found between client and server\n");
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	}
+}
+#endif
 void configure_context(SSL_CTX *ctx)
 {
 #if defined(SSL_CTX_set_ecdh_auto)
@@ -85,6 +112,10 @@ void configure_context(SSL_CTX *ctx)
         ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
     }
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+	SSL_CTX_set_alpn_select_cb(ctx,alpn_select_cb, NULL);
+	SSL_CTX_set_next_protos_advertised_cb(ctx,alpn_advertise_protos_cb,NULL);
+#endif
 }
 
 #endif
@@ -276,7 +307,12 @@ int main(int argc, char* argv[])
 							client->ssl = (void*)SSL_new(ctx);
 							if(!client->ssl) continue;
 							SSL_set_fd((SSL*)client->ssl, client->sock);
-
+							// this can be used in the protocol select callback to
+							// set the protocol selected by the server
+							if(!SSL_set_ex_data((SSL*)client->ssl, client->sock, client))
+							{
+								ERROR("Cannot set ex data to ssl client:%d", client->sock);
+							}
 							/*if (SSL_accept((SSL*)client->ssl) <= 0) {
 								LOG("EROOR accept\n");
 								ERR_print_errors_fp(stderr);

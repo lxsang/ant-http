@@ -25,9 +25,15 @@ THE SOFTWARE.
 #define DICTIONARY_H
 
 #define DHASHSIZE 	16
+#define dput(d,k,v)             (insert(d,k,v,ANTD_DI_HEAP))
+#define dput_static(d,k,v)      (insert(d,k,v,ANTD_DI_STATIC))
+#define dput_list(d,k,v)        (insert(d,k,v,ANTD_DI_LIST))
+#define dput_dict(d,k,v)        (insert(d,k,v,ANTD_DI_DIC))
 #define for_each_assoc(assoc, dic) \
     for(unsigned int i = 0; i < dic->cap; i++) \
     	for(assoc = dic->map[i];assoc!= NULL; assoc = assoc->next)
+
+typedef enum{ANTD_DI_STATIC, ANTD_DI_HEAP, ANTD_DI_LIST, ANTD_DI_DIC} antd_dict_item_type_t;
 
 /**
  * Dictionary for header
@@ -35,8 +41,8 @@ THE SOFTWARE.
 typedef struct  __assoc{ 
     struct __assoc *next; 
     char *key; 
+    antd_dict_item_type_t type;
     void* value;
-    //char *value;
 } * chain_t;
 
 typedef  chain_t* map_t;
@@ -51,7 +57,7 @@ dictionary_t dict();
 dictionary_t dict_n(unsigned int n);
 chain_t dlookup(dictionary_t,const char*);
 void* dvalue(dictionary_t, const char*);
-chain_t dput(dictionary_t,const char*, void*);
+chain_t insert(dictionary_t,const char*, void*, antd_dict_item_type_t type);
 chain_t dremove(dictionary_t, const char*);
 void freedict(dictionary_t);
 

@@ -21,6 +21,7 @@
 #include "dictionary.h"
 #include "list.h"
 #include "ini.h"
+#include "scheduler.h"
 
 #define SERVER_NAME "Antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)
@@ -37,7 +38,12 @@
 
 typedef enum {ANTD_CGZ, ANTD_CDEFL, ANTD_CNONE} antd_compress_t;
 
-//extern config_t server_config;
+// define the client flag
+#define CLIENT_FL_ACCEPTED          0x01
+#define CLIENT_FL_COMPRESSION_END   0x02
+#define CLIENT_FL_HTTP_1_1          0x04
+#define CLIENT_FL_READABLE          0x08
+#define CLIENT_FL_WRITABLE          0x10
 
 typedef struct {
     unsigned int port;
@@ -50,9 +56,9 @@ typedef struct {
 typedef struct{
     int sock;
     void* ssl;
-    int status;
+    uint8_t flags;
     time_t last_io;
-    // compress
+    // compress option
     antd_compress_t z_level;
     void* zstream;
 } antd_client_t;
@@ -72,7 +78,7 @@ typedef struct
 
 
 
-typedef struct  { 
+typedef struct  {
 	//int port;
     char *plugins_dir; 
     char *plugins_ext;
@@ -105,14 +111,15 @@ typedef struct  {
     int raw_body;
 } plugin_header_t;
 
-
-int __attribute__((weak)) require_plugin(const char*);
+// some functions that allows access to server
+// private data
+int __attribute__((weak))  require_plugin(const char*);
 void __attribute__((weak)) htdocs(antd_request_t* rq, char* dest);
 void __attribute__((weak)) dbdir(char* dest);
 void __attribute__((weak)) tmpdir(char* dest);
 void __attribute__((weak)) plugindir(char* dest);
-
-int __attribute__((weak)) compressable(char* ctype);
+int __attribute__((weak))  compressable(char* ctype);
+void __attribute__((weak)) schedule_task(antd_task_t* task);
 
 void set_nonblock(int socket);
 //void set_block(int socket);

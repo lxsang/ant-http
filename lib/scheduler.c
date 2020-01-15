@@ -155,8 +155,9 @@ void antd_scheduler_init(antd_scheduler_t* scheduler, int n)
     scheduler->status = 1;
     scheduler->workers_queue = NULL;
     scheduler->pending_task = 0 ;
-    scheduler->validate_data = 0;
+    scheduler->validate_data = NULL;
     scheduler->destroy_data = NULL;
+    scheduler->task_ready = NULL;
     // init semaphore
     scheduler->scheduler_sem = sem_open("scheduler", O_CREAT, 0600, 0);
     if (scheduler->scheduler_sem == SEM_FAILED)
@@ -323,7 +324,7 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
     }
     // has the task now
     // validate the task
-    if(scheduler->validate_data && difftime( time(NULL), it->task->access_time) > MAX_VALIDITY_INTERVAL)
+    if(scheduler->validate_data && ! scheduler->validate_data(it->task))
     {
         // data task is not valid
         LOG("Task data is not valid, task will be killed");
@@ -336,6 +337,16 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
         return 0;
     }
 
+    // check if the task is ready
+    if(scheduler->task_ready && !scheduler->task_ready(it->task))
+    {
+        // task is not ready, put it back to the queue
+        antd_add_task(scheduler,  it->task);
+        free(it);
+        return 0;
+    }
+
+    // task is ready for execute, now figure out how it will be executed
     // check the type of task
     if(it->task->type == LIGHT || scheduler->n_workers <= 0)
     {
@@ -355,7 +366,7 @@ int antd_task_schedule(antd_scheduler_t* scheduler)
     }
     return 1;
 }
-void antd_wait(antd_scheduler_t* scheduler)
+void antd_scheduler_wait(antd_scheduler_t* scheduler)
 {
     int stat;
     while(scheduler->status)

@@ -24,9 +24,7 @@ void destroy_config();
 void load_config(const char* file);
 void* accept_request(void*);
 void* finish_request(void*);
-void cat(void*, FILE *);
-void cannot_execute(void*);
-//int get_line(int, char *, int);
+
 void* serve_file(void*);
 int startup(unsigned *);
 int rule_check(const char*, const char*, const char* , const char* , const char* , char*);
@@ -41,7 +39,6 @@ void* decode_multi_part_request(void*,const char*);
 void* decode_multi_part_request_data(void* data);
 void decode_cookie(const char*, dictionary_t d);
 char* post_data_decode(void*,int);
-void set_nonblock(int);
 void* execute_plugin(void* data, const char *path);
 
 #endif

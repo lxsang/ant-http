@@ -1,5 +1,5 @@
 #include "http_server.h"
-
+#include "lib/h2.h"
 //define all basic mime here
 static mime_t _mimes[] = {
 	{"image/bmp","bmp"},
@@ -229,7 +229,7 @@ void load_config(const char *file)
 	// put it default mimes
 	for(int i = 0; _mimes[i].type != NULL; i++)
 	{
-		dput(server_config.mimes,_mimes[i].type, strdup(_mimes[i].ext));
+		dput_static(server_config.mimes,_mimes[i].type, (void*)_mimes[i].ext);
 	}
 	if (ini_parse(file, config_handler, &server_config) < 0)
 	{
@@ -254,9 +254,6 @@ void load_config(const char *file)
 
 void *accept_request(void *data)
 {
-	char buf[BUFFLEN];
-	char *token = NULL;
-	char *line = NULL;
 	antd_task_t *task;
 	antd_request_t *rq = (antd_request_t *)data;
 
@@ -281,22 +278,13 @@ void *accept_request(void *data)
 	}
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
 	{
-		/*if(client->last_wait == 0) client->last_wait = time(NULL);
-		// retry it later
-		if(time(NULL) - client->last_wait > MAX_WAIT_S)
-		{
-			LOG("Read and write timeout, give up on %d\n", client->sock);
-			server_config.connection++;
-			unknow(rq->client);
-			return task;
-		}*/
 		task->handle = accept_request;
 		return task;
 	}
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
 	int ret = -1, stat;
-	if (client->ssl && client->status == 0)
+	if (client->ssl && !(client->flags & CLIENT_FL_ACCEPTED) )
 	{
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
@@ -307,27 +295,17 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_READ:
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
-				//LOG("RETRY SSL %d\n", client->sock);
-				/*if(client->last_wait == 0) client->last_wait = time(NULL);
-				if(time(NULL) - client->last_wait > MAX_WAIT_S)
-				{
-					server_config.connection++;
-					unknow(rq->client);
-					LOG("SSL timeout, give up on %d\n", client->sock);
-					return task;
-				}
-				task->status = TASK_ACCEPT_SSL_CONT;*/
 				task->handle = accept_request;
 				return task;
 			default:
 				ERROR("Error performing SSL handshake %d %d %s", stat, ret, ERR_error_string(ERR_get_error(), NULL));
 				antd_error(rq->client, 400, "Invalid SSL request");
-				//server_config.connection++;
+
 				ERR_print_errors_fp(stderr);
 				return task;
 			}
 		}
-		client->status = 1;
+		client->flags |= CLIENT_FL_ACCEPTED;
 		task->handle = accept_request;
 		//LOG("Handshake finish for %d\n", client->sock);
 		return task;
@@ -336,54 +314,22 @@ void *accept_request(void *data)
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
-			/*if(client->last_wait == 0) client->last_wait = time(NULL);
-			if(time(NULL) - client->last_wait > MAX_WAIT_S)
-			{
-				server_config.connection++;
-				unknow(rq->client);
-				LOG("Read timeout, give up on %d\n", client->sock);
-				return task;
-			}*/
+			client->flags |= CLIENT_FL_ACCEPTED;
 			task->handle = accept_request;
 			return task;
 		}
 	}
 #endif
-	//LOG("Ready for reading %d\n", client->sock);
-	//server_config.connection++;
-	read_buf(rq->client, buf, sizeof(buf));
-	line = buf;
-	// get the method string
-	token = strsep(&line, " ");
-	if (!line)
+	//printf("Flag: %d\n", client->flags);
+	// now return the task base on the http version
+	if(client->flags & CLIENT_FL_HTTP_1_1)
 	{
-		//LOG("No method found");
-		antd_error(rq->client, 405, "No method found");
-		return task;
+		task->handle = decode_request_header;
 	}
-	trim(token, ' ');
-	trim(line, ' ');
-	dput(rq->request, "METHOD", strdup(token));
-	// get the request
-	token = strsep(&line, " ");
-	if (!line)
+	else
 	{
-		//LOG("No request found");
-		antd_error(rq->client, 400, "Bad request");
-		return task;
+		task->handle = antd_h2_preface_ck;
 	}
-	trim(token, ' ');
-	trim(line, ' ');
-	trim(line, '\n');
-	trim(line, '\r');
-	dput(rq->request, "PROTOCOL", strdup(line));
-	dput(rq->request, "REQUEST_QUERY", strdup(token));
-	line = token;
-	token = strsep(&line, "?");
-	dput(rq->request, "REQUEST_PATH", url_decode(token));
-	// decode request
-	// now return the task
-	task->handle = decode_request_header;
 	return task;
 }
 
@@ -460,7 +406,7 @@ void *resolve_request(void *data)
 		// find an handler plugin to process it
 		// if the plugin is not found, forbidden access to the file should be sent
 		char *mime_type = mime(path);
-		dput(rq->request, "RESOURCE_MIME", strdup(mime_type));
+		dput_static(rq->request, "RESOURCE_MIME", mime_type);
 		if (strcmp(mime_type, "application/octet-stream") == 0)
 		{
 			char *ex = ext(path);
@@ -639,7 +585,7 @@ void *serve_file(void *data)
 			rhd.cookie = NULL;
 			rhd.status = 200;
 			rhd.header = dict();
-			dput(rhd.header, "Content-Type", strdup(mime_type));
+			dput_static(rhd.header, "Content-Type", mime_type);
 #ifdef USE_ZLIB
 			if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
 #endif
@@ -647,7 +593,7 @@ void *serve_file(void *data)
 			gmtime_r(&st.st_ctime, &tm);
 			strftime(ibuf, 255, "%a, %d %b %Y %H:%M:%S GMT", &tm);
 			dput(rhd.header, "Last-Modified", strdup(ibuf));
-			dput(rhd.header, "Cache-Control", strdup("no-cache"));
+			dput_static(rhd.header, "Cache-Control", "no-cache");
 			antd_send_header(rq->client, &rhd);
 
 			__f(rq->client, path);
@@ -745,12 +691,48 @@ void *decode_request_header(void *data)
 	char *query = NULL;
 	char *host = NULL;
 	char buf[2 * BUFFLEN];
+	// read the first line
+
+	//server_config.connection++;
+	read_buf(rq->client, buf, sizeof(buf));
+	line = buf;
+	trim(line, '\n');
+	trim(line, '\r');
+	// get the method string
+	token = strsep(&line, " ");
+	if (!line)
+	{
+		//LOG("No method found");
+		antd_error(rq->client, 405, "No method found");
+		return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);
+	}
+	trim(token, ' ');
+	trim(line, ' ');
+	dput(rq->request, "METHOD", strdup(token));
+	// get the request
+	token = strsep(&line, " ");
+	if (!line)
+	{
+		//LOG("No request found");
+		antd_error(rq->client, 400, "Bad request");
+		return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);
+	}
+	trim(token, ' ');
+	trim(line, ' ');
+	trim(line, '\n');
+	trim(line, '\r');
+	dput(rq->request, "PROTOCOL", strdup(line));
+	dput(rq->request, "REQUEST_QUERY", strdup(token));
+	line = token;
+	token = strsep(&line, "?");
+	dput(rq->request, "REQUEST_PATH", url_decode(token));
+
 	char *url = (char *)dvalue(rq->request, "REQUEST_QUERY");
 	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
 	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
 	char* port_s = (char*) dvalue(xheader, "SERVER_PORT");
 	port_config_t* pcnf = (port_config_t*)dvalue(server_config.ports, port_s);
-	// first real all header
+
 	// this for check if web socket is enabled
 	while ((read_buf(rq->client, buf, sizeof(buf))) && strcmp("\r\n", buf))
 	{
@@ -864,7 +846,7 @@ void *decode_request(void *data)
 			// insert wsocket flag to request
 			// plugin should handle this ugraded connection
 			// not the server
-			dput(rq->request, "__web_socket__", strdup("1"));
+			dput_static(rq->request, "__web_socket__", "1");
 		}
 		// resolve task
 		task->handle = resolve_request;
@@ -929,8 +911,8 @@ void *decode_post_request(void *data)
 			key = ctype;
 		if(pquery)
 		{
-			dput(request, key, strdup(pquery));
-			free(pquery);
+			dput(request, key, pquery);
+			//free(pquery);
 		}
 	}
 	return task;

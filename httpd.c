@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include "http_server.h"
 #include "lib/ini.h"
+#define MAX_VALIDITY_INTERVAL 20
 
 static  antd_scheduler_t scheduler;
 
@@ -42,7 +43,8 @@ SSL_CTX *create_context()
 }
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
 static unsigned char antd_protocols[] = {
-	//TODO: add support to HTTP/2 protocol: 2,'h', '2',
+	//TODO: add support to HTTP/2 protocol:
+	2,'h', '2',
     8, 'h', 't', 't', 'p', '/', '1', '.', '1'
 };
 static int alpn_advertise_protos_cb(SSL *ssl, const unsigned char **out, unsigned int *outlen,void *arg)
@@ -55,10 +57,28 @@ static int alpn_advertise_protos_cb(SSL *ssl, const unsigned char **out, unsigne
 }
 static int alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen, const unsigned char *in, unsigned int inlen, void *arg)
 {
-	UNUSED(ssl);
 	UNUSED(arg);
+	char buf[64];
 	if(SSL_select_next_proto((unsigned char **)out, outlen,antd_protocols,sizeof(antd_protocols),in, inlen) == OPENSSL_NPN_NEGOTIATED)
 	{
+		// set client flag to indicate protocol
+		int sock = SSL_get_fd(ssl);
+		if(sock <= 0)
+		{
+			return SSL_TLSEXT_ERR_ALERT_FATAL;
+		}
+			
+		antd_client_t* client = SSL_get_ex_data(ssl, sock);
+		if(!client)
+		{
+			return SSL_TLSEXT_ERR_ALERT_FATAL;
+		}
+		memcpy(buf,*out,*outlen);
+		buf[*outlen] = '\0';
+		if(strcmp(buf,"http/1.1") !=0 )
+		{
+			client->flags &= ~CLIENT_FL_HTTP_1_1;
+		}
 		return SSL_TLSEXT_ERR_OK;
 	}
 	else
@@ -120,6 +140,11 @@ void configure_context(SSL_CTX *ctx)
 
 #endif
 
+void schedule_task(antd_task_t* task)
+{
+	antd_add_task(&scheduler, task);
+}
+
 
 void stop_serve(int dummy) {
 	UNUSED(dummy);
@@ -146,6 +171,52 @@ void stop_serve(int dummy) {
 #endif
 	destroy_config(); 
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
+}
+
+
+static int validate_data(antd_task_t* task)
+{
+	if(difftime( time(NULL), task->access_time) > MAX_VALIDITY_INTERVAL)
+		return 0;
+	return 1;
+}
+
+static int is_task_ready(antd_task_t* task)
+{
+	antd_request_t* rq = (antd_request_t*)task->data;
+	if(!rq) return 0;
+	// check if data is ready for read/write
+	fd_set read_flags, write_flags;
+	struct timeval timeout;
+	FD_ZERO(&read_flags);
+	FD_SET(rq->client->sock, &read_flags);
+	FD_ZERO(&write_flags);
+	FD_SET(rq->client->sock, &write_flags);
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 0; 
+	int sel = select(rq->client->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
+	if(sel > 0 && (FD_ISSET(rq->client->sock, &read_flags)|| FD_ISSET(rq->client->sock, &write_flags)))
+	{
+		if(FD_ISSET(rq->client->sock, &read_flags))
+		{
+			rq->client->flags |= CLIENT_FL_READABLE;
+		}
+		else
+		{
+			rq->client->flags &= ~CLIENT_FL_READABLE;
+		}
+
+		if(FD_ISSET(rq->client->sock, &write_flags))
+		{
+			rq->client->flags |= CLIENT_FL_WRITABLE;
+		}
+		else
+		{
+			rq->client->flags &= ~CLIENT_FL_WRITABLE;
+		}
+		return 1;
+	}
+	return 0;
 }
 
 int main(int argc, char* argv[])
@@ -207,15 +278,16 @@ int main(int argc, char* argv[])
 	}
 	// default to 4 workers
 	antd_scheduler_init(&scheduler, conf->n_workers);
-	scheduler.validate_data = 1;
+	scheduler.validate_data = validate_data;
 	scheduler.destroy_data = finish_request;
-	// use blocking server_sock
+	scheduler.task_ready = is_task_ready;
+	
+	
 	// make the scheduler wait for event on another thread
 	// this allow to ged rid of high cpu usage on
 	// endless loop without doing anything
-    // set_nonblock(server_sock);
 	pthread_t scheduler_th;
-	if (pthread_create(&scheduler_th, NULL,(void *(*)(void *))antd_wait, (void*)&scheduler) != 0)
+	if (pthread_create(&scheduler_th, NULL,(void *(*)(void *))antd_scheduler_wait, (void*)&scheduler) != 0)
 	{
 		ERROR("pthread_create: cannot create worker");
 		stop_serve(0);
@@ -237,7 +309,6 @@ int main(int argc, char* argv[])
 	{
 		if(conf->connection > conf->maxcon)
 		{
-			//ERROR("Reach max connection %d", conf->connection);
 			timeout.tv_sec = 0;
 			timeout.tv_usec = 10000; // 5 ms
 			select(0, NULL, NULL, NULL, &timeout);
@@ -267,7 +338,7 @@ int main(int argc, char* argv[])
 						request->request = dict();
 						client->zstream = NULL;
 						client->z_level = ANTD_CNONE;
-						
+
 						dictionary_t xheader = dict();
 						dput(request->request, "REQUEST_HEADER", xheader);
 						dput(request->request, "REQUEST_DATA", dict());
@@ -300,8 +371,9 @@ int main(int argc, char* argv[])
 						client->sock = client_sock;
 						time(&client->last_io);
 						client->ssl = NULL;
+						// default selected protocol is http/1.1
+						client->flags = CLIENT_FL_HTTP_1_1;
 	#ifdef USE_OPENSSL
-						client->status = 0;
 						if(pcnf->usessl == 1)
 						{
 							client->ssl = (void*)SSL_new(ctx);
@@ -313,12 +385,6 @@ int main(int argc, char* argv[])
 							{
 								ERROR("Cannot set ex data to ssl client:%d", client->sock);
 							}
-							/*if (SSL_accept((SSL*)client->ssl) <= 0) {
-								LOG("EROOR accept\n");
-								ERR_print_errors_fp(stderr);
-								antd_close(client);
-								continue;
-							}*/
 						}
 	#endif
 						conf->connection++;

@@ -403,7 +403,7 @@ int ws_client_connect(ws_client_t* wsclient, port_config_t pcnf)
 	}
 	// will be free
 	wsclient->antdsock->sock = sock;
-	wsclient->antdsock->status = 0;
+	wsclient->antdsock->flags = 0;
 	wsclient->antdsock->last_io = time(NULL);
 	wsclient->antdsock->zstream = NULL;
 #ifdef USE_OPENSSL

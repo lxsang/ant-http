@@ -23,6 +23,7 @@ THE SOFTWARE.
 */
 #include "dictionary.h"
 #include "utils.h"
+#include "list.h"
 
 dictionary_t dict()
 {
@@ -66,8 +67,13 @@ chain_t __put_el_with_key(dictionary_t dic, const char* key)
 	if(dic->map == NULL) return NULL;
     if ((np = dlookup(dic,key)) == NULL) { /* not found */
         np = (chain_t) malloc(sizeof(*np));
-        if (np == NULL || (np->key = strdup(key)) == NULL)
+        if (np == NULL)
           return NULL;
+		if((np->key = strdup(key)) == NULL)
+		{
+			free(np);
+			return NULL;
+		}
 		np->value = NULL;
         hashval = hash(key, dic->cap);
         np->next = dic->map[hashval];
@@ -77,18 +83,43 @@ chain_t __put_el_with_key(dictionary_t dic, const char* key)
 	// found
     return np;
 }
-chain_t dput(dictionary_t dic,const char* key, void* value)
+
+static void free_ditem_value(void* value, antd_dict_item_type_t type)
+{
+	switch (type)
+	{
+	case ANTD_DI_HEAP:
+		if(value)
+			free(value);
+		break;
+	case ANTD_DI_LIST:
+		if(value)
+			list_free((list_t*)&value);
+		break;
+	case ANTD_DI_DIC:
+		if(value)
+			freedict(value);
+	default:
+		break;
+	}
+}
+
+chain_t insert(dictionary_t dic,const char* key, void* value, antd_dict_item_type_t type)
 {
 	chain_t np = __put_el_with_key(dic,key);
 	if(np == NULL)
 	{
-		if(value) free(value);
+		free_ditem_value(value, type);
 		return NULL;
 	}
-	if(np->value && value) free(np->value);
+	if(np->value && value) free_ditem_value(np->value, np->type);
+	np->type = type;
 	np->value = value;
     return np;
 }
+
+
+
 chain_t dremove(dictionary_t dic, const char* key)
 {
 	if(dic->map == NULL) return 0;
@@ -131,7 +162,7 @@ void free_association(chain_t * asoc)
 		if(a->key)
 		{
 			free(a->key);
-			if(a->value) free(a->value);
+			if(a->value) free_ditem_value(a->value, a->type);
 		}
 		free(a);
 	}

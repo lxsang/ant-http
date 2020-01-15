@@ -1,4 +1,5 @@
-#include "handle.h" 
+#include "handle.h"
+
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 
 static const char* S_100 =  "Continue";
@@ -80,6 +81,11 @@ int  compressable(char* ctype)
 {
 	UNUSED(ctype);
 	return 0;
+}
+
+void schedule_task(antd_task_t* task)
+{
+	UNUSED(task);
 }
 
 void htdocs(antd_request_t* rq, char* dest)
@@ -210,7 +216,7 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 						}
 						else
 						{
-							client->status = Z_NO_FLUSH;
+							//client->status = Z_NO_FLUSH;
 							dput(res->header,"Content-Encoding", strdup("gzip"));
 						}
 					}
@@ -224,7 +230,7 @@ void antd_send_header(void* cl, antd_response_header_t* res)
 						}
 						else
 						{
-							client->status = Z_NO_FLUSH;
+							//client->status = Z_NO_FLUSH;
 							dput(res->header,"Content-Encoding", strdup("deflate"));
 						}
 					}
@@ -282,6 +288,7 @@ int antd_send(void *src, const void* data_in, int len_in)
 	antd_client_t * source = (antd_client_t *) src;
 
 #ifdef USE_ZLIB
+	int status = (source->flags & CLIENT_FL_COMPRESSION_END)?Z_NO_FLUSH:Z_FINISH;
 	if(source->zstream && source->z_level != ANTD_CNONE)
 	{
 		antd_compress_t current_zlevel = source->z_level;
@@ -296,7 +303,7 @@ int antd_send(void *src, const void* data_in, int len_in)
 		{
 			zstream->avail_out = BUFFLEN;
 			zstream->next_out = buf;
-			if(deflate(zstream, source->status) == Z_STREAM_ERROR)
+			if(deflate(zstream,status) == Z_STREAM_ERROR)
 			{
 				source->z_level = current_zlevel;
 				data = NULL;
@@ -643,9 +650,9 @@ int antd_close(void* src)
 	//TODO: send finish data to the socket before quit
 	if(source->zstream)
 	{
-		if(source->status == Z_NO_FLUSH && source->z_level != ANTD_CNONE)
+		if(!(source->flags & CLIENT_FL_COMPRESSION_END) && source->z_level != ANTD_CNONE)
 		{
-			source->status = Z_FINISH;
+			source->flags |= CLIENT_FL_COMPRESSION_END;
 			antd_send(source, "", 0);
 		}
 		deflateEnd(source->zstream);

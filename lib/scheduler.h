@@ -9,7 +9,7 @@
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
 #define LOW_PRIORITY (N_PRIORITY - 1)
 #define HIGH_PRIORITY 0
-#define MAX_VALIDITY_INTERVAL 20 // 10 s for task validity
+
 typedef enum
 {
     LIGHT,
@@ -92,7 +92,8 @@ typedef struct
     default to NULL
     */
     void* (*destroy_data)(void*);
-    int validate_data;
+    int (*validate_data)(antd_task_t*);
+    int (*task_ready)(antd_task_t*);
 } antd_scheduler_t;
 
 /*
@@ -133,7 +134,7 @@ int antd_task_schedule(antd_scheduler_t *);
 /*
 wait for event
 */
-void antd_wait(antd_scheduler_t *);
+void antd_scheduler_wait(antd_scheduler_t *);
 
 antd_callback_t* callback_of( void* (*callback)(void*) );
 #endif

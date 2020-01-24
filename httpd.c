@@ -140,11 +140,6 @@ void configure_context(SSL_CTX *ctx)
 
 #endif
 
-void schedule_task(antd_task_t* task)
-{
-	antd_add_task(&scheduler, task);
-}
-
 
 void stop_serve(int dummy) {
 	UNUSED(dummy);

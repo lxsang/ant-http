@@ -83,11 +83,6 @@ int  compressable(char* ctype)
 	return 0;
 }
 
-void schedule_task(antd_task_t* task)
-{
-	UNUSED(task);
-}
-
 void htdocs(antd_request_t* rq, char* dest)
 {
 	dictionary_t xheader = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");

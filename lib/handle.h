@@ -119,7 +119,6 @@ void __attribute__((weak)) dbdir(char* dest);
 void __attribute__((weak)) tmpdir(char* dest);
 void __attribute__((weak)) plugindir(char* dest);
 int __attribute__((weak))  compressable(char* ctype);
-void __attribute__((weak)) schedule_task(antd_task_t* task);
 
 void set_nonblock(int socket);
 //void set_block(int socket);

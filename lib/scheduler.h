@@ -115,6 +115,8 @@ void antd_scheduler_destroy(antd_scheduler_t *);
 */
 antd_task_t *antd_create_task(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t);
 
+antd_task_t* antd_empty_task(void* data, time_t);
+
 /*
     add a task
 */

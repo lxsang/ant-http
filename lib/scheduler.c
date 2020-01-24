@@ -379,3 +379,10 @@ void antd_scheduler_wait(antd_scheduler_t* scheduler)
         }
     }
 }
+
+antd_task_t* antd_empty_task(void* data,time_t t)
+{
+    antd_task_t* task = antd_create_task(NULL,data,NULL,t);
+    task->priority++;
+    return task;
+}

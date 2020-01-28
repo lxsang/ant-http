@@ -1,7 +1,9 @@
 #ifndef HTTP2_H
 #define HTTP2_H
+
 #include "handle.h"
 #include "hpack.h"
+#include "queue.h"
 
 #define H2_CONN_PREFACE  "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
@@ -90,21 +92,65 @@ instead of HTTP/2.
 */
 #define H2_HTTP_1_1_REQUIRED    0xd
 
+/*
+The frame should be ignore
+*/
+#define H2_IGNORED              0xe
+
+/*
+SETTING FRAME CONSTs
+*/
+/*
+When set, bit 0 indicates that this frame acknowledges
+receipt and application of the peer's SETTINGS frame.  When this
+bit is set, the payload of the SETTINGS frame MUST be empty.
+Receipt of a SETTINGS frame with the ACK flag set and a length
+field value other than 0 MUST be treated as a connection error
+(Section 5.4.1) of type FRAME_SIZE_ERROR
+*/
+#define H2_SETTING_ACK_FLG                      0x1
+#define H2_SETTINGS_HEADER_TABLE_SIZE           0x1
+#define H2_SETTINGS_ENABLE_PUSH                 0x2
+#define H2_SETTINGS_MAX_CONCURRENT_STREAMS      0x3
+#define H2_SETTINGS_INITIAL_WINDOW_SIZE         0x4
+#define H2_SETTINGS_MAX_FRAME_SIZE              0x5
+#define H2_SETTINGS_MAX_HEADER_LIST_SIZE        0x6
+
+
+typedef struct{
+    uint32_t header_table_sz;
+    uint32_t enable_push;
+    uint32_t max_concurrent_streams;
+    uint32_t init_win_sz;
+    uint32_t max_frame_sz;
+    uint32_t max_header_list_sz;
+} antd_h2_conn_setting_t;
+
+
+typedef struct antd_h2_stream_list_t* antd_h2_stream_list_t;
 
 /**
  * Struct that holds a
  * h2 connection
 */
 typedef struct {
-
+    antd_h2_conn_setting_t settings;
+    antd_h2_stream_list_t* streams;
+    int win_sz;
+    int last_stream_id;
 } antd_h2_conn_t;
 
+#define H2_CONN(rq) ((antd_h2_conn_t*)dvalue(((antd_request_t*)rq)->request,"H2_CONNECTION"))
+#define H2_SETTING(rq) (H2_CON(rq)->settings)
 /**
  * Struct that holds a
  * h2 stream
 */
 typedef struct {
-
+    struct queue_root* stdin;
+    struct queue_root* stdout;
+    int win_sz;
+    int id;
 } antd_h2_stream_t;
 
 /**
@@ -121,13 +167,21 @@ typedef struct {
     unsigned int identifier;
 } antd_h2_frame_header_t;
 
+/*stream utilities functions*/
+void antd_h2_close_stream(antd_h2_stream_t* stream);
+void antd_h2_add_stream(antd_h2_stream_list_t*, antd_h2_stream_t*);
+antd_h2_stream_t* antd_h2_get_stream(antd_h2_stream_list_t*, int);
+void antd_h2_del_stream(antd_h2_stream_list_t*, int);
+void antd_h2_close_all_streams(antd_h2_stream_list_t);
+void antd_h2_update_streams_win_sz(antd_h2_stream_list_t streams, int offset);
 
+/*Connection utilities funtions*/
+antd_h2_conn_t* antd_h2_open_conn();
+void antd_h2_close_conn(antd_h2_conn_t*);
 
 void* antd_h2_read(void* rq);
 void* antd_h2_write(void* rq);
-
 void* antd_h2_preface_ck(void* rq);
-
 void* antd_h2_handle(void* rq);
-
+int antd_h2_send_frame(antd_request_t*, antd_h2_frame_header_t*, uint8_t*);
 #endif

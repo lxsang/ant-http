@@ -319,17 +319,15 @@ void *accept_request(void *data)
 			return task;
 		}
 	}
-#endif
-	//printf("Flag: %d\n", client->flags);
-	// now return the task base on the http version
-	if(client->flags & CLIENT_FL_HTTP_1_1)
-	{
-		task->handle = decode_request_header;
-	}
-	else
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+	if(!(client->flags & CLIENT_FL_HTTP_1_1))
 	{
 		task->handle = antd_h2_preface_ck;
+		return task;
 	}
+#endif
+#endif
+	task->handle = decode_request_header;
 	return task;
 }
 
@@ -1326,3 +1324,41 @@ int  compressable(char* ctype)
 	return 0;
 }
 #endif
+
+void destroy_request(void *data)
+{
+	if (!data)
+		return;
+	antd_request_t *rq = (antd_request_t *)data;
+	//LOG("Close request %d", rq->client->sock);
+	// free all other thing
+	if (rq->request)
+	{
+		dictionary_t tmp = dvalue(rq->request, "COOKIE");
+		if (tmp)
+			freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_HEADER");
+		if (tmp)
+			freedict(tmp);
+		tmp = dvalue(rq->request, "REQUEST_DATA");
+		if (tmp)
+			freedict(tmp);
+		dput(rq->request, "REQUEST_HEADER", NULL);
+		dput(rq->request, "REQUEST_DATA", NULL);
+		dput(rq->request, "COOKIE", NULL);
+#ifdef USE_OPENSSL
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+		antd_h2_conn_t* conn = H2_CONN(data);
+		if(conn)
+		{
+			//H2_CONNECTION
+			antd_h2_close_conn(conn);
+			dput(rq->request, "H2_CONNECTION", NULL);
+		}
+#endif
+#endif
+		freedict(rq->request);
+	}
+	antd_close(rq->client);
+	free(rq);
+}

@@ -1,5 +1,4 @@
 #include "handle.h"
-
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 
 static const char* S_100 =  "Continue";
@@ -849,36 +848,4 @@ int read_buf(void* sock, char*buf,int size)
 	}
 	buf[i] = '\0';
 	return i;
-}
-/*
-	We put it here since we want the plugin is able
-	to destroy the request if it want to
-	in this case, the plugin should return an empty
-	with no data
-*/
-void destroy_request(void *data)
-{
-	if (!data)
-		return;
-	antd_request_t *rq = (antd_request_t *)data;
-	//LOG("Close request %d", rq->client->sock);
-	// free all other thing
-	if (rq->request)
-	{
-		dictionary_t tmp = dvalue(rq->request, "COOKIE");
-		if (tmp)
-			freedict(tmp);
-		tmp = dvalue(rq->request, "REQUEST_HEADER");
-		if (tmp)
-			freedict(tmp);
-		tmp = dvalue(rq->request, "REQUEST_DATA");
-		if (tmp)
-			freedict(tmp);
-		dput(rq->request, "REQUEST_HEADER", NULL);
-		dput(rq->request, "REQUEST_DATA", NULL);
-		dput(rq->request, "COOKIE", NULL);
-		freedict(rq->request);
-	}
-	antd_close(rq->client);
-	free(rq);
 }

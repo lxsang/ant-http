@@ -21,6 +21,7 @@ libantd_la_SOURCES =  lib/ini.c \
 			lib/ws.c \
 			lib/sha1.c \
 			lib/list.c \
+			lib/queue.c \
 			lib/scheduler.c \
 			lib/h2.c
 
@@ -34,7 +35,8 @@ pkginclude_HEADERS =  lib/ini.h \
 			lib/list.h \
 			lib/scheduler.h \
             lib/plugin.h \
-			lib/h2.h
+			lib/h2.h \
+			lib/queue.h
 
 
 EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE antd-config.ini

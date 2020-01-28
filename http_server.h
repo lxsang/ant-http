@@ -40,5 +40,6 @@ void* decode_multi_part_request_data(void* data);
 void decode_cookie(const char*, dictionary_t d);
 char* post_data_decode(void*,int);
 void* execute_plugin(void* data, const char *path);
+void destroy_request(void *data);
 
 #endif

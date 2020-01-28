@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
 	pthread_t scheduler_th;
 	if (pthread_create(&scheduler_th, NULL,(void *(*)(void *))antd_scheduler_wait, (void*)&scheduler) != 0)
 	{
-		ERROR("pthread_create: cannot create worker");
+		ERROR("pthread_create: cannot create scheduler thread");
 		stop_serve(0);
 		exit(1);
 	}

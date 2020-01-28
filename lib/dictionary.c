@@ -118,8 +118,6 @@ chain_t insert(dictionary_t dic,const char* key, void* value, antd_dict_item_typ
     return np;
 }
 
-
-
 chain_t dremove(dictionary_t dic, const char* key)
 {
 	if(dic->map == NULL) return 0;

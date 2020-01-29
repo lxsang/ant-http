@@ -6,6 +6,12 @@
 
 static  antd_scheduler_t scheduler;
 
+
+void antd_schedule_task(antd_task_t* task)
+{
+	antd_add_task(&scheduler,task);
+}
+
 #ifdef USE_OPENSSL
 
 // define the cipher suit used
@@ -186,15 +192,15 @@ static int is_task_ready(antd_task_t* task)
 	fd_set read_flags, write_flags;
 	struct timeval timeout;
 	FD_ZERO(&read_flags);
-	FD_SET(rq->client->sock, &read_flags);
+	FD_SET(rq->client->id, &read_flags);
 	FD_ZERO(&write_flags);
-	FD_SET(rq->client->sock, &write_flags);
+	FD_SET(rq->client->id, &write_flags);
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 0; 
-	int sel = select(rq->client->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
-	if(sel > 0 && (FD_ISSET(rq->client->sock, &read_flags)|| FD_ISSET(rq->client->sock, &write_flags)))
+	int sel = select(rq->client->id + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
+	if(sel > 0 && (FD_ISSET(rq->client->id, &read_flags)|| FD_ISSET(rq->client->id, &write_flags)))
 	{
-		if(FD_ISSET(rq->client->sock, &read_flags))
+		if(FD_ISSET(rq->client->id, &read_flags))
 		{
 			rq->client->flags |= CLIENT_FL_READABLE;
 		}
@@ -203,7 +209,7 @@ static int is_task_ready(antd_task_t* task)
 			rq->client->flags &= ~CLIENT_FL_READABLE;
 		}
 
-		if(FD_ISSET(rq->client->sock, &write_flags))
+		if(FD_ISSET(rq->client->id, &write_flags))
 		{
 			rq->client->flags |= CLIENT_FL_WRITABLE;
 		}
@@ -368,22 +374,22 @@ int main(int argc, char* argv[])
 						if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
 							perror("setsockopt failed\n");
 						*/
-						client->sock = client_sock;
+						client->id = client_sock;
 						time(&client->last_io);
-						client->ssl = NULL;
+						client->stream = NULL;
 						// default selected protocol is http/1.1
 						client->flags = CLIENT_FL_HTTP_1_1;
 	#ifdef USE_OPENSSL
 						if(pcnf->usessl == 1)
 						{
-							client->ssl = (void*)SSL_new(ctx);
-							if(!client->ssl) continue;
-							SSL_set_fd((SSL*)client->ssl, client->sock);
+							client->stream = (void*)SSL_new(ctx);
+							if(!client->stream) continue;
+							SSL_set_fd((SSL*)client->stream, client->id);
 							// this can be used in the protocol select callback to
 							// set the protocol selected by the server
-							if(!SSL_set_ex_data((SSL*)client->ssl, client->sock, client))
+							if(!SSL_set_ex_data((SSL*)client->stream, client->id, client))
 							{
-								ERROR("Cannot set ex data to ssl client:%d", client->sock);
+								ERROR("Cannot set ex data to ssl client:%d", client->id);
 							}
 						}
 	#endif

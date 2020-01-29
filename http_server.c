@@ -263,20 +263,20 @@ void *accept_request(void *data)
 	// first verify if the socket is ready
 	antd_client_t *client = (antd_client_t *)rq->client;
 	FD_ZERO(&read_flags);
-	FD_SET(rq->client->sock, &read_flags);
+	FD_SET(rq->client->id, &read_flags);
 	FD_ZERO(&write_flags);
-	FD_SET(rq->client->sock, &write_flags);
+	FD_SET(rq->client->id, &write_flags);
 	struct timeval timeout;
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 500;
 	// select
-	int sel = select(client->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
+	int sel = select(client->id + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
 	if (sel == -1)
 	{
 		antd_error(rq->client, 400, "Bad request");
 		return task;
 	}
-	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
+	if (sel == 0 || (!FD_ISSET(client->id, &read_flags) && !FD_ISSET(client->id, &write_flags)))
 	{
 		task->handle = accept_request;
 		return task;
@@ -284,12 +284,12 @@ void *accept_request(void *data)
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
 	int ret = -1, stat;
-	if (client->ssl && !(client->flags & CLIENT_FL_ACCEPTED) )
+	if (client->stream && !(client->flags & CLIENT_FL_ACCEPTED) )
 	{
 		//LOG("Atttempt %d\n", client->attempt);
-		if (SSL_accept((SSL *)client->ssl) == -1)
+		if (SSL_accept((SSL *)client->stream) == -1)
 		{
-			stat = SSL_get_error((SSL *)client->ssl, ret);
+			stat = SSL_get_error((SSL *)client->stream, ret);
 			switch (stat)
 			{
 			case SSL_ERROR_WANT_READ:
@@ -312,7 +312,7 @@ void *accept_request(void *data)
 	}
 	else
 	{
-		if (!FD_ISSET(client->sock, &read_flags))
+		if (!FD_ISSET(client->id, &read_flags))
 		{
 			client->flags |= CLIENT_FL_ACCEPTED;
 			task->handle = accept_request;

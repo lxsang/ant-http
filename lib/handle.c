@@ -104,6 +104,11 @@ void  plugindir(char* dest)
 	UNUSED(dest);
 }
 
+void antd_schedule_task(antd_task_t* task)
+{
+	UNUSED(task);
+}
+
 const char* get_status_str(int stat)
 {
 	switch(stat)
@@ -326,7 +331,7 @@ int antd_send(void *src, const void* data_in, int len_in)
 	int  count;
 
 #ifdef USE_OPENSSL
-	if(source->ssl)
+	if(source->stream)
 	{
 		//LOG("SSL WRITE\n");
 		//ret = SSL_write((SSL*) source->ssl, data, len);
@@ -339,8 +344,8 @@ int antd_send(void *src, const void* data_in, int len_in)
         {
 			// clear the error queue
 			ERR_clear_error();
-            count = SSL_write (source->ssl, ptr+written, writelen);
-			int err = SSL_get_error(source->ssl, count);
+            count = SSL_write (source->stream, ptr+written, writelen);
+			int err = SSL_get_error(source->stream, count);
             if (count > 0)
             {
                 written += count;
@@ -378,7 +383,7 @@ int antd_send(void *src, const void* data_in, int len_in)
                         // no data available right now, wait a few seconds in case new data arrives...
                         //printf("SSL_ERROR_WANT_READ\n");
 
-                        int sock = SSL_get_rfd(source->ssl);
+                        int sock = SSL_get_rfd(source->stream);
                         FD_ZERO(&fds);
                         FD_SET(sock, &fds);
 
@@ -398,7 +403,7 @@ int antd_send(void *src, const void* data_in, int len_in)
                     {
                         // socket not writable right now, wait a few seconds and try again...
                         //printf("SSL_ERROR_WANT_WRITE \n");
-                        int sock = SSL_get_wfd(source->ssl);
+                        int sock = SSL_get_wfd(source->stream);
                         FD_ZERO(&fds);
                         FD_SET(sock, &fds);
 
@@ -437,7 +442,7 @@ int antd_send(void *src, const void* data_in, int len_in)
 		written = 0;
 		while (writelen > 0)
         {
-            count = send(source->sock, ptr+written, writelen, 0);
+            count = send(source->id, ptr+written, writelen, 0);
             if (count > 0)
             {
                 written += count;
@@ -468,7 +473,7 @@ int antd_recv(void *src,  void* data, int len)
 	int readlen=0;
 	antd_client_t * source = (antd_client_t *) src;
 #ifdef USE_OPENSSL
-	if(source->ssl)
+	if(source->stream)
 	{
 		ptr = (char* )data;
 		readlen = len > BUFFLEN?BUFFLEN:len;
@@ -478,8 +483,8 @@ int antd_recv(void *src,  void* data, int len)
 		while (readlen > 0 )//&& source->attempt < MAX_ATTEMPT
         {
 			ERR_clear_error();
-            received = SSL_read (source->ssl, ptr+read, readlen);
-			int err = SSL_get_error(source->ssl, received);
+            received = SSL_read (source->stream, ptr+read, readlen);
+			int err = SSL_get_error(source->stream, received);
             if (received > 0)
             {
                 read += received;
@@ -518,7 +523,7 @@ int antd_recv(void *src,  void* data, int len)
                         // no data available right now, wait a few seconds in case new data arrives...
                         //printf("SSL_ERROR_WANT_READ\n");
 
-                        int sock = SSL_get_rfd(source->ssl);
+                        int sock = SSL_get_rfd(source->stream);
                         FD_ZERO(&fds);
                         FD_SET(sock, &fds);
 
@@ -538,7 +543,7 @@ int antd_recv(void *src,  void* data, int len)
                     {
                         // socket not writable right now, wait a few seconds and try again...
                         //printf("SSL_ERROR_WANT_WRITE \n");
-                        int sock = SSL_get_wfd(source->ssl);
+                        int sock = SSL_get_wfd(source->stream);
                         FD_ZERO(&fds);
                         FD_SET(sock, &fds);
 
@@ -595,7 +600,7 @@ int antd_recv(void *src,  void* data, int len)
 		read = 0;
 		while (readlen > 0 )
         {
-            received = recv(((int) source->sock), ptr+read, readlen, 0);
+            received = recv(((int) source->id), ptr+read, readlen, 0);
 			//LOG("Read : %c\n", *ptr);
             if (received > 0)
             {
@@ -656,24 +661,24 @@ int antd_close(void* src)
 	}
 #endif
 #ifdef USE_OPENSSL
-	if(source->ssl){
+	if(source->stream){
 		//printf("SSL:Shutdown ssl\n");
         //SSL_shutdown((SSL*) source->ssl);
-		SSL_set_shutdown((SSL*) source->ssl, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
+		SSL_set_shutdown((SSL*) source->stream, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
 		//printf("SSL:Free ssl\n");
-		SSL_free((SSL*) source->ssl);
+		SSL_free((SSL*) source->stream);
 		
 		//EVP_cleanup();
 		//ENGINE_cleanup();
 		CRYPTO_cleanup_all_ex_data();
 		ERR_remove_state(0);
 		ERR_free_strings();
-		source->ssl = NULL;
+		source->stream = NULL;
 		//LOG("Freeing SSL\n");
 	}
 #endif
 	//printf("Close sock %d\n", source->sock);
-	int ret = close(source->sock);
+	int ret = close(source->id);
 	free(src);
 	src = NULL;
 	return ret;

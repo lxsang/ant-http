@@ -402,7 +402,7 @@ int ws_client_connect(ws_client_t* wsclient, port_config_t pcnf)
 		return -1;
 	}
 	// will be free
-	wsclient->antdsock->sock = sock;
+	wsclient->antdsock->id = sock;
 	wsclient->antdsock->flags = 0;
 	wsclient->antdsock->last_io = time(NULL);
 	wsclient->antdsock->zstream = NULL;
@@ -486,19 +486,19 @@ int ws_client_connect(ws_client_t* wsclient, port_config_t pcnf)
 			SSL_CTX_set_verify(wsclient->ssl_ctx, SSL_VERIFY_NONE, NULL);	
 		}
 
-		wsclient->antdsock->ssl = (void*)SSL_new(wsclient->ssl_ctx);
-		if(!wsclient->antdsock->ssl)
+		wsclient->antdsock->stream = (void*)SSL_new(wsclient->ssl_ctx);
+		if(!wsclient->antdsock->stream)
 		{
 			ssl_err = ERR_get_error();
 			ERROR("SSL_new: %s", ERR_error_string(ssl_err, NULL));
 			return -1;
 		}
-		SSL_set_fd((SSL*)wsclient->antdsock->ssl, wsclient->antdsock->sock);
+		SSL_set_fd((SSL*)wsclient->antdsock->stream, wsclient->antdsock->id);
 		int stat, ret;
 		ERR_clear_error();
-		while( (ret = SSL_connect(wsclient->antdsock->ssl)) <= 0)
+		while( (ret = SSL_connect(wsclient->antdsock->stream)) <= 0)
 		{
-			stat = SSL_get_error(wsclient->antdsock->ssl, ret);
+			stat = SSL_get_error(wsclient->antdsock->stream, ret);
 			switch (stat)
 			{
 				case SSL_ERROR_WANT_READ:

@@ -75,7 +75,7 @@ static int process_setting_frame(antd_request_t* rq, antd_h2_frame_header_t* fra
         ptr += 2;
         memcpy(&param_val,ptr,4);
         param_val = ntohl(param_val);
-        printf("id: %d val: %d\n", param_id, param_val);
+        //printf("id: %d val: %d\n", param_id, param_val);
         switch (param_id)
         {
         case H2_SETTINGS_HEADER_TABLE_SIZE:
@@ -162,6 +162,160 @@ static int process_window_update_frame(antd_request_t* rq, antd_h2_frame_header_
     return H2_NO_ERROR;
 }
 
+static void antd_h2_error(void* source,int stream_id, int error_code)
+{
+    // send error frame
+    antd_h2_conn_t* conn = H2_CONN(source);
+    if(!conn) return;
+    antd_h2_frame_header_t header;
+    header.identifier = stream_id;
+    //header.type = stat;
+    header.flags = 0;
+    header.length = 8;
+    uint8_t error_body[8];
+    int tmp = htonl(conn->last_stream_id);
+    memcpy(error_body, &tmp , 4 );
+    tmp = htonl(error_code);
+    memcpy(error_body + 4, &tmp ,4);
+    header.type = H2_FRM_RST_STREAM;
+    if(stream_id == 0)
+        header.type = H2_FRM_GOAWAY;
+    antd_h2_send_frame(source,&header,error_body);
+}
+
+antd_h2_stream_t* antd_h2_init_stream(int id, int wsz)
+{
+    antd_h2_stream_t* stream = (antd_h2_stream_t*) malloc(sizeof(antd_h2_stream_t));
+    if(!stream) return NULL;
+    stream->id = id;
+    stream->win_sz = wsz;
+    stream->state = H2_STR_IDLE;
+    stream->stdin = ALLOC_QUEUE_ROOT();
+    stream->stdout = ALLOC_QUEUE_ROOT();
+    //stream->flags = 0;
+    stream->dependency = 0;
+    stream->weight = 255;
+    return stream;
+}
+
+antd_request_t* antd_h2_request_init(antd_request_t* rq,  antd_h2_stream_t* stream)
+{
+    antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+    antd_request_t* h2rq = (antd_request_t*)malloc(sizeof(*h2rq));
+    h2rq->client = client;
+    h2rq->request = dict();
+    client->zstream = NULL;
+    client->z_level = ANTD_CNONE;
+    
+    dictionary_t h2xheader = dict();
+    dictionary_t xheader = (dictionary_t)dvalue(rq->request,"REQUEST_HEADER");
+
+    dput(h2rq->request, "REQUEST_HEADER", h2xheader);
+	dput(h2rq->request, "REQUEST_DATA", dict());
+    dput_static(h2xheader, "SERVER_PORT", dvalue(xheader,"SERVER_PORT"));
+	dput_static(h2xheader, "SERVER_WWW_ROOT", dvalue(xheader,"SERVER_WWW_ROOT"));
+    dput_static(h2xheader, "REMOTE_ADDR", dvalue(xheader,"REMOTE_ADDR"));
+    client->id = stream->id;
+    time(&client->last_io);
+	client->stream = stream;
+    client->flags =  CLIENT_FL_ACCEPTED | CLIENT_FL_H2_STREAM;
+    return h2rq;
+}
+
+static void* antd_h2_stream_handle(void* data)
+{
+    antd_request_t* rq = (antd_request_t*) data;
+    antd_h2_stream_t* stream = (antd_h2_stream_t*) rq->client->stream;
+    // transition state here
+    // TODO: next day 
+    return NULL;
+}
+
+
+static int process_header_frame(antd_request_t* rq, antd_h2_frame_header_t* frame_h)
+{
+    if(frame_h->length == 0 || frame_h->identifier == 0)
+    {
+        return H2_PROTOCOL_ERROR;
+    }
+    uint8_t* data =  (uint8_t*) malloc(frame_h->length);
+    if(!data)
+    {
+        return H2_INTERNAL_ERROR;
+    }
+    if(antd_recv(rq->client,data,frame_h->length) != (int)frame_h->length)
+    {
+        free(data);
+        return H2_PROTOCOL_ERROR;
+    }
+    // now parse the stream
+    antd_h2_conn_t* conn = H2_CONN(rq);
+    if(!conn)
+    {
+        free(data);
+        return H2_INTERNAL_ERROR;
+    }
+    int is_new_stream = 0;
+    antd_h2_stream_t* stream = antd_h2_get_stream(conn->streams,frame_h->identifier);
+    if(stream == NULL)
+    {
+        stream = antd_h2_init_stream(frame_h->identifier,conn->settings.init_win_sz);
+        antd_h2_add_stream(conn->streams,stream);
+        is_new_stream = 1;
+    }
+    if( stream->state == H2_STR_IDLE || stream->state == H2_STR_REV_LOC || stream->state == H2_STR_OPEN || stream->state == H2_STR_HALF_CLOSED_REM )
+    {
+        antd_h2_frame_t* frame = (antd_h2_frame_t*) malloc(sizeof(antd_h2_frame_t));
+        frame->header = *frame_h;
+        frame->pageload = data;
+        h2_stream_io_put(stream,frame);
+        if(is_new_stream)
+        {
+            // TODO create new request
+            // just dump the scheduler when we have a connection
+            antd_schedule_task( antd_create_task(antd_h2_stream_handle, antd_h2_request_init(rq, stream) , NULL, time(NULL)));
+        }
+        return H2_NO_ERROR;
+    }
+    else
+    {
+        free(data);
+        return H2_PROTOCOL_ERROR;
+    }
+}
+
+antd_h2_frame_t* h2_streamio_get(struct queue_root* io)
+{
+    struct queue_head* head = queue_get(io);
+    if(!head) return NULL;
+    antd_h2_frame_t* frame = (antd_h2_frame_t*)head->data;
+    free(head);
+    return frame;
+}
+
+void h2_stream_io_put(antd_h2_stream_t* stream, antd_h2_frame_t* frame)
+{
+    struct queue_head* head = (struct queue_head*) malloc(sizeof(struct queue_head));
+    INIT_QUEUE_HEAD(head);
+    head->data = (void*)frame;
+    if(frame->header.identifier % 2 == 0)
+    {
+        queue_put(head, stream->stdin);
+    }
+    else
+    {
+        queue_put(head, stream->stdout);
+    }
+}
+
+
+void antd_h2_destroy_frame(antd_h2_frame_t* frame)
+{
+    if(frame->pageload)
+        free(frame->pageload);
+    free(frame);
+}
+
 static int process_frame(void* source, antd_h2_frame_header_t* frame_h)
 {
     int stat;
@@ -173,6 +327,9 @@ static int process_frame(void* source, antd_h2_frame_header_t* frame_h)
         case H2_FRM_WINDOW_UPDATE:
             stat = process_window_update_frame(source,frame_h);
             break;
+        case H2_FRM_HEADER:
+            stat = process_header_frame(source, frame_h);
+            break;
         default:
             printf("Frame: %d, length: %d id: %d\n", frame_h->type, frame_h->length, frame_h->identifier);
             stat = H2_IGNORED;
@@ -180,25 +337,7 @@ static int process_frame(void* source, antd_h2_frame_header_t* frame_h)
     if(stat == H2_NO_ERROR || stat == H2_IGNORED) 
         return stat;
 
-    antd_h2_conn_t* conn = H2_CONN(source);
-    if(conn)
-    {
-        // send error frame
-        antd_h2_frame_header_t header;
-        header.identifier = frame_h->identifier;
-        //header.type = stat;
-        header.flags = 0;
-        header.length = 8;
-        uint8_t error_body[8];
-        int tmp = htonl(conn->last_stream_id);
-        memcpy(error_body, &tmp , 4 );
-        tmp = htonl(stat);
-        memcpy(error_body + 4, &tmp ,4);
-        header.type = H2_FRM_RST_STREAM;
-        if(frame_h->identifier == 0)
-            header.type = H2_FRM_GOAWAY;
-        antd_h2_send_frame(source,&header,error_body);
-    }
+    antd_h2_error(source, frame_h->identifier,stat);
     return stat;
 
 }
@@ -213,15 +352,17 @@ void* antd_h2_preface_ck(void* data)
     {
         // TODO servers MUST treat an invalid connection preface as a
         // connection error (Section 5.4.1) of type PROTOCOL_ERROR
-        ERROR("Unable to read preface for client %d: [%s]",rq->client->sock,buf);
+        ERROR("Unable to read preface for client %d: [%s]",rq->client->id,buf);
+        antd_h2_error(data,0, H2_PROTOCOL_ERROR);
         return antd_empty_task((void *)rq,rq->client->last_io);
     }
     buf[24] = '\0';
     if(strcmp(buf, H2_CONN_PREFACE) != 0)
     {
-        ERROR("Connection preface is not correct for client %d: [%s]",rq->client->sock,buf);
+        ERROR("Connection preface is not correct for client %d: [%s]",rq->client->id,buf);
         // TODO servers MUST treat an invalid connection preface as a
         // connection error (Section 5.4.1) of type PROTOCOL_ERROR
+        antd_h2_error(data,0, H2_PROTOCOL_ERROR);
         return antd_empty_task((void *)rq, rq->client->last_io);
     }
     // read the setting frame
@@ -230,8 +371,8 @@ void* antd_h2_preface_ck(void* data)
         // TODO: frame error
         // 
         // send go away with PROTOCOL_ERROR
-        printf("error reading setting frame\n");
-        ERROR("Unable to read setting frame from client %d",rq->client->sock);
+        ERROR("Unable to read setting frame from client %d",rq->client->id);
+        antd_h2_error(data,0, H2_PROTOCOL_ERROR);
         return antd_empty_task((void *)rq, rq->client->last_io);
     }
     // create a connection
@@ -248,18 +389,15 @@ void* antd_h2_preface_ck(void* data)
         header.identifier = 0;
         if(antd_h2_send_frame(rq, &header,NULL))
         {
-            printf("frame sent\n");
             return antd_create_task(antd_h2_handle, (void *)rq, NULL, rq->client->last_io);
         }
         else
         {
-            printf("cannot send frame\n");
             return antd_empty_task(data, rq->client->last_io);
         }  
     }
     else
     {
-        printf("Error process frame %d\n", stat);
         return antd_empty_task(data, rq->client->last_io);
     }
 }
@@ -267,14 +405,20 @@ void* antd_h2_preface_ck(void* data)
 void* antd_h2_handle(void* data)
 {
     antd_request_t* rq = (antd_request_t*) data;
-    antd_task_t* task;
+    antd_task_t* task = NULL;
     if(rq->client->flags & CLIENT_FL_READABLE)
     {
-        antd_h2_read(data);
+        if(!antd_h2_read(data))
+        {
+            return antd_empty_task(data, rq->client->last_io);
+        }
     }
     if(rq->client->flags & CLIENT_FL_WRITABLE)
     {
-        antd_h2_write(data);
+        if(!antd_h2_write(data))
+        {
+            return antd_empty_task(data, rq->client->last_io);
+        }
     }
 
     task = antd_create_task(antd_h2_handle, (void *)rq, NULL, rq->client->last_io);
@@ -285,30 +429,34 @@ void* antd_h2_handle(void* data)
 
 
 
-void* antd_h2_read(void* data)
+int antd_h2_read(void* data)
 {
     antd_h2_frame_header_t frame_h;
     antd_request_t* rq = (antd_request_t*) data;
     if(!antd_h2_read_frame_header(rq->client, &frame_h))
     {
-        // TODO: frame error
         // send goaway frame
-        ERROR("Unable to read frame from client %d",rq->client->sock);
-        return antd_empty_task(data, rq->client->last_io);
+        ERROR("Unable to read frame from client %d",rq->client->id);
+        antd_h2_error(data, 0, H2_PROTOCOL_ERROR);
+        return 0;
     }
-    process_frame(data, &frame_h);
-    return  antd_empty_task(data, rq->client->last_io);
+    int stat = process_frame(data, &frame_h);
+    if(stat == H2_NO_ERROR || stat == H2_IGNORED)
+        return 1;
+
+    return  0;
 }
-void* antd_h2_write(void* data)
+int antd_h2_write(void* data)
 {
-    antd_request_t* rq = (antd_request_t*) data;
+    UNUSED(data);
+    //antd_request_t* rq = (antd_request_t*) data;
     //printf("write task\n");
-    return antd_empty_task(data, rq->client->last_io);
+    return 1;
 }
 
 antd_h2_conn_t* antd_h2_open_conn()
 {
-    antd_h2_conn_t* conn = (antd_h2_conn_t*) malloc(sizeof(conn));
+    antd_h2_conn_t* conn = (antd_h2_conn_t*) malloc(sizeof(antd_h2_conn_t));
     if(! conn)
         return NULL;
 
@@ -321,7 +469,11 @@ antd_h2_conn_t* antd_h2_open_conn()
     conn->win_sz = conn->settings.init_win_sz;
     conn->last_stream_id = 0;
     conn->streams = (antd_h2_stream_list_t*) malloc(2*sizeof(antd_h2_stream_list_t));
-
+    if(conn->streams)
+    {
+        conn->streams[0] = NULL;
+        conn->streams[1] = NULL;
+    }
     return conn;
 }
 
@@ -333,8 +485,8 @@ void antd_h2_close_conn(antd_h2_conn_t* conn)
 
     if(conn->streams)
     {
-        antd_h2_close_all_streams(conn->streams[0]);
-        antd_h2_close_all_streams(conn->streams[1]);
+        antd_h2_close_all_streams(&conn->streams[0]);
+        antd_h2_close_all_streams(&conn->streams[1]);
         free(conn->streams);
     }
     free(conn);
@@ -398,19 +550,31 @@ antd_h2_stream_t* antd_h2_get_stream(antd_h2_stream_list_t* streams, int id)
 void antd_h2_close_stream(antd_h2_stream_t* stream)
 {
     if(!stream) return;
-    if(stream->stdin) free(stream->stdin);
-    if(stream->stdout) free(stream->stdout);
-    free(stream);
+    // TODO empty the queue
+    if(stream->stdin)
+    {
+        queue_empty(stream->stdin, (void (*)(void*))antd_h2_destroy_frame);
+        free(stream->stdin);
+    }
+    if(stream->stdout)
+    {
+        queue_empty(stream->stdout, (void (*)(void*))antd_h2_destroy_frame);
+        free(stream->stdout);
+    }
+    //free(stream);
 }
 
-void antd_h2_close_all_streams(antd_h2_stream_list_t streams)
+void antd_h2_close_all_streams(antd_h2_stream_list_t* streams)
 {
     antd_h2_stream_list_t it;
-    for(it = streams; it != NULL; it = it->next)
+    while((*streams) != NULL)
     {
+        it = *streams;
+        (*streams) = (*streams)->next;
         if(it->stream)
         {
             antd_h2_close_stream(it->stream);
+            free(it->stream);
         }
         free(it);
     }
@@ -436,6 +600,7 @@ void antd_h2_del_stream(antd_h2_stream_list_t* streams, int id)
         it = streams[idx];
         streams[idx] = it->next;
         antd_h2_close_stream(it->stream);
+        free(it->stream);
         free(it);
         return;
     }
@@ -448,6 +613,7 @@ void antd_h2_del_stream(antd_h2_stream_list_t* streams, int id)
             it->next = np->next;
             np->next = NULL;
             antd_h2_close_stream(np->stream);
+            free(np->stream);
             free(np);
             return;
         }

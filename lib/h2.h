@@ -117,6 +117,17 @@ field value other than 0 MUST be treated as a connection error
 #define H2_SETTINGS_MAX_HEADER_LIST_SIZE        0x6
 
 
+// stream state
+typedef enum {
+    H2_STR_IDLE,
+    H2_STR_OPEN,
+    H2_STR_REV_LOC,
+    H2_STR_REV_REM,
+    H2_STR_HALF_CLOSED_LOC,
+    H2_STR_HALF_CLOSED_REM,
+    H2_STR_CLOSED
+} antd_h2_stream_state_t;
+
 typedef struct{
     uint32_t header_table_sz;
     uint32_t enable_push;
@@ -150,6 +161,10 @@ typedef struct {
     struct queue_root* stdin;
     struct queue_root* stdout;
     int win_sz;
+    antd_h2_stream_state_t state;
+    //uint8_t flags;
+    int dependency;
+    uint8_t weight;
     int id;
 } antd_h2_stream_t;
 
@@ -167,20 +182,34 @@ typedef struct {
     unsigned int identifier;
 } antd_h2_frame_header_t;
 
+typedef struct {
+    antd_h2_frame_header_t header;
+    uint8_t* pageload;
+} antd_h2_frame_t;
+
+
+/*Frame utilities functions*/
+void antd_h2_destroy_frame(antd_h2_frame_t*);
+
 /*stream utilities functions*/
+antd_h2_stream_t* antd_h2_init_stream(int id, int wsz);
 void antd_h2_close_stream(antd_h2_stream_t* stream);
 void antd_h2_add_stream(antd_h2_stream_list_t*, antd_h2_stream_t*);
 antd_h2_stream_t* antd_h2_get_stream(antd_h2_stream_list_t*, int);
 void antd_h2_del_stream(antd_h2_stream_list_t*, int);
-void antd_h2_close_all_streams(antd_h2_stream_list_t);
+void antd_h2_close_all_streams(antd_h2_stream_list_t*);
 void antd_h2_update_streams_win_sz(antd_h2_stream_list_t streams, int offset);
+void h2_stream_io_put(antd_h2_stream_t*, antd_h2_frame_t*);
+antd_h2_frame_t* h2_streamio_get(struct queue_root*);
+antd_request_t* antd_h2_request_init(antd_request_t*, antd_h2_stream_t*);
+
 
 /*Connection utilities funtions*/
 antd_h2_conn_t* antd_h2_open_conn();
 void antd_h2_close_conn(antd_h2_conn_t*);
 
-void* antd_h2_read(void* rq);
-void* antd_h2_write(void* rq);
+int antd_h2_read(void* rq);
+int antd_h2_write(void* rq);
 void* antd_h2_preface_ck(void* rq);
 void* antd_h2_handle(void* rq);
 int antd_h2_send_frame(antd_request_t*, antd_h2_frame_header_t*, uint8_t*);

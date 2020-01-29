@@ -44,6 +44,7 @@ typedef enum {ANTD_CGZ, ANTD_CDEFL, ANTD_CNONE} antd_compress_t;
 #define CLIENT_FL_HTTP_1_1          0x04
 #define CLIENT_FL_READABLE          0x08
 #define CLIENT_FL_WRITABLE          0x10
+#define CLIENT_FL_H2_STREAM         0x20
 
 typedef struct {
     unsigned int port;
@@ -54,8 +55,8 @@ typedef struct {
 } port_config_t;
 
 typedef struct{
-    int sock;
-    void* ssl;
+    int id;
+    void* stream;
     uint8_t flags;
     time_t last_io;
     // compress option
@@ -122,6 +123,7 @@ void __attribute__((weak)) dbdir(char* dest);
 void __attribute__((weak)) tmpdir(char* dest);
 void __attribute__((weak)) plugindir(char* dest);
 int __attribute__((weak))  compressable(char* ctype);
+void __attribute__((weak))  antd_schedule_task(antd_task_t*);
 
 void set_nonblock(int socket);
 //void set_block(int socket);

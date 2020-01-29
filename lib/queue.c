@@ -50,6 +50,24 @@ void queue_put(struct queue_head *new,
 	}
 }
 
+int queue_readable(struct queue_root *root)
+{
+	return root->out_queue != NULL && root->out_queue != QUEUE_POISON1;
+}
+
+void queue_empty(struct queue_root * root, void (* fn)(void*))
+{
+	struct queue_head* head = NULL;
+	while((head = queue_get(root)) != NULL)
+	{
+		if(fn)
+		{
+			fn(head->data);
+		}
+		free(head);
+	}
+}
+
 struct queue_head *queue_get(struct queue_root *root)
 {
 //	pthread_spin_lock(&root->lock);

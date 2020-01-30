@@ -192,7 +192,7 @@ antd_h2_stream_t* antd_h2_init_stream(int id, int wsz)
     stream->state = H2_STR_IDLE;
     stream->stdin = ALLOC_QUEUE_ROOT();
     stream->stdout = ALLOC_QUEUE_ROOT();
-    //stream->flags = 0;
+    stream->flags = 0;
     stream->dependency = 0;
     stream->weight = 255;
     return stream;
@@ -226,8 +226,33 @@ static void* antd_h2_stream_handle(void* data)
 {
     antd_request_t* rq = (antd_request_t*) data;
     antd_h2_stream_t* stream = (antd_h2_stream_t*) rq->client->stream;
-    // transition state here
-    // TODO: next day 
+    antd_task_t* task = NULL;
+
+    if(stream->state == H2_STREAM_CLOSED)
+    {
+        return antd_empty_task(data, rq->client->last_io);
+    }
+
+    // print header info
+    antd_h2_frame_t* frame = antd_h2_streamio_get(stream->stdin);
+    if(!frame)
+    {
+        task = antd_create_task(antd_h2_stream_handle,data,NULL,rq->client->last_io);
+        task->priority++;
+        return task;
+    }
+
+    // print stream status
+    printf("End stream: %d\n", stream->flags & H2_END_STREAM_FLG);
+    printf("Priority %d\n", stream->flags & H2_PRIORITY_FLG );
+    printf("Exclusive %d\n", stream->flags & H2_EXCLUSIVE_FLG );
+    printf("dependencies %d\n", stream->dependency);
+    printf("weight %d\n", stream->weight);
+
+    printf("frame end stream %d\n", frame->header.flags & H2_END_STREAM_FLG);
+    printf("frame end header %d\n", frame->header.flags & H2_END_HEADERS_FLG);
+    printf("frame padded %d\n", frame->header.flags & H2_PADDED_FLG);
+    printf("frame priority %d\n", frame->header.flags & H2_PRIORITY_FLG);
     return NULL;
 }
 
@@ -263,28 +288,59 @@ static int process_header_frame(antd_request_t* rq, antd_h2_frame_header_t* fram
         antd_h2_add_stream(conn->streams,stream);
         is_new_stream = 1;
     }
-    if( stream->state == H2_STR_IDLE || stream->state == H2_STR_REV_LOC || stream->state == H2_STR_OPEN || stream->state == H2_STR_HALF_CLOSED_REM )
+
+    // switch state here
+    switch (stream->state)
     {
-        antd_h2_frame_t* frame = (antd_h2_frame_t*) malloc(sizeof(antd_h2_frame_t));
-        frame->header = *frame_h;
-        frame->pageload = data;
-        h2_stream_io_put(stream,frame);
-        if(is_new_stream)
-        {
-            // TODO create new request
-            // just dump the scheduler when we have a connection
-            antd_schedule_task( antd_create_task(antd_h2_stream_handle, antd_h2_request_init(rq, stream) , NULL, time(NULL)));
-        }
-        return H2_NO_ERROR;
-    }
-    else
-    {
+    case H2_STR_IDLE:
+        stream->state = H2_STR_OPEN;
+        break;
+    
+    case H2_STR_REV_REM:
+        stream->state = H2_STR_HALF_CLOSED_LOC;
+        break;
+    
+    default:
         free(data);
         return H2_PROTOCOL_ERROR;
     }
+
+    antd_h2_frame_t* frame = (antd_h2_frame_t*) malloc(sizeof(antd_h2_frame_t));
+    frame->header = *frame_h;
+    frame->pageload = data;
+
+    stream->flags = (frame_h->flags & H2_END_STREAM_FLG) | (frame_h->flags & H2_PRIORITY_FLG);
+    if(frame_h->flags & H2_PRIORITY_FLG)
+    {
+        uint8_t* ptr = data;
+        if(frame_h->flags & H2_PADDED_FLG)
+            ptr += 1;
+        // set stream weight + dependencies
+        memcpy(&stream->dependency, ptr, 4);
+        printf("%u\n", stream->dependency);
+        stream->dependency = ntohl(stream->dependency) & 0x7FFFFFFF;
+        printf("%d\n", *ptr);
+        if(*(ptr) & 0x80)
+        {
+            stream->flags |=  H2_EXCLUSIVE_FLG;
+        }
+        else
+        {
+            stream->flags &= ~H2_EXCLUSIVE_FLG;
+        }
+        stream->weight = *(data + 4);
+        // set flag
+    }
+    
+    h2_stream_io_put(stream,frame);
+    if(is_new_stream)
+    {
+        antd_schedule_task( antd_create_task(antd_h2_stream_handle, antd_h2_request_init(rq, stream) , NULL, time(NULL)));
+    }
+    return H2_NO_ERROR;
 }
 
-antd_h2_frame_t* h2_streamio_get(struct queue_root* io)
+antd_h2_frame_t* antd_h2_streamio_get(struct queue_root* io)
 {
     struct queue_head* head = queue_get(io);
     if(!head) return NULL;
@@ -300,11 +356,11 @@ void h2_stream_io_put(antd_h2_stream_t* stream, antd_h2_frame_t* frame)
     head->data = (void*)frame;
     if(frame->header.identifier % 2 == 0)
     {
-        queue_put(head, stream->stdin);
+        queue_put(head, stream->stdout);
     }
     else
     {
-        queue_put(head, stream->stdout);
+        queue_put(head, stream->stdin);
     }
 }
 

@@ -1,4 +1,5 @@
 #include "handle.h"
+
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 
 static const char* S_100 =  "Continue";
@@ -661,21 +662,28 @@ int antd_close(void* src)
 	}
 #endif
 #ifdef USE_OPENSSL
-	if(source->stream){
-		//printf("SSL:Shutdown ssl\n");
-        //SSL_shutdown((SSL*) source->ssl);
-		SSL_set_shutdown((SSL*) source->stream, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
-		//printf("SSL:Free ssl\n");
-		SSL_free((SSL*) source->stream);
-		
-		//EVP_cleanup();
-		//ENGINE_cleanup();
-		CRYPTO_cleanup_all_ex_data();
-		ERR_remove_state(0);
-		ERR_free_strings();
-		source->stream = NULL;
-		//LOG("Freeing SSL\n");
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+	if(!(source->flags & CLIENT_FL_H2_STREAM))
+	{
+#endif
+		if(source->stream){
+			//printf("SSL:Shutdown ssl\n");
+			//SSL_shutdown((SSL*) source->ssl);
+			SSL_set_shutdown((SSL*) source->stream, SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN);
+			//printf("SSL:Free ssl\n");
+			SSL_free((SSL*) source->stream);
+			
+			//EVP_cleanup();
+			//ENGINE_cleanup();
+			CRYPTO_cleanup_all_ex_data();
+			ERR_remove_state(0);
+			ERR_free_strings();
+			source->stream = NULL;
+			//LOG("Freeing SSL\n");
+		}
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
 	}
+#endif
 #endif
 	//printf("Close sock %d\n", source->sock);
 	int ret = close(source->id);

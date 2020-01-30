@@ -117,6 +117,15 @@ field value other than 0 MUST be treated as a connection error
 #define H2_SETTINGS_MAX_HEADER_LIST_SIZE        0x6
 
 
+/*header flag*/
+#define H2_END_STREAM_FLG        0x1
+#define H2_END_HEADERS_FLG       0x4
+#define H2_PADDED_FLG            0x8
+#define H2_PRIORITY_FLG          0x20
+#define H2_EXCLUSIVE_FLG         0x40
+
+
+
 // stream state
 typedef enum {
     H2_STR_IDLE,
@@ -125,7 +134,8 @@ typedef enum {
     H2_STR_REV_REM,
     H2_STR_HALF_CLOSED_LOC,
     H2_STR_HALF_CLOSED_REM,
-    H2_STR_CLOSED
+    H2_STR_CLOSED,
+    H2_STR_FINALIZED
 } antd_h2_stream_state_t;
 
 typedef struct{
@@ -162,8 +172,8 @@ typedef struct {
     struct queue_root* stdout;
     int win_sz;
     antd_h2_stream_state_t state;
-    //uint8_t flags;
-    int dependency;
+    uint8_t flags;
+    uint32_t dependency;
     uint8_t weight;
     int id;
 } antd_h2_stream_t;
@@ -200,7 +210,7 @@ void antd_h2_del_stream(antd_h2_stream_list_t*, int);
 void antd_h2_close_all_streams(antd_h2_stream_list_t*);
 void antd_h2_update_streams_win_sz(antd_h2_stream_list_t streams, int offset);
 void h2_stream_io_put(antd_h2_stream_t*, antd_h2_frame_t*);
-antd_h2_frame_t* h2_streamio_get(struct queue_root*);
+antd_h2_frame_t* antd_h2_streamio_get(struct queue_root*);
 antd_request_t* antd_h2_request_init(antd_request_t*, antd_h2_stream_t*);
 
 

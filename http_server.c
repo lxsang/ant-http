@@ -1419,14 +1419,25 @@ void destroy_request(void *data)
 		dput(rq->request, "REQUEST_HEADER", NULL);
 		dput(rq->request, "REQUEST_DATA", NULL);
 		dput(rq->request, "COOKIE", NULL);
+	
 #ifdef USE_OPENSSL
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
-		antd_h2_conn_t* conn = H2_CONN(data);
-		if(conn)
+		if(rq->client->flags & CLIENT_FL_H2_STREAM)
 		{
-			//H2_CONNECTION
-			antd_h2_close_conn(conn);
-			dput(rq->request, "H2_CONNECTION", NULL);
+			// close the stream
+			antd_h2_stream_t* stream = (antd_h2_stream_t*)rq->client->stream;
+			antd_h2_close_stream(stream);
+			stream->state  = H2_STR_FINALIZED;
+		}
+		else
+		{
+			antd_h2_conn_t* conn = H2_CONN(data);
+			if(conn)
+			{
+				//H2_CONNECTION
+				antd_h2_close_conn(conn);
+				dput(rq->request, "H2_CONNECTION", NULL);
+			}
 		}
 #endif
 #endif

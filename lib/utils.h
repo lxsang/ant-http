@@ -57,12 +57,12 @@ THE SOFTWARE.
 #define false 0
 
 #ifdef DEBUG
-	#define LOG(a,...) syslog (LOG_NOTICE,"[%s: %d]: " a "\n", __FILE__, \
+	#define LOG(a,...) syslog (LOG_NOTICE,"ANTD_LOG@[%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 #else
     #define LOG(a,...) do{}while(0)
 #endif
-#define ERROR(a,...) syslog (LOG_ERR, "[%s: %d]: " a "\n", __FILE__, \
+#define ERROR(a,...) syslog (LOG_ERR, "ANTD_ERROR@[%s: %d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 // add this to the utils
 #define UNUSED(x) (void)(x)

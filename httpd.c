@@ -123,6 +123,8 @@ void configure_context(SSL_CTX *ctx)
 
 void stop_serve(int dummy) {
 	UNUSED(dummy);
+	// close log server
+	closelog ();
 	sigset_t mask;
 	sigemptyset(&mask);	
 	//Blocks the SIG_IGN signal (by adding SIG_IGN to newMask)
@@ -166,6 +168,9 @@ int main(int argc, char* argv[])
 	signal(SIGINT, stop_serve);
 
 	config_t* conf = config();
+	// start syslog
+	setlogmask (LOG_UPTO (LOG_NOTICE));
+	openlog (SERVER_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
 
 #ifdef USE_OPENSSL
 	if( conf->enable_ssl == 1 )

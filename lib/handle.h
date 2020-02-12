@@ -85,9 +85,6 @@ typedef struct  {
     int connection;
     int n_workers;
     int max_upload_size;
-    // log
-    FILE* errorfp;
-    FILE* logfp;
     // ssl
     int enable_ssl;
     char* sslcert;

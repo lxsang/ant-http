@@ -27,57 +27,6 @@ config_t *config()
 {
 	return &server_config;
 }
-
-void error_log(const char* fmt, ...)
-{
-	if(server_config.errorfp)
-	{
-		va_list arguments;
-		char * data;
-    	va_start( arguments, fmt);
-    	int dlen = vsnprintf(0,0,fmt,arguments) + 1;
-    	va_end(arguments); 
-    	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
-    	{
-			char buf[64];
-			server_time(buf,64);
-			fwrite(buf,strlen(buf),1,server_config.errorfp);
-			va_start(arguments, fmt);
-			vsnprintf(data, dlen, fmt, arguments);
-			va_end(arguments);
-			fwrite(data,dlen,1,server_config.errorfp);
-            fflush(server_config.errorfp);
-			free(data);
-		}
-    }
-}
-
-#ifdef DEBUG
-void server_log(const char* fmt, ...)
-{
-
-	if(server_config.logfp)
-	{
-		va_list arguments;
-		char * data;
-    	va_start( arguments, fmt);
-    	int dlen = vsnprintf(0,0,fmt,arguments) + 1;
-    	va_end(arguments); 
-    	if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
-    	{
-			char buf[64];
-			server_time(buf,64);
-			fwrite(buf,strlen(buf),1,server_config.logfp);
-			va_start(arguments, fmt);
-			vsnprintf(data, dlen, fmt, arguments);
-			va_end(arguments);
-			fwrite(data,dlen,1,server_config.logfp);
-            fflush(server_config.logfp);
-			free(data);
-		}
-    }
-}
-#endif
 void destroy_config()
 {
 	freedict(server_config.handlers);
@@ -93,16 +42,6 @@ void destroy_config()
 		free(server_config.ssl_cipher);
 	if(server_config.gzip_types)
 		list_free(&server_config.gzip_types);
-	if(server_config.errorfp)
-	{
-		fclose(server_config.errorfp);
-	}
-#ifdef DEBUG
-	if(server_config.logfp)
-	{
-		fclose(server_config.logfp);
-	}
-#endif
 	if(server_config.mimes)
 		freedict(server_config.mimes);
 	if(server_config.ports)
@@ -166,10 +105,6 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->n_workers = atoi(value);
 	}
-	else if (MATCH("SERVER", "error_log"))
-	{
-		pconfig->errorfp = fopen(value, "w");
-	}
 #ifdef USE_ZLIB
 	else if (MATCH("SERVER", "gzip_enable"))
 	{
@@ -178,12 +113,6 @@ static int config_handler(void *conf, const char *section, const char *name,
 	else if (MATCH("SERVER", "gzip_types"))
 	{
 		pconfig->gzip_types = split(value,",");
-	}
-#endif
-#ifdef DEBUG
-	else if (MATCH("SERVER", "server_log"))
-	{
-		pconfig->logfp = fopen(value, "w");
 	}
 #endif
 #ifdef USE_OPENSSL
@@ -290,8 +219,6 @@ void load_config(const char *file)
 	server_config.maxcon = 100;
 	server_config.max_upload_size = 10000000; //10Mb
 	server_config.connection = 0;
-	server_config.errorfp = NULL;
-	server_config.logfp = NULL;
 	server_config.mimes = dict();
 	server_config.enable_ssl = 0;
 	server_config.sslcert = "cert.pem";

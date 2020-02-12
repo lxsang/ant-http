@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
 	config_t* conf = config();
 	// start syslog
 	setlogmask (LOG_UPTO (LOG_NOTICE));
-	openlog (SERVER_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
+	openlog (SERVER_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
 #ifdef USE_OPENSSL
 	if( conf->enable_ssl == 1 )

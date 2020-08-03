@@ -69,6 +69,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 {
 	config_t *pconfig = (config_t *)conf;
 	regmatch_t port_matches[2];
+	struct stat st;
 	//trim(section, ' ');
 	//trim(value,' ');
 	//trim(name,' ');
@@ -76,6 +77,8 @@ static int config_handler(void *conf, const char *section, const char *name,
 	if (MATCH("SERVER", "plugins"))
 	{
 		pconfig->plugins_dir = strdup(value);
+		if (stat(pconfig->plugins_dir, &st) == -1)
+			mkdirp(pconfig->plugins_dir, 0755);
 	}
 	else if (MATCH("SERVER", "plugins_ext"))
 	{
@@ -84,10 +87,18 @@ static int config_handler(void *conf, const char *section, const char *name,
 	else if (MATCH("SERVER", "database"))
 	{
 		pconfig->db_path = strdup(value);
+		if (stat(pconfig->db_path, &st) == -1)
+			mkdirp(pconfig->db_path, 0755);
 	}
 	else if (MATCH("SERVER", "tmpdir"))
 	{
 		pconfig->tmpdir = strdup(value);
+		if (stat(pconfig->tmpdir, &st) == -1)
+			mkdirp(pconfig->tmpdir, 0755);
+		else
+		{
+			removeAll(pconfig->tmpdir, 0);
+		}
 	}
 	else if (MATCH("SERVER", "max_upload_size"))
 	{
@@ -161,6 +172,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 		if(strcmp(name, "htdocs") == 0)
 		{
 			p->htdocs = strdup(value);
+			if (stat(p->htdocs, &st) == -1)
+			{
+				mkdirp(p->htdocs, 0755);
+			}
 		}
 		else if(strcmp(name, "ssl.enable") == 0)
 		{
@@ -180,31 +195,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	return 1;
 }
-void init_file_system()
-{
-	struct stat st;
-	port_config_t* pcnf;
-	chain_t it;
-	if (stat(server_config.plugins_dir, &st) == -1)
-		mkdirp(server_config.plugins_dir, 0755);
-	if (stat(server_config.db_path, &st) == -1)
-		mkdirp(server_config.db_path, 0755);
-	for_each_assoc(it, server_config.ports)
-	{
-		pcnf = (port_config_t*) it->value;
-		if (stat(pcnf->htdocs, &st) == -1)
-		{
-			mkdirp(pcnf->htdocs, 0755);
-		}
 
-	}
-	if (stat(server_config.tmpdir, &st) == -1)
-		mkdirp(server_config.tmpdir, 0755);
-	else
-	{
-		removeAll(server_config.tmpdir, 0);
-	}
-}
 void load_config(const char *file)
 {
 	server_config.ports = dict();
@@ -249,7 +240,6 @@ void load_config(const char *file)
 #endif
 	}
 	LOG("%d mimes entries found", server_config.mimes->size);
-	init_file_system();
 }
 
 void *accept_request(void *data)

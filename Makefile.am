@@ -37,7 +37,7 @@ pkginclude_HEADERS =  lib/ini.h \
             lib/plugin.h
 
 
-EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE antd-config.ini
+EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE antd-config.ini ant-d antd.service
 # check for db 
 if DB
 libantd_la_SOURCES += lib/dbhelper.c
@@ -50,7 +50,12 @@ bin_PROGRAMS = antd
 antd_SOURCES = plugin_manager.c http_server.c httpd.c
 antd_LDADD = libantd.la
 
+
 sysconf_DATA = antd-config.ini
+
+install-data-local:
+	- install -c ant-d $(prefix)/bin
+	- [ -d /etc/systemd/system/ ] && cp antd.service /etc/systemd/system/
 
 #install-data-local: $(srcdir)/conf/config.file $(srcdir)/conf/sub1/config.file
 #        mkdir $(sysconfdir)/conf

@@ -937,7 +937,7 @@ void ws_confirm_request(void *client, const char *key)
 	char rkey[128];
 	char sha_d[20];
 	char base64[64];
-	strcpy(rkey, key);
+	strncpy(rkey, key, 128);
 	strcat(rkey, WS_MAGIC_STRING);
 	//printf("RESPONDKEY '%s'\n", rkey);
 #ifdef USE_OPENSSL
@@ -1307,15 +1307,15 @@ dictionary_t mimes_list()
 
 void  dbdir(char* dest)
 {
-	strcpy(dest,server_config.db_path);
+	strncpy(dest,server_config.db_path, 512);
 }
 void  tmpdir(char* dest)
 {
-	strcpy(dest, server_config.tmpdir);
+	strncpy(dest, server_config.tmpdir, 512);
 }
 void  plugindir(char* dest)
 {
-	strcpy(dest, server_config.plugins_dir);
+	strncpy(dest, server_config.plugins_dir, 512);
 }
 
 #ifdef USE_ZLIB

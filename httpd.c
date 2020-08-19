@@ -150,6 +150,96 @@ void stop_serve(int dummy) {
 	sigprocmask(SIG_UNBLOCK, &mask, NULL); 
 }
 
+static void* antd_monitor(port_config_t* pcnf)
+{
+	antd_task_t* task = NULL;
+	struct timeval timeout;
+	int client_sock = -1;
+	struct sockaddr_in client_name;
+	socklen_t client_name_len = sizeof(client_name);
+	char* client_ip = NULL;
+	config_t* conf = config();
+	LOG("Listening on port %d", pcnf->port);
+	while (scheduler.status)
+	{
+		if(conf->connection > conf->maxcon)
+		{
+			//ERROR("Reach max connection %d", conf->connection);
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 10000; // 5 ms
+			select(0, NULL, NULL, NULL, &timeout);
+			continue;
+		}
+		if(pcnf->sock > 0)
+		{
+			client_sock = accept(pcnf->sock,(struct sockaddr *)&client_name,&client_name_len);
+			if (client_sock > 0)
+			{
+				// just dump the scheduler when we have a connection
+				antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
+				antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
+				request->client = client;
+				request->request = dict();
+				client->zstream = NULL;
+				client->z_level = ANTD_CNONE;
+				
+				dictionary_t xheader = dict();
+				dput(request->request, "REQUEST_HEADER", xheader);
+				dput(request->request, "REQUEST_DATA", dict());
+				dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
+				dput(xheader, "SERVER_WWW_ROOT", (void*)strdup(pcnf->htdocs));
+				/*
+					get the remote IP
+				*/
+				if (client_name.sin_family == AF_INET)
+				{
+					client_ip =  inet_ntoa(client_name.sin_addr);
+					LOG("Connect to client IP: %s on port:%d", client_ip, pcnf->port);
+					// ip address
+					dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
+					//LOG("socket: %d\n", client_sock);
+				}
+
+				// set timeout to socket
+				set_nonblock(client_sock);
+				
+				client->sock = client_sock;
+				time(&client->last_io);
+				client->ssl = NULL;
+#ifdef USE_OPENSSL
+				client->status = 0;
+				if(pcnf->usessl == 1)
+				{
+					client->ssl = (void*)SSL_new(ctx);
+					if(!client->ssl) continue;
+					SSL_set_fd((SSL*)client->ssl, client->sock);
+					// this can be used in the protocol select callback to
+					// set the protocol selected by the server
+					if(!SSL_set_ex_data((SSL*)client->ssl, client->sock, client))
+					{
+						ERROR("Cannot set ex data to ssl client:%d", client->sock);
+					}
+					/*if (SSL_accept((SSL*)client->ssl) <= 0) {
+						LOG("EROOR accept\n");
+						ERR_print_errors_fp(stderr);
+						antd_close(client);
+						continue;
+					}*/
+				}
+#endif
+				pthread_mutex_lock(&scheduler.scheduler_lock);
+				conf->connection++;
+				pthread_mutex_unlock(&scheduler.scheduler_lock);
+				// create callback for the server
+				task = antd_create_task(accept_request,(void*)request, finish_request, client->last_io);
+				//task->type = LIGHT;
+				antd_add_task(&scheduler, task);
+			}
+		}
+	}
+	return NULL;
+}
+
 int main(int argc, char* argv[])
 {
 // load the config first
@@ -157,10 +247,6 @@ int main(int argc, char* argv[])
 		load_config(CONFIG_FILE);
 	else
 		load_config(argv[1]);
-	int client_sock = -1;
-	struct sockaddr_in client_name;
-	socklen_t client_name_len = sizeof(client_name);
-	char* client_ip = NULL;
 	// ignore the broken PIPE error when writing 
 	//or reading to/from a closed socked connection
 	signal(SIGPIPE, SIG_IGN);
@@ -182,6 +268,12 @@ int main(int argc, char* argv[])
 	}
     
 #endif
+	// enable scheduler
+	// default to 4 workers
+	scheduler.validate_data = 1;
+	scheduler.destroy_data = finish_request;
+	antd_scheduler_init(&scheduler, conf->n_workers);
+	pthread_t monitor_th;
 	// startup port
 	chain_t it;
 	port_config_t * pcnf;
@@ -194,9 +286,18 @@ int main(int argc, char* argv[])
 			pcnf->sock = startup(&pcnf->port);
 			if(pcnf->sock>0)
 			{
+				if (pthread_create(&monitor_th, NULL,(void *(*)(void *))antd_monitor, (void*)pcnf) != 0)
+				{
+					ERROR("pthread_create: cannot create worker");
+					stop_serve(0);
+					exit(1);
+				}
+				else
+				{
+					// reclaim data when exit
+					pthread_detach(monitor_th);
+				}
 				nlisten++;
-				set_nonblock(pcnf->sock);
-				LOG("Listening on port %d", pcnf->port);
 			}
 			else
 			{
@@ -210,133 +311,7 @@ int main(int argc, char* argv[])
 		stop_serve(0);
 		exit(1);
 	}
-	// default to 4 workers
-	antd_scheduler_init(&scheduler, conf->n_workers);
-	scheduler.validate_data = 1;
-	scheduler.destroy_data = finish_request;
-	// use blocking server_sock
-	// make the scheduler wait for event on another thread
-	// this allow to ged rid of high cpu usage on
-	// endless loop without doing anything
-    // set_nonblock(server_sock);
-	pthread_t scheduler_th;
-	if (pthread_create(&scheduler_th, NULL,(void *(*)(void *))antd_wait, (void*)&scheduler) != 0)
-	{
-		ERROR("pthread_create: cannot create worker");
-		stop_serve(0);
-		exit(1);
-	}
-	else
-	{
-		// reclaim data when exit
-		pthread_detach(scheduler_th);
-	}
-	antd_task_t* task = NULL;
-
-	fd_set read_flags, write_flags;
-	// first verify if the socket is ready
-	struct timeval timeout;
-	// select
-
-	while (scheduler.status)
-	{
-		if(conf->connection > conf->maxcon)
-		{
-			//ERROR("Reach max connection %d", conf->connection);
-			timeout.tv_sec = 0;
-			timeout.tv_usec = 10000; // 5 ms
-			select(0, NULL, NULL, NULL, &timeout);
-			continue;
-		}
-		for_each_assoc(it, conf->ports)
-		{
-			pcnf = (port_config_t*) it->value;
-			if(pcnf->sock > 0)
-			{
-				FD_ZERO(&read_flags);
-				FD_SET(pcnf->sock, &read_flags);
-				FD_ZERO(&write_flags);
-				FD_SET(pcnf->sock, &write_flags);
-				timeout.tv_sec = 0;
-				timeout.tv_usec = 10000; // 10 ms
-				int sel = select(pcnf->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
-				if(sel > 0 && (FD_ISSET(pcnf->sock, &read_flags) || FD_ISSET(pcnf->sock, &write_flags)))
-				{
-					client_sock = accept(pcnf->sock,(struct sockaddr *)&client_name,&client_name_len);
-					if (client_sock > 0)
-					{
-						// just dump the scheduler when we have a connection
-						antd_client_t* client = (antd_client_t*)malloc(sizeof(antd_client_t));
-						antd_request_t* request = (antd_request_t*)malloc(sizeof(*request));
-						request->client = client;
-						request->request = dict();
-						client->zstream = NULL;
-						client->z_level = ANTD_CNONE;
-						
-						dictionary_t xheader = dict();
-						dput(request->request, "REQUEST_HEADER", xheader);
-						dput(request->request, "REQUEST_DATA", dict());
-						dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
-						dput(xheader, "SERVER_WWW_ROOT", (void*)strdup(pcnf->htdocs));
-						/*
-							get the remote IP
-						*/
-						if (client_name.sin_family == AF_INET)
-						{
-							client_ip =  inet_ntoa(client_name.sin_addr);
-							LOG("Connect to client IP: %s on port:%d", client_ip, pcnf->port);
-							// ip address
-							dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
-							//LOG("socket: %d\n", client_sock);
-						}
-
-						// set timeout to socket
-						set_nonblock(client_sock);
-						/*struct timeval timeout;      
-						timeout.tv_sec = 0;
-						timeout.tv_usec = 5000;
-
-						if (setsockopt (client_sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-							perror("setsockopt failed\n");
-
-						if (setsockopt (client_sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout)) < 0)
-							perror("setsockopt failed\n");
-						*/
-						client->sock = client_sock;
-						time(&client->last_io);
-						client->ssl = NULL;
-	#ifdef USE_OPENSSL
-						client->status = 0;
-						if(pcnf->usessl == 1)
-						{
-							client->ssl = (void*)SSL_new(ctx);
-							if(!client->ssl) continue;
-							SSL_set_fd((SSL*)client->ssl, client->sock);
-							// this can be used in the protocol select callback to
-							// set the protocol selected by the server
-							if(!SSL_set_ex_data((SSL*)client->ssl, client->sock, client))
-							{
-								ERROR("Cannot set ex data to ssl client:%d", client->sock);
-							}
-							/*if (SSL_accept((SSL*)client->ssl) <= 0) {
-								LOG("EROOR accept\n");
-								ERR_print_errors_fp(stderr);
-								antd_close(client);
-								continue;
-							}*/
-						}
-	#endif
-						conf->connection++;
-						// create callback for the server
-						task = antd_create_task(accept_request,(void*)request, finish_request, client->last_io);
-						//task->type = LIGHT;
-						antd_add_task(&scheduler, task);
-					}
-				}
-			}
-		}
-	}
-
+	antd_wait(&scheduler);
 	stop_serve(0);
 	return(0);
 }

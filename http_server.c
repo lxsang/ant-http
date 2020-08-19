@@ -51,13 +51,16 @@ void destroy_config()
 		for_each_assoc(it, server_config.ports)
 		{
 			cnf = (port_config_t*)it->value;
-			if(cnf && cnf->htdocs)
-				free(cnf->htdocs);
-			if(cnf->sock > 0)
+			if(cnf != NULL)
 			{
-				close(cnf->sock);
+				if(cnf->htdocs != NULL)
+					free(cnf->htdocs);
+				if(cnf->sock > 0)
+				{
+					close(cnf->sock);
+				}
+				freedict(cnf->rules);
 			}
-			freedict(cnf->rules);
 		}
 		freedict(server_config.ports);
 	}

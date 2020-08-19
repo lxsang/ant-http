@@ -374,8 +374,7 @@ void ws_client_close(ws_client_t* wsclient)
 #ifdef USE_OPENSSL
 	if(wsclient->ssl_ctx)
 	{
-		if(wsclient->ssl_ctx)
-			SSL_CTX_free(wsclient->ssl_ctx);
+		SSL_CTX_free(wsclient->ssl_ctx);
 		FIPS_mode_set(0);
 		// DEPRECATED: CONF_modules_unload(1);
 		EVP_cleanup();

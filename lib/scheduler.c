@@ -118,7 +118,7 @@ static void destroy_queue(antd_task_queue_t q)
         free(curr);
     }
 }
-static void work(antd_worker_t* worker)
+static void* work(antd_worker_t* worker)
 {
     antd_scheduler_t* scheduler = (antd_scheduler_t*) worker->manager;
     while(scheduler->status)
@@ -142,6 +142,7 @@ static void work(antd_worker_t* worker)
         }
         
     }
+    return NULL;
 }
 
 /*

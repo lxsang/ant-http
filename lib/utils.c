@@ -485,8 +485,7 @@ char* __s(const char* fstring,...)
 	int dlen;
 	va_start( arguments, fstring);
     dlen = vsnprintf(0,0,fstring,arguments) + 1;
-    va_end(arguments); 
-    va_end(arguments); 
+    va_end(arguments);
     if ((data = (char*)malloc(dlen*sizeof(char))) != 0)
     {
         va_start(arguments, fstring);

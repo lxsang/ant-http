@@ -13,18 +13,14 @@ static  antd_scheduler_t scheduler;
 
 static int ssl_session_ctx_id = 1;
 SSL_CTX *ctx;
-void init_openssl()
+static void init_openssl()
 { 
     SSL_load_error_strings();	
     OpenSSL_add_ssl_algorithms();
 }
 
-void cleanup_openssl()
-{
-    EVP_cleanup();
-}
 
-SSL_CTX *create_context()
+static SSL_CTX *create_context()
 {
     const SSL_METHOD *method;
     SSL_CTX *ctx;
@@ -68,7 +64,7 @@ static int alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *ou
 	}
 }
 #endif
-void configure_context(SSL_CTX *ctx)
+static void configure_context(SSL_CTX *ctx)
 {
 #if defined(SSL_CTX_set_ecdh_auto)
     SSL_CTX_set_ecdh_auto(ctx, 1);
@@ -121,7 +117,7 @@ void configure_context(SSL_CTX *ctx)
 #endif
 
 
-void stop_serve(int dummy) {
+static void stop_serve(int dummy) {
 	UNUSED(dummy);
 	// close log server
 	closelog ();

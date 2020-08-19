@@ -280,7 +280,11 @@ int antd_send(void *src, const void* data_in, int len_in)
 	uint8_t* data = (uint8_t*)data_in;
 	int len = len_in;
 	antd_client_t * source = (antd_client_t *) src;
-
+	if(!src || !data)
+	{	
+		return -1;
+	}
+	
 #ifdef USE_ZLIB
 	if(source->zstream && source->z_level != ANTD_CNONE)
 	{
@@ -313,11 +317,6 @@ int antd_send(void *src, const void* data_in, int len_in)
 		return len;
 	}
 #endif
-
-	if(!src || !data)
-	{	
-		return -1;
-	}
 
 	int written;
 	char* ptr;

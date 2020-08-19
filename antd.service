@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/www
-ExecStart=ant-d
+ExecStart=/usr/bin/ant-d
 Restart=always
 LimitNOFILE=65536
 

@@ -1,11 +1,8 @@
 #ifndef PLUGIN_H
 #define PLUGIN_H
 
-#ifdef USE_DB
-#include "dbhelper.h"
-#endif
-#include "ws.h"
-#include "scheduler.h"
+#include "utils.h"
+#include "handle.h"
 
  
 

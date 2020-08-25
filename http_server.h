@@ -1,16 +1,9 @@
 #ifndef HTTP_SERVER
 #define HTTP_SERVER
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/stat.h>
-#include <pthread.h>
-#include <signal.h>
-#include <sys/socket.h>
-#include <sys/select.h>
+
+#include <stdio.h>
+#include <string.h>
 #include "lib/handle.h"
-#include "lib/scheduler.h"
-#include "plugin_manager.h"
 
 #define PLUGIN_HANDLER	 "handle"
 #define WS_MAGIC_STRING	 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"

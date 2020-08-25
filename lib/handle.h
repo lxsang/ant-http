@@ -1,26 +1,11 @@
 #ifndef HANDLE_H
 #define HANDLE_H
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <errno.h>
-//open ssl
-#ifdef USE_OPENSSL
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#endif
-#ifdef USE_ZLIB
-#include <zlib.h>
-#endif
-#ifdef USE_DB
-#include "dbhelper.h"
-#endif
 
-#include <fcntl.h>
-#include <stdlib.h>
-#include "dictionary.h"
+#include <time.h>
+
 #include "list.h"
-#include "ini.h"
+#include "dictionary.h"
+
 
 #define SERVER_NAME "Antd"
 #define IS_POST(method) (strcmp(method,"POST")== 0)

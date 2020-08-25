@@ -23,27 +23,12 @@ THE SOFTWARE.
 */
 #ifndef UTILS_H
 #define UTILS_H
-#include <stdio.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <strings.h>
-#include <string.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <ctype.h>
+
 #include <regex.h>
-#include <time.h>
-#include <stdint.h>
-#include <errno.h>
 #include <syslog.h>
-#ifdef USE_OPENSSL
-#include <openssl/sha.h>
-#else
-#include "sha1.h"
-#endif
-#include "base64.h"
+#include <stdint.h>
+#include <stdlib.h>
+
 #include "dictionary.h"
 
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))

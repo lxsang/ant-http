@@ -23,6 +23,29 @@ THE SOFTWARE.
 */
 #include "utils.h"
 
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <ctype.h>
+
+#ifdef USE_OPENSSL
+#include <openssl/sha.h>
+#else
+#include "sha1.h"
+#endif
+
+
+#include "dictionary.h"
+#include <time.h>
+
+
 
 void error_log(const char* fmt, ...)
 {

@@ -1,4 +1,8 @@
+#include <string.h>
+#include <stdio.h>
+
 #include "dbhelper.h"
+#include "utils.h"
 
 sqlite3 * database(const char* file)
 {

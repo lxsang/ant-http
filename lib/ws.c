@@ -1,7 +1,20 @@
+
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+#include<netdb.h> //hostent
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
+#include <sys/time.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+
+#include "utils.h"
+#include "handle.h"
+
 #include "ws.h"
 static void ws_gen_mask_key(ws_msg_header_t * header)
 {
@@ -332,7 +345,7 @@ int request_socket(const char* ip, int port)
 	struct sockaddr_in dest;
 	
 	// time out setting
-	struct timeval timeout;      
+	struct timeval timeout;
 	timeout.tv_sec = CONN_TIME_OUT_S;
 	timeout.tv_usec = 0;//3 s
 	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 )

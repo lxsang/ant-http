@@ -1,10 +1,9 @@
 #ifndef ANT_SCHEDULER
 #define ANT_SCHEDULER
 
-#include "utils.h"
 #include <pthread.h>
 #include <semaphore.h>
-#include <fcntl.h>
+#include <stdint.h>
 #define N_PRIORITY 10
 #define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
 #define LOW_PRIORITY (N_PRIORITY - 1)
@@ -98,7 +97,7 @@ typedef struct
 /*
     init the main scheduler
 */
-void antd_scheduler_init(antd_scheduler_t *, int);
+int antd_scheduler_init(antd_scheduler_t *, int);
 /*
     destroy all pending task
 */

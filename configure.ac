@@ -1,5 +1,5 @@
 # initialise autoconf and set up some basic information about the program we’re packaging
-AC_INIT([antd], [1.0.4b], [xsang.le@gmail.com])
+AC_INIT([antd], [1.0.5b], [xsang.le@gmail.com])
 
 # We’re going to use automake for this project
 AM_INIT_AUTOMAKE([subdir-objects])

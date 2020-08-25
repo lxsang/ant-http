@@ -1,19 +1,10 @@
 #ifndef WS_H
 #define WS_H
-#include <resolv.h>
-#include <errno.h>
-#include <ifaddrs.h>
-#include <sys/socket.h>
-#include <stdio.h>
-#include <stdint.h>
-#include<netdb.h> //hostent
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <libgen.h>
-#include <sys/time.h>
 
-#include "utils.h"
+#include <stdint.h>
+
 #include "handle.h"
+
 #define CONN_TIME_OUT_S 3
 #define BITV(v,i)  ((v & (1 << i)) >> i) 
 #define WS_TEXT	0x1

@@ -1,4 +1,22 @@
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <dlfcn.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
+
 #include "http_server.h"
+#include "lib/handle.h"
+#include "plugin_manager.h"
+#include "lib/scheduler.h"
+#include "lib/utils.h"
+#include "lib/ini.h"
+#include "lib/base64.h"
 
 //define all basic mime here
 static mime_t _mimes[] = {
@@ -254,7 +272,6 @@ void *accept_request(void *data)
 	antd_request_t *rq = (antd_request_t *)data;
 
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t *client = (antd_client_t *)rq->client;
@@ -274,15 +291,6 @@ void *accept_request(void *data)
 	}
 	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
 	{
-		/*if(client->last_wait == 0) client->last_wait = time(NULL);
-		// retry it later
-		if(time(NULL) - client->last_wait > MAX_WAIT_S)
-		{
-			LOG("Read and write timeout, give up on %d\n", client->sock);
-			server_config.connection++;
-			unknow(rq->client);
-			return task;
-		}*/
 		task->handle = accept_request;
 		return task;
 	}
@@ -300,16 +308,6 @@ void *accept_request(void *data)
 			case SSL_ERROR_WANT_READ:
 			case SSL_ERROR_WANT_WRITE:
 			case SSL_ERROR_NONE:
-				//LOG("RETRY SSL %d\n", client->sock);
-				/*if(client->last_wait == 0) client->last_wait = time(NULL);
-				if(time(NULL) - client->last_wait > MAX_WAIT_S)
-				{
-					server_config.connection++;
-					unknow(rq->client);
-					LOG("SSL timeout, give up on %d\n", client->sock);
-					return task;
-				}
-				task->status = TASK_ACCEPT_SSL_CONT;*/
 				task->handle = accept_request;
 				return task;
 			default:
@@ -329,14 +327,6 @@ void *accept_request(void *data)
 	{
 		if (!FD_ISSET(client->sock, &read_flags))
 		{
-			/*if(client->last_wait == 0) client->last_wait = time(NULL);
-			if(time(NULL) - client->last_wait > MAX_WAIT_S)
-			{
-				server_config.connection++;
-				unknow(rq->client);
-				LOG("Read timeout, give up on %d\n", client->sock);
-				return task;
-			}*/
 			task->handle = accept_request;
 			return task;
 		}
@@ -386,7 +376,6 @@ void *resolve_request(void *data)
 	char path[2 * BUFFLEN];
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
 	char *newurl = NULL;
 	char *rqp = NULL;
@@ -593,7 +582,6 @@ void *serve_file(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
 
@@ -636,9 +624,9 @@ void *serve_file(void *data)
 #ifdef USE_ZLIB
 			if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
 #endif
-				dput(rhd.header, "Content-Length", strdup(ibuf));
+			dput(rhd.header, "Content-Length", strdup(ibuf));
 			gmtime_r(&st.st_ctime, &tm);
-			strftime(ibuf, 255, "%a, %d %b %Y %H:%M:%S GMT", &tm);
+			strftime(ibuf, 64, "%a, %d %b %Y %H:%M:%S GMT", &tm);
 			dput(rhd.header, "Last-Modified", strdup(ibuf));
 			dput(rhd.header, "Cache-Control", strdup("no-cache"));
 			antd_send_header(rq->client, &rhd);
@@ -827,8 +815,6 @@ void *decode_request_header(void *data)
 		free(host);
 	// header ok, now checkmethod
 	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL,rq->client->last_io);
-
-	task->priority++;
 	return task;
 }
 
@@ -847,7 +833,6 @@ void *decode_request(void *data)
 		ws = 1;
 	method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0)
 	{
 		//if(ctype) free(ctype);
@@ -891,7 +876,6 @@ void *decode_post_request(void *data)
 		clen = atoi(tmp);
 	char *method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	task->type = HEAVY;
 	if (!method || strcmp(method, "POST") != 0)
 		return task;
@@ -1005,7 +989,6 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -1039,7 +1022,6 @@ void *decode_multi_part_request_data(void *data)
 	char *token, *keytoken, *valtoken;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	// search for content disposition:
@@ -1258,7 +1240,6 @@ void *execute_plugin(void *data, const char *pname)
 	char *error;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->priority++;
 	//LOG("Plugin name '%s'", pname);
 
 	//load the plugin
@@ -1297,7 +1278,6 @@ void *execute_plugin(void *data, const char *pname)
 	{
 		free(task);
 		task = antd_create_task(decode_post_request, (void *)rq, fn, rq->client->last_io);
-		task->priority++;
 	}
 	return task;
 }

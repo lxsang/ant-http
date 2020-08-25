@@ -1,4 +1,27 @@
-#include "handle.h" 
+#include "handle.h"
+#include "utils.h"
+
+#include <time.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
+//open ssl
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
+#ifdef USE_ZLIB
+#include <zlib.h>
+#endif
+#ifdef USE_DB
+#include "dbhelper.h"
+#endif
+
+#include <fcntl.h>
+#include <stdlib.h>
+
 #define HTML_TPL "<HTML><HEAD><TITLE>%s</TITLE></HEAD><BODY><h2>%s</h2></BODY></HTML>"
 
 static const char* S_100 =  "Continue";

@@ -1,4 +1,9 @@
+#include <dlfcn.h>
+#include <string.h>
 #include "plugin_manager.h"
+#include "lib/utils.h"
+#include "lib/handle.h"
+#include "http_server.h"
 /**
  * Plugin table to store the loaded plugin
  */

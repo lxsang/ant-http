@@ -1,7 +1,6 @@
 #ifndef DB_HELPER
 #define DB_HELPER
 #include <sqlite3.h>
-#include "utils.h"
 
 sqlite3 * database(const char*);
 typedef struct _dbfield

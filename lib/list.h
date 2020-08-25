@@ -23,7 +23,7 @@ THE SOFTWARE.
 */
 #ifndef LIST_H
 #define LIST_H
-#include "utils.h"
+
 
 #define LIST_TYPE_ARRAY		0x5
 #define LIST_TYPE_POINTER	0x4

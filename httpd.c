@@ -1,7 +1,18 @@
-
-#include <dirent.h>
+#include <pthread.h>
+#include <signal.h>
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include "http_server.h"
 #include "lib/ini.h"
+#include "lib/scheduler.h"
+#include "plugin_manager.h"
+#include "lib/utils.h"
+
 
 static  antd_scheduler_t scheduler;
 
@@ -238,6 +249,11 @@ static void* antd_monitor(port_config_t* pcnf)
 
 int main(int argc, char* argv[])
 {
+	pthread_t monitor_th;
+	// startup port
+	chain_t it;
+	port_config_t * pcnf;
+	int nlisten = 0;
 // load the config first
 	if(argc==1)
 		load_config(CONFIG_FILE);
@@ -268,12 +284,12 @@ int main(int argc, char* argv[])
 	// default to 4 workers
 	scheduler.validate_data = 1;
 	scheduler.destroy_data = finish_request;
-	antd_scheduler_init(&scheduler, conf->n_workers);
-	pthread_t monitor_th;
-	// startup port
-	chain_t it;
-	port_config_t * pcnf;
-	int nlisten = 0;
+	if(antd_scheduler_init(&scheduler, conf->n_workers) == -1)
+	{
+		ERROR("Unable to initialise scheduler. Exit");
+		stop_serve(0);
+		exit(1);
+	}
 	for_each_assoc(it, conf->ports)
 	{
 		pcnf = (port_config_t*)it->value;

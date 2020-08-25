@@ -1,9 +1,12 @@
 #ifndef PLUGIN_H
 #define PLUGIN_H
 
+
+#include <sys/stat.h>
+
 #include "utils.h"
 #include "handle.h"
-
+#include "dbhelper.h"
  
 
 //typedef void(*call)();

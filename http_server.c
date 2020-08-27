@@ -766,6 +766,7 @@ void *decode_request_header(void *data)
 		if(header_size > HEADER_MAX_SIZE)
 		{
 			antd_error(rq->client, 413, "Payload Too Large");
+			ERROR("Header size too large (%d): %d vs %d", rq->client->sock, header_size, HEADER_MAX_SIZE);
 			return antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 		}
 	}

@@ -336,6 +336,7 @@ void *accept_request(void *data)
 	//server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
+	LOG("Request (%d): %s", rq->client->sock,line);
 	// get the method string
 	token = strsep(&line, " ");
 	if (!line)
@@ -770,7 +771,7 @@ void *decode_request_header(void *data)
 			// dirty fix, wait for message to be sent
 			// 100 ms sleep
 			usleep(100000);
-			return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);;
+			return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);
 		}
 	}
 
@@ -800,7 +801,7 @@ void *decode_request_header(void *data)
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
 	strcat(buf, url);
-	LOG("Original query: %s", url);
+	LOG("Original query (%d): %s", rq->client->sock, url);
 	query = apply_rules(pcnf->rules, host, buf);
 	LOG("Processed query: %s", query);
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));

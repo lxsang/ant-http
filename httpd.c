@@ -201,7 +201,7 @@ static void* antd_monitor(port_config_t* pcnf)
 				if (client_name.sin_family == AF_INET)
 				{
 					client_ip =  inet_ntoa(client_name.sin_addr);
-					LOG("Connect to client IP: %s on port:%d", client_ip, pcnf->port);
+					LOG("Connect to client IP: %s on port:%d (%d)", client_ip, pcnf->port, client_sock);
 					// ip address
 					dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
 					//LOG("socket: %d\n", client_sock);

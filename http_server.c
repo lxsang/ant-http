@@ -18,26 +18,26 @@
 #include "lib/ini.h"
 #include "lib/base64.h"
 
+#define HEADER_MAX_SIZE 8192
+
 //define all basic mime here
 static mime_t _mimes[] = {
-	{"image/bmp","bmp"},
-	{"image/jpeg","jpg,jpeg"},
-	{"text/css","css"},
-    {"text/markdown","md"},
-	{"text/csv","csv"},
-	{"application/pdf","pdf"},
-	{"image/gif","gif"},
-	{"text/html","html"},
-	{"application/json","json"},
-	{"application/javascript","js"},
-	{"image/png","png"},
-	{"text/plain","txt"},
-	{"application/xhtml+xml","xhtml"},
-	{"application/xml","xml"},
-	{"image/svg+xml","svg"},
-	{NULL,NULL}
-};
-
+	{"image/bmp", "bmp"},
+	{"image/jpeg", "jpg,jpeg"},
+	{"text/css", "css"},
+	{"text/markdown", "md"},
+	{"text/csv", "csv"},
+	{"application/pdf", "pdf"},
+	{"image/gif", "gif"},
+	{"text/html", "html"},
+	{"application/json", "json"},
+	{"application/javascript", "js"},
+	{"image/png", "png"},
+	{"text/plain", "txt"},
+	{"application/xhtml+xml", "xhtml"},
+	{"application/xml", "xml"},
+	{"image/svg+xml", "svg"},
+	{NULL, NULL}};
 
 static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
 config_t server_config;
@@ -56,24 +56,24 @@ void destroy_config()
 		free(server_config.db_path);
 	if (server_config.tmpdir)
 		free(server_config.tmpdir);
-	if(server_config.ssl_cipher)
+	if (server_config.ssl_cipher)
 		free(server_config.ssl_cipher);
-	if(server_config.gzip_types)
+	if (server_config.gzip_types)
 		list_free(&server_config.gzip_types);
-	if(server_config.mimes)
+	if (server_config.mimes)
 		freedict(server_config.mimes);
-	if(server_config.ports)
+	if (server_config.ports)
 	{
 		chain_t it;
-		port_config_t* cnf;
+		port_config_t *cnf;
 		for_each_assoc(it, server_config.ports)
 		{
-			cnf = (port_config_t*)it->value;
-			if(cnf != NULL)
+			cnf = (port_config_t *)it->value;
+			if (cnf != NULL)
 			{
-				if(cnf->htdocs != NULL)
+				if (cnf->htdocs != NULL)
 					free(cnf->htdocs);
-				if(cnf->sock > 0)
+				if (cnf->sock > 0)
 				{
 					close(cnf->sock);
 				}
@@ -86,7 +86,7 @@ void destroy_config()
 }
 
 static int config_handler(void *conf, const char *section, const char *name,
-						 const char *value)
+						  const char *value)
 {
 	config_t *pconfig = (config_t *)conf;
 	regmatch_t port_matches[2];
@@ -144,7 +144,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	else if (MATCH("SERVER", "gzip_types"))
 	{
-		pconfig->gzip_types = split(value,",");
+		pconfig->gzip_types = split(value, ",");
 	}
 #endif
 #ifdef USE_OPENSSL
@@ -156,7 +156,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->sslkey = strdup(value);
 	}
-	else if(MATCH("SERVER","ssl.cipher"))
+	else if (MATCH("SERVER", "ssl.cipher"))
 	{
 		pconfig->ssl_cipher = strdup(value);
 	}
@@ -171,26 +171,26 @@ static int config_handler(void *conf, const char *section, const char *name,
 		// auto start plugin
 		plugin_load((char *)value);
 	}
-	else if(strcmp(section, "MIMES") == 0)
+	else if (strcmp(section, "MIMES") == 0)
 	{
-		dput(pconfig->mimes,name,strdup(value));
+		dput(pconfig->mimes, name, strdup(value));
 	}
-	else if( regex_match("PORT:\\s*([0-9]+)", section, 2, port_matches) )
+	else if (regex_match("PORT:\\s*([0-9]+)", section, 2, port_matches))
 	{
 		char buf[20];
 		memset(buf, '\0', sizeof(buf));
 		memcpy(buf, section + port_matches[1].rm_so, port_matches[1].rm_eo - port_matches[1].rm_so);
-		port_config_t* p = dvalue(pconfig->ports,buf);
-		if(!p)
+		port_config_t *p = dvalue(pconfig->ports, buf);
+		if (!p)
 		{
-			p = (port_config_t*) malloc( sizeof(port_config_t));
+			p = (port_config_t *)malloc(sizeof(port_config_t));
 			p->htdocs = NULL;
 			p->sock = -1;
 			p->rules = dict();
-			dput(pconfig->ports,buf, p);
+			dput(pconfig->ports, buf, p);
 			p->port = atoi(buf);
 		}
-		if(strcmp(name, "htdocs") == 0)
+		if (strcmp(name, "htdocs") == 0)
 		{
 			p->htdocs = strdup(value);
 			if (stat(p->htdocs, &st) == -1)
@@ -198,10 +198,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 				mkdirp(p->htdocs, 0755);
 			}
 		}
-		else if(strcmp(name, "ssl.enable") == 0)
+		else if (strcmp(name, "ssl.enable") == 0)
 		{
 			p->usessl = atoi(value);
-			if(p->usessl)
+			if (p->usessl)
 				pconfig->enable_ssl = 1;
 		}
 		else
@@ -239,9 +239,9 @@ void load_config(const char *file)
 	server_config.gzip_enable = 0;
 	server_config.gzip_types = NULL;
 	// put it default mimes
-	for(int i = 0; _mimes[i].type != NULL; i++)
+	for (int i = 0; _mimes[i].type != NULL; i++)
 	{
-		dput(server_config.mimes,_mimes[i].type, strdup(_mimes[i].ext));
+		dput(server_config.mimes, _mimes[i].type, strdup(_mimes[i].ext));
 	}
 	if (ini_parse(file, config_handler, &server_config) < 0)
 	{
@@ -336,7 +336,7 @@ void *accept_request(void *data)
 	//server_config.connection++;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
-	LOG("Request (%d): %s", rq->client->sock,line);
+	LOG("Request (%d): %s", rq->client->sock, line);
 	// get the method string
 	token = strsep(&line, " ");
 	if (!line)
@@ -414,7 +414,7 @@ void *resolve_request(void *data)
 				{
 					newurl = __s("%s/index.%s", url, it->key);
 					memset(path, 0, sizeof(path));
-					htdocs(rq,path);
+					htdocs(rq, path);
 					strcat(path, newurl);
 					if (stat(path, &st) != 0)
 					{
@@ -469,22 +469,22 @@ void *resolve_request(void *data)
 		else
 		{
 			task->type = HEAVY;
-		
+
 			// discard all request data
-			dictionary_t headers = (dictionary_t) dvalue(rq->request, "REQUEST_HEADER");
-			if(headers)
+			dictionary_t headers = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
+			if (headers)
 			{
-				char * sclen = (char *)dvalue(headers, "Content-Length");
+				char *sclen = (char *)dvalue(headers, "Content-Length");
 				unsigned clen = 0;
 				unsigned read = 0;
 				int count;
-				if(sclen)
+				if (sclen)
 				{
 					clen = atoi(sclen);
 					while (read < clen)
 					{
-						count = antd_recv(rq->client, path, sizeof(path) < clen ? sizeof(path): clen );
-						if(count <= 0)
+						count = antd_recv(rq->client, path, sizeof(path) < clen ? sizeof(path) : clen);
+						if (count <= 0)
 							break;
 						read += count;
 					}
@@ -588,8 +588,8 @@ void *serve_file(void *data)
 
 	struct stat st;
 	int s = stat(path, &st);
-	
-	if(s == -1)
+
+	if (s == -1)
 	{
 		antd_error(rq->client, 404, "File not found");
 	}
@@ -597,35 +597,35 @@ void *serve_file(void *data)
 	{
 		// check if it is modified
 		dictionary_t header = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
-		char * last_modif_since = (char*)dvalue(header, "If-Modified-Since");
+		char *last_modif_since = (char *)dvalue(header, "If-Modified-Since");
 		time_t t = st.st_ctime;
 		struct tm tm;
-		if(last_modif_since)
+		if (last_modif_since)
 		{
 			strptime(last_modif_since, "%a, %d %b %Y %H:%M:%S GMT", &tm);
 			t = timegm(&tm);
 			//t = mktime(localtime(&t));
 		}
 
-		if(last_modif_since && st.st_ctime == t)
+		if (last_modif_since && st.st_ctime == t)
 		{
 			// return the not changed
-			antd_error(rq->client,304, "");
+			antd_error(rq->client, 304, "");
 		}
 		else
 		{
 			int size = (int)st.st_size;
 			char ibuf[64];
-			snprintf (ibuf, sizeof(ibuf), "%d",size);
+			snprintf(ibuf, sizeof(ibuf), "%d", size);
 			antd_response_header_t rhd;
 			rhd.cookie = NULL;
 			rhd.status = 200;
 			rhd.header = dict();
 			dput(rhd.header, "Content-Type", strdup(mime_type));
 #ifdef USE_ZLIB
-			if(!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
+			if (!compressable(mime_type) || rq->client->z_level == ANTD_CNONE)
 #endif
-			dput(rhd.header, "Content-Length", strdup(ibuf));
+				dput(rhd.header, "Content-Length", strdup(ibuf));
 			gmtime_r(&st.st_ctime, &tm);
 			strftime(ibuf, 64, "%a, %d %b %Y %H:%M:%S GMT", &tm);
 			dput(rhd.header, "Last-Modified", strdup(ibuf));
@@ -635,7 +635,7 @@ void *serve_file(void *data)
 			__f(rq->client, path);
 		}
 	}
-	
+
 	return task;
 }
 
@@ -691,12 +691,12 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
 	}
 	//char* oldurl = strdup(url);
 	chain_t it;
-	char* k;
-	char* v;
+	char *k;
+	char *v;
 	for_each_assoc(it, rules)
 	{
 		k = it->key;
-		v = (char*)it->value;
+		v = (char *)it->value;
 		// 1 group
 		if (rule_check(k, v, host, url, query_string, url))
 		{
@@ -727,15 +727,19 @@ void *decode_request_header(void *data)
 	char *query = NULL;
 	char *host = NULL;
 	char buf[2 * BUFFLEN];
+	int header_size = 0;
+	int ret;
 	char *url = (char *)dvalue(rq->request, "REQUEST_QUERY");
 	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
 	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
-	char* port_s = (char*) dvalue(xheader, "SERVER_PORT");
-	port_config_t* pcnf = (port_config_t*)dvalue(server_config.ports, port_s);
+	char *port_s = (char *)dvalue(xheader, "SERVER_PORT");
+	port_config_t *pcnf = (port_config_t *)dvalue(server_config.ports, port_s);
 	// first real all header
 	// this for check if web socket is enabled
-	while ((read_buf(rq->client, buf, sizeof(buf))) && strcmp("\r\n", buf))
+
+	while ((( ret = read_buf(rq->client, buf, sizeof(buf))) > 0) && strcmp("\r\n", buf))
 	{
+		header_size += ret;
 		line = buf;
 		trim(line, '\n');
 		trim(line, '\r');
@@ -749,7 +753,7 @@ void *decode_request_header(void *data)
 		}
 		if (token != NULL && strcasecmp(token, "Cookie") == 0)
 		{
-			if(!cookie)
+			if (!cookie)
 			{
 				cookie = dict();
 			}
@@ -759,32 +763,37 @@ void *decode_request_header(void *data)
 		{
 			host = strdup(line);
 		}
+		if(header_size > HEADER_MAX_SIZE)
+		{
+			antd_error(rq->client, 413, "Payload Too Large");
+			return antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+		}
 	}
 	// check for content length size
 	line = (char *)dvalue(xheader, "Content-Length");
 	if (line)
 	{
 		int clen = atoi(line);
-		if(clen > server_config.max_upload_size)
+		if (clen > server_config.max_upload_size)
 		{
 			antd_error(rq->client, 413, "Request body data is too large");
 			// dirty fix, wait for message to be sent
 			// 100 ms sleep
 			usleep(100000);
-			return antd_create_task(NULL, (void *)rq, NULL,rq->client->last_io);
+			return antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 		}
 	}
 
 #ifdef USE_ZLIB
 	// check for gzip
 	line = (char *)dvalue(xheader, "Accept-Encoding");
-	if(line)
+	if (line)
 	{
-		if(regex_match("gzip",line,0, NULL))
+		if (regex_match("gzip", line, 0, NULL))
 		{
 			rq->client->z_level = ANTD_CGZ;
 		}
-		else if(regex_match("deflate", line, 0, NULL))
+		else if (regex_match("deflate", line, 0, NULL))
 		{
 			rq->client->z_level = ANTD_CDEFL;
 		}
@@ -815,7 +824,7 @@ void *decode_request_header(void *data)
 	if (host)
 		free(host);
 	// header ok, now checkmethod
-	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL,rq->client->last_io);
+	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL, rq->client->last_io);
 	return task;
 }
 
@@ -857,7 +866,7 @@ void *decode_request(void *data)
 	}
 	else
 	{
-		antd_error(rq->client,501, "Request Method Not Implemented");
+		antd_error(rq->client, 501, "Request Method Not Implemented");
 		return task;
 	}
 }
@@ -896,7 +905,7 @@ void *decode_post_request(void *data)
 	{
 		free(task);
 		return decode_multi_part_request(rq, ctype);
-	} 
+	}
 	else
 	{
 		char *pquery = post_data_decode(rq->client, clen);
@@ -905,7 +914,7 @@ void *decode_post_request(void *data)
 			key++;
 		else
 			key = ctype;
-		if(pquery)
+		if (pquery)
 		{
 			dput(request, key, strdup(pquery));
 			free(pquery);
@@ -986,7 +995,7 @@ void *decode_multi_part_request(void *data, const char *ctype)
 {
 	char *boundary;
 	char line[BUFFLEN];
-	char *str_copy = (char*)ctype;
+	char *str_copy = (char *)ctype;
 	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
@@ -999,7 +1008,8 @@ void *decode_multi_part_request(void *data, const char *ctype)
 		trim(boundary, ' ');
 		dput(rq->request, "MULTI_PART_BOUNDARY", strdup(boundary));
 		//find first boundary
-		while (( (len = read_buf(rq->client, line, sizeof(line))) > 0 ) && !strstr(line, boundary));
+		while (((len = read_buf(rq->client, line, sizeof(line))) > 0) && !strstr(line, boundary))
+			;
 		if (len > 0)
 		{
 			task->handle = decode_multi_part_request_data;
@@ -1026,7 +1036,9 @@ void *decode_multi_part_request_data(void *data)
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	// search for content disposition:
-	while ( ( (len = read_buf(rq->client, buf, sizeof(buf))) > 0 ) && !strstr(buf, "Content-Disposition:"));;
+	while (((len = read_buf(rq->client, buf, sizeof(buf))) > 0) && !strstr(buf, "Content-Disposition:"))
+		;
+	;
 
 	if (len <= 0 || !strstr(buf, "Content-Disposition:"))
 	{
@@ -1064,7 +1076,9 @@ void *decode_multi_part_request_data(void *data)
 	if (part_name != NULL)
 	{
 		// go to the beginning of data bock
-		while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && strcmp(buf, "\r\n") != 0);;
+		while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && strcmp(buf, "\r\n") != 0)
+			;
+		;
 
 		if (part_file == NULL)
 		{
@@ -1075,7 +1089,7 @@ void *decode_multi_part_request_data(void *data)
 			 * Need an efficient way to handle this
 			 */
 			len = read_buf(rq->client, buf, sizeof(buf));
-			if(len > 0)
+			if (len > 0)
 			{
 				line = buf;
 				trim(line, '\n');
@@ -1084,11 +1098,10 @@ void *decode_multi_part_request_data(void *data)
 				dput(dic, part_name, strdup(line));
 			}
 			// find the next boundary
-			while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0  && !strstr(buf, boundary))
+			while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && !strstr(buf, boundary))
 			{
 				line = buf;
 			}
-
 		}
 		else
 		{
@@ -1288,29 +1301,28 @@ dictionary_t mimes_list()
 	return server_config.mimes;
 }
 
-
-void  dbdir(char* dest)
+void dbdir(char *dest)
 {
-	strncpy(dest,server_config.db_path, 512);
+	strncpy(dest, server_config.db_path, 512);
 }
-void  tmpdir(char* dest)
+void tmpdir(char *dest)
 {
 	strncpy(dest, server_config.tmpdir, 512);
 }
-void  plugindir(char* dest)
+void plugindir(char *dest)
 {
 	strncpy(dest, server_config.plugins_dir, 512);
 }
 
 #ifdef USE_ZLIB
-int  compressable(char* ctype)
+int compressable(char *ctype)
 {
-	if(!server_config.gzip_enable || server_config.gzip_types == NULL)
+	if (!server_config.gzip_enable || server_config.gzip_types == NULL)
 		return 0;
 	item_t it;
 	list_for_each(it, server_config.gzip_types)
 	{
-		if(it->type == LIST_TYPE_POINTER && it->value.ptr && regex_match((const char*)it->value.ptr, ctype, 0, NULL))
+		if (it->type == LIST_TYPE_POINTER && it->value.ptr && regex_match((const char *)it->value.ptr, ctype, 0, NULL))
 		{
 			return 1;
 		}

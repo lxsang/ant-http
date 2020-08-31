@@ -269,7 +269,6 @@ void antd_execute_task(antd_scheduler_t* scheduler, antd_task_item_t taski)
     if(!taski)
         return;
     // execute the task
-    LOG("Execute task with priority: %d", taski->task->priority);
     void *ret = (*(taski->task->handle))(taski->task->data);
     // check the return data if it is a new task
     if(!ret)

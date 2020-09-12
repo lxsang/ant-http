@@ -9,6 +9,7 @@
 #define LOW_PRIORITY (N_PRIORITY - 1)
 #define HIGH_PRIORITY 0
 #define MAX_VALIDITY_INTERVAL 20 // 10 s for task validity
+#define MAX_FIFO_NAME_SZ 255
 typedef enum
 {
     LIGHT,
@@ -92,6 +93,13 @@ typedef struct
     */
     void* (*destroy_data)(void*);
     int validate_data;
+    /**
+     * statistic infomation
+    */
+    char stat_fifo[MAX_FIFO_NAME_SZ];
+    int stat_fd;
+    pthread_t stat_tid;
+    void (*stat_data_cb)(int, void *);
 } antd_scheduler_t;
 
 /*

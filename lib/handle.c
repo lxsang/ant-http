@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <errno.h>
 //open ssl
 #ifdef USE_OPENSSL
@@ -295,7 +296,7 @@ void antd_send_header(void *cl, antd_response_header_t *res)
 						}
 						else
 						{
-							client->status = Z_NO_FLUSH;
+							client->z_status = Z_NO_FLUSH;
 							dput(res->header, "Content-Encoding", strdup("gzip"));
 						}
 					}
@@ -309,7 +310,7 @@ void antd_send_header(void *cl, antd_response_header_t *res)
 						}
 						else
 						{
-							client->status = Z_NO_FLUSH;
+							client->z_status = Z_NO_FLUSH;
 							dput(res->header, "Content-Encoding", strdup("deflate"));
 						}
 					}
@@ -384,7 +385,7 @@ int antd_send(void *src, const void *data_in, int len_in)
 		{
 			zstream->avail_out = BUFFLEN;
 			zstream->next_out = buf;
-			if (deflate(zstream, source->status) == Z_STREAM_ERROR)
+			if (deflate(zstream, source->z_status) == Z_STREAM_ERROR)
 			{
 				source->z_level = current_zlevel;
 				data = NULL;
@@ -729,9 +730,9 @@ int antd_close(void *src)
 	//TODO: send finish data to the socket before quit
 	if (source->zstream)
 	{
-		if (source->status == Z_NO_FLUSH && source->z_level != ANTD_CNONE)
+		if (source->z_status == Z_NO_FLUSH && source->z_level != ANTD_CNONE)
 		{
-			source->status = Z_FINISH;
+			source->z_status = Z_FINISH;
 			antd_send(source, "", 0);
 		}
 		deflateEnd(source->zstream);

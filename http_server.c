@@ -4,10 +4,15 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
+#include <errno.h>
 
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/sha.h>
+#else
+#include "sha1.h"
 #endif
 
 #include "http_server.h"
@@ -62,6 +67,8 @@ void destroy_config()
 		list_free(&server_config.gzip_types);
 	if (server_config.mimes)
 		freedict(server_config.mimes);
+	if (server_config.stat_fifo_path)
+		free(server_config.stat_fifo_path);
 	if (server_config.ports)
 	{
 		chain_t it;
@@ -103,16 +110,22 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	else if (MATCH("SERVER", "plugins_ext"))
 	{
+		if(pconfig->plugins_ext)
+			free(pconfig->plugins_ext);
 		pconfig->plugins_ext = strdup(value);
 	}
 	else if (MATCH("SERVER", "database"))
 	{
+		if(pconfig->db_path)
+			free(pconfig->db_path);
 		pconfig->db_path = strdup(value);
 		if (stat(pconfig->db_path, &st) == -1)
 			mkdirp(pconfig->db_path, 0755);
 	}
 	else if (MATCH("SERVER", "tmpdir"))
 	{
+		if(pconfig->tmpdir)
+			free(pconfig->tmpdir);
 		pconfig->tmpdir = strdup(value);
 		if (stat(pconfig->tmpdir, &st) == -1)
 			mkdirp(pconfig->tmpdir, 0755);
@@ -120,6 +133,12 @@ static int config_handler(void *conf, const char *section, const char *name,
 		{
 			removeAll(pconfig->tmpdir, 0);
 		}
+	}
+	else if (MATCH("SERVER", "statistic_fifo"))
+	{
+		if(pconfig->stat_fifo_path)
+			free(pconfig->stat_fifo_path);
+		pconfig->stat_fifo_path = strdup(value);
 	}
 	else if (MATCH("SERVER", "max_upload_size"))
 	{
@@ -150,14 +169,20 @@ static int config_handler(void *conf, const char *section, const char *name,
 #ifdef USE_OPENSSL
 	else if (MATCH("SERVER", "ssl.cert"))
 	{
+		if(pconfig->sslcert)
+			free(pconfig->sslcert);
 		pconfig->sslcert = strdup(value);
 	}
 	else if (MATCH("SERVER", "ssl.key"))
 	{
+		if(pconfig->sslkey)
+			free(pconfig->sslkey);
 		pconfig->sslkey = strdup(value);
 	}
 	else if (MATCH("SERVER", "ssl.cipher"))
 	{
+		if(pconfig->ssl_cipher)
+			free(pconfig->ssl_cipher);
 		pconfig->ssl_cipher = strdup(value);
 	}
 #endif
@@ -220,11 +245,12 @@ static int config_handler(void *conf, const char *section, const char *name,
 void load_config(const char *file)
 {
 	server_config.ports = dict();
-	server_config.plugins_dir = "plugins/";
-	server_config.plugins_ext = ".dylib";
-	server_config.db_path = "databases/";
+	server_config.plugins_dir = strdup("plugins/");
+	server_config.plugins_ext = strdup(".dylib");
+	server_config.db_path = strdup("databases/");
 	//server_config.htdocs = "htdocs/";
-	server_config.tmpdir = "tmp/";
+	server_config.tmpdir = strdup("tmp/");
+	server_config.stat_fifo_path = strdup("/var/run/antd_stat");
 	server_config.n_workers = 4;
 	server_config.backlog = 1000;
 	server_config.handlers = dict();
@@ -233,8 +259,8 @@ void load_config(const char *file)
 	server_config.connection = 0;
 	server_config.mimes = dict();
 	server_config.enable_ssl = 0;
-	server_config.sslcert = "cert.pem";
-	server_config.sslkey = "key.pem";
+	server_config.sslcert = strdup("cert.pem");
+	server_config.sslkey = strdup("key.pem");
 	server_config.ssl_cipher = NULL;
 	server_config.gzip_enable = 0;
 	server_config.gzip_types = NULL;
@@ -297,7 +323,7 @@ void *accept_request(void *data)
 	// perform the ssl handshake if enabled
 #ifdef USE_OPENSSL
 	int ret = -1, stat;
-	if (client->ssl && client->status == 0)
+	if (client->ssl && client->state == ANTD_CLIENT_ACCEPT)
 	{
 		//LOG("Atttempt %d\n", client->attempt);
 		if (SSL_accept((SSL *)client->ssl) == -1)
@@ -318,7 +344,7 @@ void *accept_request(void *data)
 				return task;
 			}
 		}
-		client->status = 1;
+		client->state = ANTD_CLIENT_HANDSHAKE;
 		task->handle = accept_request;
 		//LOG("Handshake finish for %d\n", client->sock);
 		return task;
@@ -334,6 +360,7 @@ void *accept_request(void *data)
 #endif
 	//LOG("Ready for reading %d\n", client->sock);
 	//server_config.connection++;
+	client->state = ANTD_CLIENT_PROTO_CHECK;
 	read_buf(rq->client, buf, sizeof(buf));
 	line = buf;
 	LOG("Request (%d): %s", rq->client->sock, line);
@@ -381,6 +408,7 @@ void *resolve_request(void *data)
 	char *newurl = NULL;
 	char *rqp = NULL;
 	char *oldrqp = NULL;
+	rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
 	htdocs(rq, path);
 	strcat(path, url);
 	//LOG("Path is : %s", path);
@@ -585,7 +613,7 @@ void *serve_file(void *data)
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
-
+	rq->client->state = ANTD_CLIENT_SERVE_FILE;
 	struct stat st;
 	int s = stat(path, &st);
 
@@ -721,6 +749,7 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
 void *decode_request_header(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
+	rq->client->state = ANTD_CLIENT_HEADER_DECODE;
 	dictionary_t cookie = NULL;
 	char *line;
 	char *token;
@@ -737,7 +766,7 @@ void *decode_request_header(void *data)
 	// first real all header
 	// this for check if web socket is enabled
 
-	while ((( ret = read_buf(rq->client, buf, sizeof(buf))) > 0) && strcmp("\r\n", buf))
+	while (((ret = read_buf(rq->client, buf, sizeof(buf))) > 0) && strcmp("\r\n", buf))
 	{
 		header_size += ret;
 		line = buf;
@@ -763,7 +792,7 @@ void *decode_request_header(void *data)
 		{
 			host = strdup(line);
 		}
-		if(header_size > HEADER_MAX_SIZE)
+		if (header_size > HEADER_MAX_SIZE)
 		{
 			antd_error(rq->client, 413, "Payload Too Large");
 			ERROR("Header size too large (%d): %d vs %d", rq->client->sock, header_size, HEADER_MAX_SIZE);
@@ -1256,7 +1285,7 @@ void *execute_plugin(void *data, const char *pname)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	//LOG("Plugin name '%s'", pname);
-
+	rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
 	//load the plugin
 	if ((plugin = plugin_lookup((char *)pname)) == NULL)
 	{

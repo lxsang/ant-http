@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <poll.h>
 #include <unistd.h>
 #include "scheduler.h"
 #include "utils.h"
@@ -13,12 +12,13 @@ static void set_nonblock(int fd)
 {
     int flags;
     flags = fcntl(fd, F_GETFL, 0);
-    if(flags == -1)
+    if (flags == -1)
     {
         ERROR("Unable to set flag");
     }
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
+
 static void enqueue(antd_task_queue_t *q, antd_task_t *task)
 {
     antd_task_item_t it = *q;
@@ -50,7 +50,7 @@ static void stop(antd_scheduler_t *scheduler)
             pthread_join(scheduler->workers[i].tid, NULL);
     if (scheduler->workers)
         free(scheduler->workers);
-    (void)pthread_join(scheduler->stat_tid, NULL);
+    (void)pthread_cancel(scheduler->stat_tid);
     // destroy all the mutex
     pthread_mutex_destroy(&scheduler->scheduler_lock);
     pthread_mutex_destroy(&scheduler->worker_lock);
@@ -173,7 +173,7 @@ static void *work(antd_worker_t *worker)
 
 static void *statistic(antd_scheduler_t *scheduler)
 {
-    struct pollfd fdp;
+    fd_set fd_out;
     int ret;
     char buffer[MAX_FIFO_NAME_SZ];
     antd_task_item_t it;
@@ -181,72 +181,118 @@ static void *statistic(antd_scheduler_t *scheduler)
     {
         if (scheduler->stat_fd == -1)
         {
-            scheduler->stat_fd = open(scheduler->stat_fifo, O_RDWR);
+            scheduler->stat_fd = open(scheduler->stat_fifo, O_WRONLY);
             if (scheduler->stat_fd == -1)
             {
                 ERROR("Unable to open FIFO %s: %s", scheduler->stat_fifo, strerror(errno));
                 return NULL;
             }
-        }
-        fdp.fd = scheduler->stat_fd;
-        fdp.events = POLLOUT;
-        // poll the fd in blocking mode
-        ret = poll(&fdp, 1, -1);
-
-        if (ret > 0 && (fdp.revents & POLLOUT) && scheduler->pending_task > 0)
-        {
-            pthread_mutex_lock(&scheduler->scheduler_lock);
-            // write statistic data
-            snprintf(buffer, MAX_FIFO_NAME_SZ, "Pending task: %d. Detail:\n", scheduler->pending_task);
-            ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-
-            for (int i = 0; i < N_PRIORITY; i++)
+            else
             {
-                snprintf(buffer, MAX_FIFO_NAME_SZ, "#### PRIORITY: %d\n", i);
-                ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+                set_nonblock(scheduler->stat_fd);
+            }
+        }
+        FD_ZERO(&fd_out);
+        FD_SET(scheduler->stat_fd, &fd_out);
+        ret = select(scheduler->stat_fd + 1, NULL, &fd_out, NULL, NULL);
+        switch (ret)
+        {
+        case -1:
+            ERROR("Error on select(): %s\n", strerror(errno));
+            close(scheduler->stat_fd);
+            return NULL;
 
-                it = scheduler->task_queue[i];
-                while (it)
+        case 0:
+            break;
+        // we have data
+        default:
+            if (FD_ISSET(scheduler->stat_fd, &fd_out))
+            {
+                if (scheduler->pending_task > 0)
                 {
-                    // send statistic on task data
-                    snprintf(buffer, MAX_FIFO_NAME_SZ, "---- Task created at: %lu ----\n", it->task->stamp);
+                    pthread_mutex_lock(&scheduler->scheduler_lock);
+                    // write statistic data
+                    snprintf(buffer, MAX_FIFO_NAME_SZ, "Pending task: %d. Detail:\n", scheduler->pending_task);
                     ret = write(scheduler->stat_fd, buffer, strlen(buffer));
 
-                    // send statistic on task data
-                    snprintf(buffer, MAX_FIFO_NAME_SZ, "Access time: %lu\nn", (unsigned long)it->task->access_time);
-                    ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-
-                    snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
-                    ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-
-                    snprintf(buffer, MAX_FIFO_NAME_SZ, "Task type: %d\n", it->task->type);
-                    ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-
-                    if (it->task->handle)
+                    for (int i = 0; i < N_PRIORITY; i++)
                     {
-                        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has handle: yes\n");
+                        snprintf(buffer, MAX_FIFO_NAME_SZ, "#### PRIORITY: %d\n", i);
                         ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-                    }
 
-                    if (it->task->callback)
-                    {
-                        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has callback: yes\n");
-                        ret = write(scheduler->stat_fd, buffer, strlen(buffer));
-                    }
+                        it = scheduler->task_queue[i];
+                        while (it)
+                        {
+                            // send statistic on task data
+                            snprintf(buffer, MAX_FIFO_NAME_SZ, "---- Task created at: %lu ----\n", it->task->stamp);
+                            ret = write(scheduler->stat_fd, buffer, strlen(buffer));
 
-                    // now print all task data statistic
-                    if (scheduler->stat_data_cb)
-                    {
-                        scheduler->stat_data_cb(scheduler->stat_fd, it->task->data);
+                            // send statistic on task data
+                            snprintf(buffer, MAX_FIFO_NAME_SZ, "Access time: %lu\nn", (unsigned long)it->task->access_time);
+                            ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+
+                            snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
+                            ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+
+                            snprintf(buffer, MAX_FIFO_NAME_SZ, "Task type: %d\n", it->task->type);
+                            ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+
+                            if (it->task->handle)
+                            {
+                                snprintf(buffer, MAX_FIFO_NAME_SZ, "Has handle: yes\n");
+                                ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+                            }
+
+                            if (it->task->callback)
+                            {
+                                snprintf(buffer, MAX_FIFO_NAME_SZ, "Has callback: yes\n");
+                                ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+                            }
+
+                            // now print all task data statistic
+                            if (scheduler->stat_data_cb)
+                            {
+                                scheduler->stat_data_cb(scheduler->stat_fd, it->task->data);
+                            }
+                            it = it->next;
+                        }
                     }
-                    it = it->next;
+                    pthread_mutex_unlock(&scheduler->scheduler_lock);
+                    ret = close(scheduler->stat_fd);
+                    scheduler->stat_fd = -1;
+                    usleep(5000);
+                }
+                else
+                {
+                    ret = write(scheduler->stat_fd, ".", 1);
+                    if(ret == -1)
+                    {
+                        ret = close(scheduler->stat_fd);
+                        scheduler->stat_fd = -1;
+                        usleep(5000);
+                    }
+                    else
+                    {
+                        ret = write(scheduler->stat_fd, "\b", 1);
+                    }
                 }
             }
-            pthread_mutex_unlock(&scheduler->scheduler_lock);
-            ret = close(scheduler->stat_fd);
-            scheduler->stat_fd = -1;
-            usleep(5000);
+            else
+            {
+                 ret = close(scheduler->stat_fd);
+                    scheduler->stat_fd = -1;
+            }
+            break;
         }
+        /*   else
+            {
+                ret = write(scheduler->stat_fd, ".", 1);
+                if(ret == -1)
+                {
+                    ret = close(scheduler->stat_fd);
+                    scheduler->stat_fd = -1;
+                }
+            } */
     }
     return NULL;
 }
@@ -322,19 +368,9 @@ int antd_scheduler_init(antd_scheduler_t *scheduler, int n)
         }
         else
         {
-            // open the fifo in write mode
-            scheduler->stat_fd = open(scheduler->stat_fifo, O_RDWR);
-            if (scheduler->stat_fd == -1)
+            if (pthread_create(&scheduler->stat_tid, NULL, (void *(*)(void *))statistic, scheduler) != 0)
             {
-                ERROR("Unable to open FIFO %s: %s", scheduler->stat_fifo, strerror(errno));
-            }
-            else
-            {
-                set_nonblock(scheduler->stat_fd);
-                if (pthread_create(&scheduler->stat_tid, NULL, (void *(*)(void *))statistic, scheduler) != 0)
-                {
-                    ERROR("pthread_create: cannot create statistic thread: %s", strerror(errno));
-                }
+                ERROR("pthread_create: cannot create statistic thread: %s", strerror(errno));
             }
         }
     }

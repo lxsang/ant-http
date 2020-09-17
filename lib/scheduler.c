@@ -308,8 +308,8 @@ int antd_scheduler_init(antd_scheduler_t *scheduler, int n)
     scheduler->status = 1;
     scheduler->workers_queue = NULL;
     scheduler->pending_task = 0;
-    scheduler->validate_data = 0;
-    scheduler->destroy_data = NULL;
+    // scheduler->validate_data = 0;
+    // scheduler->destroy_data = NULL;
     scheduler->stat_fd = -1;
     //scheduler->stat_data_cb = NULL;
     //memset(scheduler->stat_fifo, 0, MAX_FIFO_NAME_SZ);

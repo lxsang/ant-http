@@ -110,13 +110,13 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	else if (MATCH("SERVER", "plugins_ext"))
 	{
-		if(pconfig->plugins_ext)
+		if (pconfig->plugins_ext)
 			free(pconfig->plugins_ext);
 		pconfig->plugins_ext = strdup(value);
 	}
 	else if (MATCH("SERVER", "database"))
 	{
-		if(pconfig->db_path)
+		if (pconfig->db_path)
 			free(pconfig->db_path);
 		pconfig->db_path = strdup(value);
 		if (stat(pconfig->db_path, &st) == -1)
@@ -124,7 +124,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	else if (MATCH("SERVER", "tmpdir"))
 	{
-		if(pconfig->tmpdir)
+		if (pconfig->tmpdir)
 			free(pconfig->tmpdir);
 		pconfig->tmpdir = strdup(value);
 		if (stat(pconfig->tmpdir, &st) == -1)
@@ -136,7 +136,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 	}
 	else if (MATCH("SERVER", "statistic_fifo"))
 	{
-		if(pconfig->stat_fifo_path)
+		if (pconfig->stat_fifo_path)
 			free(pconfig->stat_fifo_path);
 		pconfig->stat_fifo_path = strdup(value);
 	}
@@ -169,19 +169,19 @@ static int config_handler(void *conf, const char *section, const char *name,
 #ifdef USE_OPENSSL
 	else if (MATCH("SERVER", "ssl.cert"))
 	{
-		if(pconfig->sslcert)
+		if (pconfig->sslcert)
 			free(pconfig->sslcert);
 		pconfig->sslcert = strdup(value);
 	}
 	else if (MATCH("SERVER", "ssl.key"))
 	{
-		if(pconfig->sslkey)
+		if (pconfig->sslkey)
 			free(pconfig->sslkey);
 		pconfig->sslkey = strdup(value);
 	}
 	else if (MATCH("SERVER", "ssl.cipher"))
 	{
-		if(pconfig->ssl_cipher)
+		if (pconfig->ssl_cipher)
 			free(pconfig->ssl_cipher);
 		pconfig->ssl_cipher = strdup(value);
 	}
@@ -873,7 +873,7 @@ void *decode_request(void *data)
 		ws = 1;
 	method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0)
+	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0 || strcmp(method, "OPTIONS") == 0)
 	{
 		//if(ctype) free(ctype);
 		if (ws && ws_key != NULL)

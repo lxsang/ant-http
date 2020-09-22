@@ -211,7 +211,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 			p = (port_config_t *)malloc(sizeof(port_config_t));
 			p->htdocs = NULL;
 			p->sock = -1;
-			p->rules = dict();
+			p->rules = dict_n(1);
 			dput(pconfig->ports, buf, p);
 			p->port = atoi(buf);
 		}
@@ -725,6 +725,7 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
 	{
 		k = it->key;
 		v = (char *)it->value;
+		//printf("[%s]: [%s]\n", k, v);
 		// 1 group
 		if (rule_check(k, v, host, url, query_string, url))
 		{

@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <errno.h>
 #include "http_server.h"
 #include "lib/ini.h"
 #include "lib/scheduler.h"
@@ -163,96 +164,85 @@ static void stop_serve(int dummy)
 	sigprocmask(SIG_UNBLOCK, &mask, NULL);
 }
 
-static void *antd_monitor(port_config_t *pcnf)
+static void antd_monitor(port_config_t *pcnf)
 {
 	antd_task_t *task = NULL;
-	struct timeval timeout;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	socklen_t client_name_len = sizeof(client_name);
 	char *client_ip = NULL;
 	config_t *conf = config();
-	LOG("Listening on port %d", pcnf->port);
-	while (scheduler.status)
+	if (pcnf->sock > 0)
 	{
-		if (conf->connection > conf->maxcon)
+		client_sock = accept(pcnf->sock, (struct sockaddr *)&client_name, &client_name_len);
+		if (client_sock > 0)
 		{
-			//ERROR("Reach max connection %d", conf->connection);
-			timeout.tv_sec = 0;
-			timeout.tv_usec = 10000; // 5 ms
-			select(0, NULL, NULL, NULL, &timeout);
-			continue;
-		}
-		if (pcnf->sock > 0)
-		{
-			client_sock = accept(pcnf->sock, (struct sockaddr *)&client_name, &client_name_len);
-			if (client_sock > 0)
-			{
-				// just dump the scheduler when we have a connection
-				antd_client_t *client = (antd_client_t *)malloc(sizeof(antd_client_t));
-				antd_request_t *request = (antd_request_t *)malloc(sizeof(*request));
-				request->client = client;
-				request->request = dict();
-				client->zstream = NULL;
-				client->z_level = ANTD_CNONE;
+			// just dump the scheduler when we have a connection
+			antd_client_t *client = (antd_client_t *)malloc(sizeof(antd_client_t));
+			antd_request_t *request = (antd_request_t *)malloc(sizeof(*request));
+			request->client = client;
+			request->request = dict();
+			client->zstream = NULL;
+			client->z_level = ANTD_CNONE;
 
-				dictionary_t xheader = dict();
-				dput(request->request, "REQUEST_HEADER", xheader);
-				dput(request->request, "REQUEST_DATA", dict());
-				dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
-				dput(xheader, "SERVER_WWW_ROOT", (void *)strdup(pcnf->htdocs));
-				/*
+			dictionary_t xheader = dict();
+			dput(request->request, "REQUEST_HEADER", xheader);
+			dput(request->request, "REQUEST_DATA", dict());
+			dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
+			dput(xheader, "SERVER_WWW_ROOT", (void *)strdup(pcnf->htdocs));
+			/*
 					get the remote IP
 				*/
-				if (client_name.sin_family == AF_INET)
-				{
-					client_ip = inet_ntoa(client_name.sin_addr);
-					LOG("Connect to client IP: %s on port:%d (%d)", client_ip, pcnf->port, client_sock);
-					// ip address
-					dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
-					//LOG("socket: %d\n", client_sock);
-				}
+			if (client_name.sin_family == AF_INET)
+			{
+				client_ip = inet_ntoa(client_name.sin_addr);
+				LOG("Connect to client IP: %s on port:%d (%d)", client_ip, pcnf->port, client_sock);
+				// ip address
+				dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
+				//LOG("socket: %d\n", client_sock);
+			}
 
-				// set timeout to socket
-				set_nonblock(client_sock);
+			// set timeout to socket
+			set_nonblock(client_sock);
 
-				client->sock = client_sock;
-				time(&client->last_io);
-				client->ssl = NULL;
-				client->state = ANTD_CLIENT_ACCEPT;
-				client->z_status = 0;
+			client->sock = client_sock;
+			time(&client->last_io);
+			client->ssl = NULL;
+			client->state = ANTD_CLIENT_ACCEPT;
+			client->z_status = 0;
 #ifdef USE_OPENSSL
-				if (pcnf->usessl == 1)
+			if (pcnf->usessl == 1)
+			{
+				client->ssl = (void *)SSL_new(ctx);
+				if (!client->ssl)
 				{
-					client->ssl = (void *)SSL_new(ctx);
-					if (!client->ssl)
-						continue;
-					SSL_set_fd((SSL *)client->ssl, client->sock);
-					// this can be used in the protocol select callback to
-					// set the protocol selected by the server
-					if (!SSL_set_ex_data((SSL *)client->ssl, client->sock, client))
-					{
-						ERROR("Cannot set ex data to ssl client:%d", client->sock);
-					}
-					/*if (SSL_accept((SSL*)client->ssl) <= 0) {
+					finish_request(request);
+					return;
+				}
+				SSL_set_fd((SSL *)client->ssl, client->sock);
+				// this can be used in the protocol select callback to
+				// set the protocol selected by the server
+				if (!SSL_set_ex_data((SSL *)client->ssl, client->sock, client))
+				{
+					ERROR("Cannot set ex data to ssl client:%d", client->sock);
+				}
+				/*if (SSL_accept((SSL*)client->ssl) <= 0) {
 						LOG("EROOR accept\n");
 						ERR_print_errors_fp(stderr);
 						antd_close(client);
 						continue;
 					}*/
-				}
-#endif
-				pthread_mutex_lock(&scheduler.scheduler_lock);
-				conf->connection++;
-				pthread_mutex_unlock(&scheduler.scheduler_lock);
-				// create callback for the server
-				task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
-				//task->type = LIGHT;
-				antd_add_task(&scheduler, task);
 			}
+#endif
+			pthread_mutex_lock(&scheduler.scheduler_lock);
+			conf->connection++;
+			pthread_mutex_unlock(&scheduler.scheduler_lock);
+			// create callback for the server
+			task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
+			//task->type = LIGHT;
+			antd_add_task(&scheduler, task);
 		}
 	}
-	return NULL;
 }
 
 static void client_statistic(int fd, void *user_data)
@@ -305,10 +295,13 @@ static void client_statistic(int fd, void *user_data)
 
 int main(int argc, char *argv[])
 {
-	pthread_t monitor_th;
+	pthread_t sched_th;
 	// startup port
 	chain_t it;
+	struct timeval timeout;
 	port_config_t *pcnf;
+	fd_set master_set, working_set;
+	int status, maxfd = 0;
 	int nlisten = 0;
 	// load the config first
 	if (argc == 1)
@@ -348,6 +341,7 @@ int main(int argc, char *argv[])
 		stop_serve(0);
 		exit(1);
 	}
+	FD_ZERO(&master_set);
 	for_each_assoc(it, conf->ports)
 	{
 		pcnf = (port_config_t *)it->value;
@@ -356,17 +350,10 @@ int main(int argc, char *argv[])
 			pcnf->sock = startup(&pcnf->port);
 			if (pcnf->sock > 0)
 			{
-				if (pthread_create(&monitor_th, NULL, (void *(*)(void *))antd_monitor, (void *)pcnf) != 0)
-				{
-					ERROR("pthread_create: cannot create worker");
-					stop_serve(0);
-					exit(1);
-				}
-				else
-				{
-					// reclaim data when exit
-					pthread_detach(monitor_th);
-				}
+				set_nonblock(pcnf->sock);
+				FD_SET(pcnf->sock, &master_set);
+				LOG("Listening on port %d", pcnf->port);
+				maxfd = pcnf->sock > maxfd ? pcnf->sock : maxfd;
 				nlisten++;
 			}
 			else
@@ -381,7 +368,51 @@ int main(int argc, char *argv[])
 		stop_serve(0);
 		exit(1);
 	}
-	antd_wait(&scheduler);
+	// Start scheduler
+	if (pthread_create(&sched_th, NULL, (void *(*)(void *))antd_wait, (void *)&scheduler) != 0)
+	{
+		ERROR("pthread_create: cannot start scheduler thread");
+		stop_serve(0);
+		exit(1);
+	}
+	else
+	{
+		// reclaim data when exit
+		pthread_detach(sched_th);
+	}
+
+	while (scheduler.status)
+	{
+		if (conf->connection > conf->maxcon)
+		{
+			//ERROR("Reach max connection %d", conf->connection);
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 10000; // 5 ms
+			select(0, NULL, NULL, NULL, &timeout);
+			continue;
+		}
+		FD_ZERO(&working_set);
+		memcpy(&working_set, &master_set, sizeof(master_set));
+		// blocking select
+		status = select(maxfd + 1, &working_set, NULL, NULL, NULL);
+		if (status < 0)
+		{
+			ERROR("select() error: %s", strerror(errno));
+			break;
+		}
+		if (status == 0)
+		{
+			continue;
+		}
+		for_each_assoc(it, conf->ports)
+		{
+			pcnf = (port_config_t *)it->value;
+			if (pcnf && pcnf->sock > 0 && FD_ISSET(pcnf->sock, &working_set))
+			{
+				antd_monitor(pcnf);
+			}
+		}
+	}
 	stop_serve(0);
 	return (0);
 }

@@ -104,6 +104,8 @@ static int config_handler(void *conf, const char *section, const char *name,
 	//char * ppath = NULL;
 	if (MATCH("SERVER", "plugins"))
 	{
+		if (pconfig->plugins_dir)
+			free(pconfig->plugins_dir);
 		pconfig->plugins_dir = strdup(value);
 		if (stat(pconfig->plugins_dir, &st) == -1)
 			mkdirp(pconfig->plugins_dir, 0755);

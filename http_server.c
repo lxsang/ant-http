@@ -673,13 +673,19 @@ int startup(unsigned *port)
 {
 	int httpd = 0;
 	struct sockaddr_in name;
-
+	uint8_t on = 1;
 	httpd = socket(PF_INET, SOCK_STREAM, 0);
 	if (httpd == -1)
 	{
 		ERROR("Port %d - socket: %s", *port, strerror(errno));
 		return -1;
 	}
+	
+	if (setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) == -1)
+	{
+		ERROR("Unable to set reuse address on port %d - setsockopt: %s", *port, strerror(errno));
+	}
+
 	memset(&name, 0, sizeof(name));
 	name.sin_family = AF_INET;
 	name.sin_port = htons(*port);
@@ -699,6 +705,7 @@ int startup(unsigned *port)
 		}
 		*port = ntohs(name.sin_port);
 	}
+
 	LOG("back log is %d", server_config.backlog);
 	if (listen(httpd, server_config.backlog) < 0)
 	{

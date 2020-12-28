@@ -673,7 +673,6 @@ int startup(unsigned *port)
 {
 	int httpd = 0;
 	struct sockaddr_in name;
-	uint8_t on = 1;
 	httpd = socket(PF_INET, SOCK_STREAM, 0);
 	if (httpd == -1)
 	{
@@ -681,7 +680,7 @@ int startup(unsigned *port)
 		return -1;
 	}
 	
-	if (setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) == -1)
+	if (setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) == -1)
 	{
 		ERROR("Unable to set reuse address on port %d - setsockopt: %s", *port, strerror(errno));
 	}

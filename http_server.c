@@ -12,7 +12,7 @@
 #include <openssl/err.h>
 #include <openssl/sha.h>
 #else
-#include "sha1.h"
+#include "lib/sha1.h"
 #endif
 
 #include "http_server.h"

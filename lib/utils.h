@@ -28,6 +28,7 @@ THE SOFTWARE.
 #include <syslog.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "dictionary.h"
 

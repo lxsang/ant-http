@@ -43,7 +43,7 @@ THE SOFTWARE.
 
 
 #include "dictionary.h"
-#include <time.h>
+// #include <time.h>
 
 
 

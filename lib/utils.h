@@ -29,6 +29,7 @@ THE SOFTWARE.
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
 
 #include "dictionary.h"
 

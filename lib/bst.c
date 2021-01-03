@@ -3,12 +3,16 @@
 
 #include "bst.h"
 
-void bst_free(bst_node_t* root)
+void bst_free_cb(bst_node_t* root, void (*cb)(void*))
 {
     if(root != NULL)
     {
         bst_free(root->left);
         bst_free(root->right);
+        if(root->data && cb)
+        {
+            cb(root->data);
+        }
         free(root);
     }
 }

@@ -21,7 +21,7 @@
 	snprintf(buff, BUFFLEN, ##__VA_ARGS__); \
 	ret = write(fd, buff, strlen(buff));
 
-static antd_scheduler_t scheduler;
+static antd_scheduler_t* scheduler;
 
 #ifdef USE_OPENSSL
 
@@ -148,7 +148,7 @@ static void stop_serve(int dummy)
 	sigaddset(&mask, SIGPIPE);
 	sigaddset(&mask, SIGABRT);
 	sigprocmask(SIG_BLOCK, &mask, NULL);
-	antd_scheduler_destroy(&scheduler);
+	antd_scheduler_destroy(scheduler);
 	unload_all_plugin();
 #ifdef USE_OPENSSL
 	FIPS_mode_set(0);
@@ -236,18 +236,18 @@ static void antd_monitor(port_config_t *pcnf)
 					}*/
 			}
 #endif
-			pthread_mutex_lock(&scheduler.scheduler_lock);
+			antd_scheduler_lock(scheduler);
 			conf->connection++;
-			pthread_mutex_unlock(&scheduler.scheduler_lock);
+			antd_scheduler_unlock(scheduler);
 			// create callback for the server
 			task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
 			//task->type = LIGHT;
-			antd_add_task(&scheduler, task);
+			antd_scheduler_add_task(scheduler, task);
 		}
 	}
 }
 
-static void client_statistic(int fd, void *user_data)
+void antd_scheduler_ext_statistic(int fd, void *user_data)
 {
 	antd_request_t *request = (antd_request_t *)user_data;
 	chain_t it, it1;
@@ -295,6 +295,19 @@ static void client_statistic(int fd, void *user_data)
 	UNUSED(ret);
 }
 
+void antd_scheduler_destroy_data(void *data)
+{
+	finish_request(data);
+}
+
+int antd_task_data_id(void *data)
+{
+	antd_request_t *rq = (antd_request_t *)data;
+	if(!rq)
+		return 0;
+	return antd_scheduler_next_id(scheduler,rq->client->sock);
+}
+
 int main(int argc, char *argv[])
 {
 	pthread_t sched_th;
@@ -333,11 +346,8 @@ int main(int argc, char *argv[])
 #endif
 	// enable scheduler
 	// default to 4 workers
-	scheduler.validate_data = 1;
-	scheduler.destroy_data = finish_request;
-	strncpy(scheduler.stat_fifo, conf->stat_fifo_path, MAX_FIFO_NAME_SZ);
-	scheduler.stat_data_cb = client_statistic;
-	if (antd_scheduler_init(&scheduler, conf->n_workers) == -1)
+	scheduler = antd_scheduler_init( conf->n_workers, conf->stat_fifo_path);
+	if (scheduler == NULL)
 	{
 		ERROR("Unable to initialise scheduler. Exit");
 		stop_serve(0);
@@ -371,7 +381,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	// Start scheduler
-	if (pthread_create(&sched_th, NULL, (void *(*)(void *))antd_wait, (void *)&scheduler) != 0)
+	if (pthread_create(&sched_th, NULL, (void *(*)(void *))antd_scheduler_wait, (void *)scheduler) != 0)
 	{
 		ERROR("pthread_create: cannot start scheduler thread");
 		stop_serve(0);
@@ -383,7 +393,7 @@ int main(int argc, char *argv[])
 		pthread_detach(sched_th);
 	}
 
-	while (scheduler.status)
+	while (antd_scheduler_ok(scheduler))
 	{
 		if (conf->connection > conf->maxcon)
 		{

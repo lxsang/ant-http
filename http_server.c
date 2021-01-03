@@ -679,7 +679,7 @@ int startup(unsigned *port)
 		ERROR("Port %d - socket: %s", *port, strerror(errno));
 		return -1;
 	}
-	
+
 	if (setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) == -1)
 	{
 		ERROR("Unable to set reuse address on port %d - setsockopt: %s", *port, strerror(errno));
@@ -848,7 +848,7 @@ void *decode_request_header(void *data)
 #endif
 	//if(line) free(line);
 	memset(buf, 0, sizeof(buf));
-	strcat(buf, url);
+	strncat(buf, url, sizeof(buf) - 1);
 	LOG("Original query (%d): %s", rq->client->sock, url);
 	query = apply_rules(pcnf->rules, host, buf);
 	LOG("Processed query: %s", query);
@@ -973,8 +973,11 @@ void ws_confirm_request(void *client, const char *key)
 	char rkey[128];
 	char sha_d[20];
 	char base64[64];
-	strncpy(rkey, key, 128);
-	strcat(rkey, WS_MAGIC_STRING);
+	strncpy(rkey, key, sizeof(rkey)-1);
+	int n = (int)sizeof(rkey) - (int)strlen(key);
+	if (n < 0)
+		n = 0;
+	strncat(rkey, WS_MAGIC_STRING, n);
 	//printf("RESPONDKEY '%s'\n", rkey);
 #ifdef USE_OPENSSL
 	SHA_CTX context;

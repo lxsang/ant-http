@@ -4,143 +4,113 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdint.h>
-#define N_PRIORITY 10
-#define NORMAL_PRIORITY ((int)((N_PRIORITY - 1) / 2))
-#define LOW_PRIORITY (N_PRIORITY - 1)
-#define HIGH_PRIORITY 0
-#define MAX_VALIDITY_INTERVAL 20 // 10 s for task validity
-#define MAX_FIFO_NAME_SZ 255
+
+#define antd_create_task(h, d, c, t) (antd_mktask(h, d, c, t, HEAVY))
+
 typedef enum
 {
     LIGHT,
     HEAVY
 } antd_task_type_t;
-// callback definition
-typedef struct __callback_t
-{
-    void *(*handle)(void *);
-    struct __callback_t *next;
-} antd_callback_t;
-// task definition
+
+typedef struct _antd_scheduler_t antd_scheduler_t;
+typedef struct _antd_callback_t antd_callback_t;
+typedef struct _antd_queue_item_t antd_scheduler_evt_t;
 typedef struct
 {
-    /*
-        creation time of a task
+    /**
+     * task id
+    */
+    int id;
+    /**
+    * creation time of a task
     */
     unsigned long stamp;
-    /*
-        Last access time of
-        task data
+    /**
+    * Last access time of
+    * task data
     */
     time_t access_time;
-    /*
-        priority from 0 to N_PRIORITY - 1
-        higher value is lower priority
-    */
-    uint8_t priority;
-    /*
-        the callback
+    /**
+    * the handle and callback
     */
     void *(*handle)(void *);
     antd_callback_t *callback;
-    /*
-        user data if any
-   */
+    /**
+     * The task events
+     * each task must be binded to
+     * one or more event, otherwise it will be
+     * rejected by the scheduler
+     * */
+    antd_scheduler_evt_t* events;
+    /**
+    * user data if any
+    */
     void *data;
-    /*
-    type of a task
-    light tasks are executed directly
-    heavy tasks are delegated to workers
+    /**
+    * type of a task
+    * light tasks are executed directly
+    * heavy tasks are delegated to workers
     */
     antd_task_type_t type;
 } antd_task_t;
-
-typedef struct __task_item_t
-{
-    antd_task_t *task;
-    struct __task_item_t *next;
-} * antd_task_item_t;
-
-typedef antd_task_item_t antd_task_queue_t;
-
-typedef struct
-{
-    int id;
-    pthread_t tid;
-    void *manager;
-} antd_worker_t;
-
-typedef struct
-{
-    // data lock
-    pthread_mutex_t scheduler_lock;
-    pthread_mutex_t worker_lock;
-    pthread_mutex_t pending_lock;
-    // event handle
-    sem_t *scheduler_sem;
-    sem_t *worker_sem;
-    // worker and data
-    antd_task_queue_t task_queue[N_PRIORITY];
-    antd_task_queue_t workers_queue;
-    uint8_t status; // 0 stop, 1 working
-    antd_worker_t *workers;
-    int n_workers;
-    int pending_task;
-    /*
-    function pointer that free data in a task if
-    the task is not valid
-    default to NULL
-    */
-    void* (*destroy_data)(void*);
-    int validate_data;
-    /**
-     * statistic infomation
-    */
-    char stat_fifo[MAX_FIFO_NAME_SZ];
-    int stat_fd;
-    pthread_t stat_tid;
-    void (*stat_data_cb)(int, void *);
-} antd_scheduler_t;
-
 /*
-    init the main scheduler
+* nit the main scheduler
 */
-int antd_scheduler_init(antd_scheduler_t *, int);
+antd_scheduler_t *antd_scheduler_init(int, const char *stat_name);
 /*
-    destroy all pending task
+* destroy all pending task
 */
 void antd_scheduler_destroy(antd_scheduler_t *);
 
-/*
-    create a task
-    parameter:
-        - handle
-        - data
-        - callback
-        - last data access time
+/**
+*    create a task
+*    parameter:
+*      - handle
+*      - data
+*      - callback
+*      - last data access time
 */
-antd_task_t *antd_create_task(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t);
+antd_task_t *antd_mktask(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t, antd_task_type_t type);
 
-/*
-    add a task
+/**
+* add a task
 */
-void antd_add_task(antd_scheduler_t *, antd_task_t *);
-/*
-    execute and free a task a task
-*/
-void antd_execute_task(antd_scheduler_t *, antd_task_item_t);
-/*
-    scheduler status
+void antd_scheduler_add_task(antd_scheduler_t *, antd_task_t *);
+
+/**
+* check if scheduler is busy
 */
 int antd_scheduler_busy(antd_scheduler_t *);
-/*
-    schedule a task
+/**
+ * get scheduler status
+ * */
+int antd_scheduler_ok(antd_scheduler_t *scheduler);
+/**
+*
+* wait for event
 */
-int antd_task_schedule(antd_scheduler_t *);
-/*
-wait for event
-*/
-void antd_wait(antd_scheduler_t *);
+void* antd_scheduler_wait(void *);
 
-antd_callback_t* callback_of( void* (*callback)(void*) );
+/**
+ * lock the scheduler
+ * */
+void antd_scheduler_lock(antd_scheduler_t *);
+/**
+ * Get next valid task id
+ * */
+int antd_scheduler_next_id(antd_scheduler_t* sched, int input);
+/**
+ * unlock the scheduler
+ * */
+void antd_scheduler_unlock(antd_scheduler_t *);
+
+/**
+ * weak functions that should be overridden by the application
+ * that user the scheduler as library
+*/
+void __attribute__((weak)) antd_scheduler_ext_statistic(int fd, void *data);
+int __attribute__((weak)) antd_scheduler_validate_data(antd_task_t *task);
+void __attribute__((weak)) antd_scheduler_destroy_data(void *data);
+int __attribute__((weak)) antd_task_data_id(void *data);
 #endif

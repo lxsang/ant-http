@@ -300,6 +300,7 @@ void *accept_request(void *data)
 	antd_request_t *rq = (antd_request_t *)data;
 
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t *client = (antd_client_t *)rq->client;
@@ -406,6 +407,7 @@ void *resolve_request(void *data)
 	char path[2 * BUFFLEN];
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
 	char *newurl = NULL;
 	char *rqp = NULL;
@@ -498,8 +500,6 @@ void *resolve_request(void *data)
 		}
 		else
 		{
-			task->type = HEAVY;
-
 			// discard all request data
 			dictionary_t headers = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
 			if (headers)
@@ -613,6 +613,7 @@ void *serve_file(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
 	rq->client->state = ANTD_CLIENT_SERVE_FILE;
@@ -772,6 +773,7 @@ void *decode_request_header(void *data)
 	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
 	char *port_s = (char *)dvalue(xheader, "SERVER_PORT");
 	port_config_t *pcnf = (port_config_t *)dvalue(server_config.ports, port_s);
+	antd_task_t * task;
 	// first real all header
 	// this for check if web socket is enabled
 
@@ -805,7 +807,9 @@ void *decode_request_header(void *data)
 		{
 			antd_error(rq->client, 413, "Payload Too Large");
 			ERROR("Header size too large (%d): %d vs %d", rq->client->sock, header_size, HEADER_MAX_SIZE);
-			return antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+			task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+			antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+			return task;
 		}
 	}
 	// check for content length size
@@ -819,7 +823,9 @@ void *decode_request_header(void *data)
 			// dirty fix, wait for message to be sent
 			// 100 ms sleep
 			usleep(100000);
-			return antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+			task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+			antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+			return task;
 		}
 	}
 
@@ -863,7 +869,8 @@ void *decode_request_header(void *data)
 	if (host)
 		free(host);
 	// header ok, now checkmethod
-	antd_task_t *task = antd_create_task(decode_request, (void *)rq, NULL, rq->client->last_io);
+	task = antd_create_task(decode_request, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	return task;
 }
 
@@ -882,6 +889,7 @@ void *decode_request(void *data)
 		ws = 1;
 	method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0 || strcmp(method, "OPTIONS") == 0)
 	{
 		//if(ctype) free(ctype);
@@ -900,7 +908,6 @@ void *decode_request(void *data)
 	else if (strcmp(method, "POST") == 0)
 	{
 		task->handle = resolve_request;
-		//task->type = HEAVY;
 		return task;
 	}
 	else
@@ -925,7 +932,7 @@ void *decode_post_request(void *data)
 		clen = atoi(tmp);
 	char *method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	task->type = HEAVY;
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	if (!method || strcmp(method, "POST") != 0)
 		return task;
 	if (ctype == NULL || clen == -1)
@@ -1041,6 +1048,7 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -1057,7 +1065,6 @@ void *decode_multi_part_request(void *data, const char *ctype)
 			task->handle = decode_multi_part_request_data;
 		}
 	}
-	task->type = HEAVY;
 	return task;
 }
 void *decode_multi_part_request_data(void *data)
@@ -1075,6 +1082,7 @@ void *decode_multi_part_request_data(void *data)
 	char *token, *keytoken, *valtoken;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	// search for content disposition:
@@ -1202,7 +1210,6 @@ void *decode_multi_part_request_data(void *data)
 	if (line && strstr(line, boundary))
 	{
 		// continue upload
-		task->type = HEAVY;
 		task->handle = decode_multi_part_request_data;
 	}
 	free(boundend);
@@ -1296,6 +1303,7 @@ void *execute_plugin(void *data, const char *pname)
 	char *error;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
+	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	//LOG("Plugin name '%s'", pname);
 	rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
 	//load the plugin
@@ -1328,12 +1336,12 @@ void *execute_plugin(void *data, const char *pname)
 	if (meta && meta->raw_body == 1)
 	{
 		task->handle = fn;
-		task->type = HEAVY;
 	}
 	else
 	{
 		free(task);
 		task = antd_create_task(decode_post_request, (void *)rq, fn, rq->client->last_io);
+		antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 	}
 	return task;
 }

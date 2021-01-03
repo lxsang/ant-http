@@ -5,12 +5,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <poll.h>
 #include "scheduler.h"
 #include "utils.h"
 #include "bst.h"
 
 #define MAX_VALIDITY_INTERVAL 20
 #define MAX_FIFO_NAME_SZ 255
+#define POLL_EVENT_TO 100 // ms
 
 // callback definition
 struct _antd_callback_t
@@ -19,23 +21,26 @@ struct _antd_callback_t
     struct _antd_callback_t *next;
 };
 
-typedef struct {
-    int type;
+typedef struct
+{
+    int flags;
     int fd;
-} antd_scheduler_evt_item_t;
+    int timeout; // seconds
+    antd_task_t *task;
+} antd_task_evt_item_t;
 
 struct _antd_queue_item_t
 {
     union
     {
-        antd_scheduler_evt_item_t* evt;
+        antd_task_evt_item_t *evt;
         antd_task_t *task;
-        void * raw_ptr;
+        void *raw_ptr;
     };
     struct _antd_queue_item_t *next;
-}; 
+};
 
-typedef struct _antd_queue_item_t* antd_queue_item_t;
+typedef struct _antd_queue_item_t *antd_queue_item_t;
 
 typedef antd_queue_item_t antd_queue_t;
 
@@ -70,7 +75,8 @@ struct _antd_scheduler_t
 
 static antd_callback_t *callback_of(void *(*callback)(void *));
 static void antd_execute_task(antd_scheduler_t *, antd_task_t *);
-static int antd_task_schedule(antd_scheduler_t *);
+static void antd_task_schedule(antd_scheduler_t *scheduler, antd_task_t *task);
+static void destroy_task(void *data);
 
 static void set_nonblock(int fd)
 {
@@ -179,11 +185,12 @@ static void execute_callback(antd_scheduler_t *scheduler, antd_task_t *task)
         task->handle = cb->handle;
         task->callback = task->callback->next;
         free(cb);
+        //antd_task_bind_event(task, 0, 0, TASK_EVT_ALWAY_ON);
         antd_scheduler_add_task(scheduler, task);
     }
     else
     {
-        free(task);
+        destroy_task(task);
     }
 }
 
@@ -193,24 +200,18 @@ static void destroy_queue(antd_queue_t q, int is_task)
     it = q;
     while (it)
     {
-        if(is_task)
+        if (is_task)
         {
             // first free the task
-            if (it->task && it->task->callback)
-            {
-                free_callback(it->task->callback);
-                it->task->callback = NULL;
-            }
-            if (it->task)
-                free(it->task);
+            destroy_task(it->task);
         }
         else
         {
-            if(it->raw_ptr)
+            if (it->raw_ptr)
             {
                 free(it->raw_ptr);
             }
-        } 
+        }
         // then free the placeholder
         curr = it;
         it = it->next;
@@ -262,9 +263,6 @@ static void print_static_info(bst_node_t *node, void **args, int argc)
     ret = write(*fdp, buffer, strlen(buffer));
 
     snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
-    ret = write(*fdp, buffer, strlen(buffer));
-
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "Task type: %d\n", task->type);
     ret = write(*fdp, buffer, strlen(buffer));
 
     if (task->handle)
@@ -460,8 +458,18 @@ antd_scheduler_t *antd_scheduler_init(int n, const char *stat_name)
 static void destroy_task(void *data)
 {
     antd_task_t *task = (antd_task_t *)data;
-    if (task && task->callback)
+    if (!task)
+        return;
+    if (task->callback)
+    {
         free_callback(task->callback);
+        task->callback = NULL;
+    }
+    if (task->events)
+    {
+        destroy_queue(task->events, 0);
+        task->events = NULL;
+    }
     if (task)
         free(task);
 }
@@ -479,14 +487,14 @@ void antd_scheduler_destroy(antd_scheduler_t *scheduler)
     LOG("Destroy remaining queue");
     bst_free_cb(scheduler->task_queue, destroy_task);
     scheduler->task_queue = NULL;
-    destroy_queue(scheduler->workers_queue,1);
+    destroy_queue(scheduler->workers_queue, 1);
     free(scheduler);
 }
 
 /*
     create a task
 */
-antd_task_t *antd_mktask(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t atime, antd_task_type_t type)
+antd_task_t *antd_create_task(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t atime)
 {
     antd_task_t *task = (antd_task_t *)malloc(sizeof *task);
     task->stamp = (unsigned long)time(NULL);
@@ -494,8 +502,8 @@ antd_task_t *antd_mktask(void *(*handle)(void *), void *data, void *(*callback)(
     task->handle = handle;
     task->id = antd_task_data_id(data);
     task->callback = callback_of(callback);
-    task->type = type;
     task->access_time = atime;
+    task->events = NULL;
     return task;
 }
 
@@ -504,7 +512,7 @@ antd_task_t *antd_mktask(void *(*handle)(void *), void *data, void *(*callback)(
 */
 void antd_scheduler_add_task(antd_scheduler_t *scheduler, antd_task_t *task)
 {
-    if(task->id == 0)
+    if (task->id == 0)
         task->id = antd_scheduler_next_id(scheduler, task->id);
     pthread_mutex_lock(&scheduler->scheduler_lock);
     scheduler->task_queue = bst_insert(scheduler->task_queue, task->id, (void *)task);
@@ -541,17 +549,18 @@ static void antd_execute_task(antd_scheduler_t *scheduler, antd_task_t *task)
             {
                 rtask->callback = task->callback;
             }
+            task->callback = NULL;
         }
         if (!rtask->handle)
         {
             // call the first callback
             execute_callback(scheduler, rtask);
-            free(task);
+            destroy_task(task);
         }
         else
         {
             antd_scheduler_add_task(scheduler, rtask);
-            free(task);
+            destroy_task(task);
         }
     }
 }
@@ -571,23 +580,12 @@ void antd_scheduler_unlock(antd_scheduler_t *sched)
     pthread_mutex_unlock(&sched->scheduler_lock);
 }
 
-static int antd_task_schedule(antd_scheduler_t *scheduler)
+static void antd_task_schedule(antd_scheduler_t *scheduler, antd_task_t *task)
 {
-    // fetch next task from the task_queue
-    antd_task_t *task = NULL;
-    bst_node_t *node;
-    pthread_mutex_lock(&scheduler->scheduler_lock);
-    node = bst_find_min(scheduler->task_queue);
-    if (node)
-    {
-        task = (antd_task_t *)node->data;
-        scheduler->task_queue = bst_delete(scheduler->task_queue, node->key);
-    }
-    pthread_mutex_unlock(&scheduler->scheduler_lock);
     // no task
     if (!task)
     {
-        return 0;
+        return;
     }
     pthread_mutex_lock(&scheduler->pending_lock);
     scheduler->pending_task--;
@@ -600,18 +598,11 @@ static int antd_task_schedule(antd_scheduler_t *scheduler)
         // data task is not valid
         LOG("Task is no longer valid and will be killed");
         antd_scheduler_destroy_data(task->data);
-        if (task->callback)
-        {
-            free_callback(task->callback);
-            task->callback = NULL;
-        }
-
-        free(task);
-        return 0;
+        destroy_task(task);
+        return;
     }
 
-    // check the type of task
-    if (task->type == LIGHT || scheduler->n_workers <= 0)
+    if (scheduler->n_workers <= 0)
     {
         // do it by myself
         antd_execute_task(scheduler, task);
@@ -626,16 +617,170 @@ static int antd_task_schedule(antd_scheduler_t *scheduler)
         // wake up idle worker
         sem_post(scheduler->worker_sem);
     }
-    return 1;
 }
-void* antd_scheduler_wait(void* ptr)
+
+static void task_polls_collect(bst_node_t* node, void** argv, int argc)
 {
-    int stat;
-    antd_scheduler_t *scheduler = (antd_scheduler_t *) ptr;
+    UNUSED(argc);
+    antd_task_evt_item_t* it = (antd_task_evt_item_t*)node->data;
+    struct pollfd* pfds = (struct pollfd*)argv[0];
+    if(it)
+    {
+        pfds[node->key].fd = it->fd;
+        if(it->flags & TASK_EVT_ON_READABLE)
+        {
+            pfds[node->key].events |= POLLIN;
+        }
+        if(it->flags & TASK_EVT_ON_WRITABLE)
+        {
+            pfds[node->key].events |= POLLOUT;
+        }
+    }
+}
+
+static void task_event_collect(bst_node_t* node, void** argv, int argc)
+{
+    UNUSED(argc);
+    antd_task_t* task = (antd_task_t*) node->data;
+    antd_queue_t* exec_list = (antd_queue_t*) argv[0];
+    bst_node_t** poll_list = (bst_node_t**) argv[1];
+    int* pollsize = (int*) argv[2];
+
+    if(!task->events)
+    {
+        enqueue(exec_list, task);
+        return;
+    }
+    antd_queue_item_t it = task->events;
+    while(it)
+    {
+        if(it->evt->flags & TASK_EVT_ALWAY_ON)
+        {
+            enqueue(exec_list, task);
+        }
+        else if(it->evt->flags & TASK_EVT_ON_TIMEOUT)
+        {
+            // check if timeout
+            if(difftime(time(NULL),task->stamp) > it->evt->timeout )
+            {
+                enqueue(exec_list, task);
+            }
+        }
+        else
+        {
+            *poll_list = bst_insert(*poll_list, *pollsize, it->evt);
+            *pollsize = (*pollsize)+1;
+        }
+        it = it->next;
+    }
+}
+
+void antd_task_bind_event(antd_task_t *task, int fd, int timeout, int flags)
+{
+    antd_task_evt_item_t *eit = (antd_task_evt_item_t *)malloc(sizeof(antd_task_evt_item_t));
+    eit->fd = fd;
+    eit->timeout = timeout;
+    eit->flags = flags;
+    eit->task = task;
+    enqueue(&task->events, eit);
+}
+
+void *antd_scheduler_wait(void *ptr)
+{
+    int pollsize, ready;
+    void *argv[3];
+    antd_queue_t exec_list = NULL;
+    bst_node_t* poll_list = NULL;
+    antd_queue_item_t it = NULL;
+    antd_queue_item_t curr = NULL;
+    antd_task_evt_item_t *eit = NULL;
+    bst_node_t* node = NULL;
+    struct pollfd *pfds = NULL;
+    antd_scheduler_t *scheduler = (antd_scheduler_t *)ptr;
+   
     while (scheduler->status)
     {
-        stat = antd_task_schedule(scheduler);
-        if (!stat)
+        pollsize = 0;
+         argv[0] = &exec_list;
+        argv[1] = &poll_list;
+        argv[2] = &pollsize;
+        pthread_mutex_lock(&scheduler->scheduler_lock);
+        bst_for_each(scheduler->task_queue, task_event_collect, argv, 3);
+        pthread_mutex_unlock(&scheduler->scheduler_lock);
+        // schedule exec list first
+        it = exec_list;
+        while(it)
+        {
+            if(it->task)
+            {
+                
+                pthread_mutex_lock(&scheduler->scheduler_lock);
+                scheduler->task_queue = bst_delete(scheduler->task_queue, it->task->id);
+                pthread_mutex_unlock(&scheduler->scheduler_lock);
+                antd_task_schedule(scheduler, it->task);
+            }
+            curr = it;
+            it = it->next;
+            free(curr);
+        }
+        // Detect event on pollist
+        if(pollsize > 0)
+        {
+            pfds = (struct pollfd*)malloc(pollsize*sizeof(struct pollfd));
+            memset(pfds, 0, pollsize*sizeof(struct pollfd));
+            if(pfds)
+            {
+                argv[0] = pfds;
+                bst_for_each(poll_list,task_polls_collect, argv, 1);
+                // now poll event
+                ready = poll(pfds, pollsize, POLL_EVENT_TO);
+                if(ready == -1)
+                {
+                    // this should not happends
+                    ERROR("Unable to poll: %s", strerror(errno));
+                    // TODO: exit ?
+                }
+                else if(ready > 0)
+                {
+                    for (int i = 0; i < pollsize; i++)
+                    {
+                        // find the event
+                        node = bst_find(poll_list,i);
+                        if(node)
+                            eit = (antd_task_evt_item_t *)node->data;
+                        if(eit)
+                        {
+                            if( ((eit->flags & TASK_EVT_ON_READABLE) && (pfds[i].revents & POLLIN))
+                                || ( (eit->flags & TASK_EVT_ON_WRITABLE) && (pfds[i].revents & POLLOUT))
+                            ) {
+                                // event triggered schedule the task
+                                pthread_mutex_lock(&scheduler->scheduler_lock);
+                                scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
+                                pthread_mutex_unlock(&scheduler->scheduler_lock);
+                                antd_task_schedule(scheduler, eit->task);
+                            }
+                            else if( (pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP) ) {
+                                // task is no longer available
+                                ERROR("Poll: Task %d is no longer valid. Remove it", eit->task->id);
+                                // remove task from task queue
+                                pthread_mutex_lock(&scheduler->scheduler_lock);
+                                scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
+                                pthread_mutex_unlock(&scheduler->scheduler_lock);
+                                antd_scheduler_destroy_data(eit->task->data);
+                                destroy_task(eit->task);
+                            }
+                        }
+                    }
+                    
+                }
+                free(pfds);
+            }
+        }
+        exec_list = NULL;
+        bst_free(poll_list);
+        poll_list = NULL;
+
+        if (!scheduler->task_queue)
         {
             // no task found, go to idle state
             sem_wait(scheduler->scheduler_sem);
@@ -672,7 +817,9 @@ void antd_scheduler_ext_statistic(int fd, void *data)
 }
 int antd_scheduler_validate_data(antd_task_t *task)
 {
-    return !(difftime(time(NULL), task->access_time) > MAX_VALIDITY_INTERVAL);
+    UNUSED(task);
+    return 1;
+    //!(difftime(time(NULL), task->access_time) > MAX_VALIDITY_INTERVAL);
 }
 void antd_scheduler_destroy_data(void *data)
 {

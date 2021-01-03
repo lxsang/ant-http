@@ -241,7 +241,7 @@ static void antd_monitor(port_config_t *pcnf)
 			antd_scheduler_unlock(scheduler);
 			// create callback for the server
 			task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
-			//task->type = LIGHT;
+			antd_task_bind_event(task,client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
 			antd_scheduler_add_task(scheduler, task);
 		}
 	}

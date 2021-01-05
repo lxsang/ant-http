@@ -10,7 +10,7 @@
 #include "utils.h"
 #include "bst.h"
 
-#define MAX_VALIDITY_INTERVAL 20
+#define MAX_VALIDITY_INTERVAL 60 // 1minute
 #define MAX_FIFO_NAME_SZ 255
 #define POLL_EVENT_TO 100 // ms
 
@@ -818,8 +818,7 @@ void antd_scheduler_ext_statistic(int fd, void *data)
 int antd_scheduler_validate_data(antd_task_t *task)
 {
     UNUSED(task);
-    return 1;
-    //!(difftime(time(NULL), task->access_time) > MAX_VALIDITY_INTERVAL);
+    return !(difftime(time(NULL), task->access_time) > MAX_VALIDITY_INTERVAL);
 }
 void antd_scheduler_destroy_data(void *data)
 {

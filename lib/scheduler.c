@@ -645,7 +645,6 @@ static void task_event_collect(bst_node_t* node, void** argv, int argc)
     antd_queue_t* exec_list = (antd_queue_t*) argv[0];
     bst_node_t** poll_list = (bst_node_t**) argv[1];
     int* pollsize = (int*) argv[2];
-
     if(!task->events)
     {
         enqueue(exec_list, task);
@@ -805,7 +804,7 @@ int antd_scheduler_next_id(antd_scheduler_t *sched, int input)
     pthread_mutex_lock(&sched->scheduler_lock);
     if (id == 0)
     {
-        sched->id_allocator++;
+         sched->id_allocator++;
         id = sched->id_allocator;
     }
 

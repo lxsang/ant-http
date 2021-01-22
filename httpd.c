@@ -190,8 +190,8 @@ static void antd_monitor(port_config_t *pcnf)
 			dictionary_t xheader = dict();
 			dput(request->request, "REQUEST_HEADER", xheader);
 			dput(request->request, "REQUEST_DATA", dict());
-			dput(xheader, "SERVER_PORT", (void *)__s("%d", pcnf->port));
-			dput(xheader, "SERVER_WWW_ROOT", (void *)strdup(pcnf->htdocs));
+			dput(request->request, "SERVER_PORT", (void *)__s("%d", pcnf->port));
+			dput(request->request, "SERVER_WWW_ROOT", (void *)strdup(pcnf->htdocs));
 			/*
 					get the remote IP
 				*/
@@ -200,7 +200,7 @@ static void antd_monitor(port_config_t *pcnf)
 				client_ip = inet_ntoa(client_name.sin_addr);
 				LOG("Connect to client IP: %s on port:%d (%d)", client_ip, pcnf->port, client_sock);
 				// ip address
-				dput(xheader, "REMOTE_ADDR", (void *)strdup(client_ip));
+				dput(request->request, "REMOTE_ADDR", (void *)strdup(client_ip));
 				//LOG("socket: %d\n", client_sock);
 			}
 
@@ -304,8 +304,10 @@ int antd_task_data_id(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	if(!rq)
-		return 0;
+		return 0; 
 	return antd_scheduler_next_id(scheduler,rq->client->sock);
+	//UNUSED(data);
+	//return antd_scheduler_next_id(scheduler,0);
 }
 
 int main(int argc, char *argv[])

@@ -694,7 +694,7 @@ void *antd_scheduler_wait(void *ptr)
     antd_queue_item_t it = NULL;
     antd_queue_item_t curr = NULL;
     antd_task_evt_item_t *eit = NULL;
-    bst_node_t* node = NULL;
+    bst_node_t* node, *task_node = NULL;
     struct pollfd *pfds = NULL;
     antd_scheduler_t *scheduler = (antd_scheduler_t *)ptr;
    
@@ -745,6 +745,7 @@ void *antd_scheduler_wait(void *ptr)
                     for (int i = 0; i < pollsize; i++)
                     {
                         // find the event
+                        task_node = NULL;
                         node = bst_find(poll_list,i);
                         if(node)
                             eit = (antd_task_evt_item_t *)node->data;
@@ -755,9 +756,12 @@ void *antd_scheduler_wait(void *ptr)
                             ) {
                                 // event triggered schedule the task
                                 pthread_mutex_lock(&scheduler->scheduler_lock);
-                                scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
+                                task_node = bst_find(scheduler->task_queue, eit->task->id);
+                                if(task_node)
+                                    scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
                                 pthread_mutex_unlock(&scheduler->scheduler_lock);
-                                antd_task_schedule(scheduler, eit->task);
+                                if(task_node)
+                                    antd_task_schedule(scheduler, eit->task);
                             }
                             else if( (pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP) ) {
                                 // task is no longer available
@@ -782,6 +786,8 @@ void *antd_scheduler_wait(void *ptr)
 
         if (!scheduler->task_queue)
         {
+            // reset id allocator
+            //scheduler->id_allocator=0;
             // no task found, go to idle state
             sem_wait(scheduler->scheduler_sem);
         }
@@ -805,6 +811,7 @@ int antd_scheduler_next_id(antd_scheduler_t *sched, int input)
 
     while (bst_find(sched->task_queue, id) != NULL)
     {
+        sched->id_allocator++;
         id = sched->id_allocator;
     }
     pthread_mutex_unlock(&sched->scheduler_lock);

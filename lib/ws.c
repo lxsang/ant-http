@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <netdb.h> //hostent
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -348,71 +347,6 @@ int ws_send_close(void *client, unsigned int status, int mask)
 	//_send_header(client, header);
 	//send(client,bytes,2,0);
 }
-int ip_from_hostname(const char *hostname, char *ip)
-{
-	struct hostent *he;
-	struct in_addr **addr_list;
-	int i;
-	if ((he = gethostbyname(hostname)) == NULL)
-	{
-		// get the host info
-		ERROR("gethostbyname:%s", strerror(errno));
-		return -1;
-	}
-	addr_list = (struct in_addr **)he->h_addr_list;
-
-	for (i = 0; addr_list[i] != NULL; i++)
-	{
-		//Return the first one;
-		strcpy(ip, inet_ntoa(*addr_list[i]));
-		return 0;
-	}
-	return -1;
-}
-
-/*
-send a request
-*/
-int request_socket(const char *ip, int port)
-{
-	int sockfd;
-	struct sockaddr_in dest;
-
-	// time out setting
-	struct timeval timeout;
-	timeout.tv_sec = CONN_TIME_OUT_S;
-	timeout.tv_usec = 0; //3 s
-	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	{
-		ERROR("Socket: %s", strerror(errno));
-		return -1;
-	}
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-		ERROR("setsockopt failed:%s", strerror(errno));
-
-	if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-		ERROR("setsockopt failed:%s", strerror(errno));
-	/*struct linger lingerStruct;
-    lingerStruct.l_onoff = 0;  // turn lingering off for sockets
-    setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &lingerStruct, sizeof(lingerStruct));*/
-
-	bzero(&dest, sizeof(dest));
-	dest.sin_family = AF_INET;
-	dest.sin_port = htons(port);
-	if (inet_aton(ip, &dest.sin_addr) == 0)
-	{
-		perror(ip);
-		close(sockfd);
-		return -1;
-	}
-	if (connect(sockfd, (struct sockaddr *)&dest, sizeof(dest)) != 0)
-	{
-		close(sockfd);
-		ERROR("Connect:%s", strerror(errno));
-		return -1;
-	}
-	return sockfd;
-}
 
 void ws_client_close(ws_client_t *wsclient)
 {
@@ -437,9 +371,8 @@ void ws_client_close(ws_client_t *wsclient)
 //this is for the client side, not use for now
 int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf)
 {
-	char ip[100];
-	int stat = ip_from_hostname(wsclient->host, ip);
-	if (stat == -1)
+	char* ip = ip_from_hostname(wsclient->host);
+	if (ip == NULL)
 		return -1;
 	int sock = request_socket(ip, pcnf.port);
 	if (sock <= 0)
@@ -447,6 +380,16 @@ int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf)
 		ERROR("Cannot request socket");
 		return -1;
 	}
+	// time out setting
+	struct timeval timeout;
+	timeout.tv_sec = CONN_TIME_OUT_S;
+	timeout.tv_usec = 0; //3 s
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		ERROR("setsockopt failed:%s", strerror(errno));
+
+	if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		ERROR("setsockopt failed:%s", strerror(errno));
+        
 	// will be free
 	wsclient->antdsock->sock = sock;
 	wsclient->antdsock->z_status = 0;

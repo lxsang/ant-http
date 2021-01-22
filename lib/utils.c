@@ -34,6 +34,8 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <arpa/inet.h>
+#include <netdb.h> //hostent
 
 #ifdef USE_OPENSSL
 #include <openssl/sha.h>
@@ -594,4 +596,60 @@ int guard_write(int fd, void* buffer, size_t size)
         n += st;
     }
     return n;
+}
+
+/*
+send a request
+*/
+int request_socket(const char *ip, int port)
+{
+	int sockfd;
+	struct sockaddr_in dest;
+
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		ERROR("Socket: %s", strerror(errno));
+		return -1;
+	}
+	/*struct linger lingerStruct;
+    lingerStruct.l_onoff = 0;  // turn lingering off for sockets
+    setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &lingerStruct, sizeof(lingerStruct));*/
+
+	bzero(&dest, sizeof(dest));
+	dest.sin_family = AF_INET;
+	dest.sin_port = htons(port);
+	if (inet_aton(ip, &dest.sin_addr) == 0)
+	{
+		perror(ip);
+		close(sockfd);
+		return -1;
+	}
+	if (connect(sockfd, (struct sockaddr *)&dest, sizeof(dest)) != 0)
+	{
+		close(sockfd);
+		ERROR("Connect:%s", strerror(errno));
+		return -1;
+	}
+	return sockfd;
+}
+
+char* ip_from_hostname(const char *hostname)
+{
+	struct hostent *he;
+	struct in_addr **addr_list;
+	int i;
+	if ((he = gethostbyname(hostname)) == NULL)
+	{
+		// get the host info
+		ERROR("gethostbyname:%s", strerror(errno));
+		return NULL;
+	}
+	addr_list = (struct in_addr **)he->h_addr_list;
+
+	for (i = 0; addr_list[i] != NULL; i++)
+	{
+		//Return the first one;
+		return inet_ntoa(*addr_list[i]);
+	}
+	return NULL;
 }

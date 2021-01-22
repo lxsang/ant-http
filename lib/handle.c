@@ -107,8 +107,8 @@ int compressable(char *ctype)
 
 void htdocs(antd_request_t *rq, char *dest)
 {
-	dictionary_t xheader = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
-	char *www = (char *)dvalue(xheader, "SERVER_WWW_ROOT");
+	//dictionary_t xheader = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
+	char *www = (char *)dvalue(rq->request, "SERVER_WWW_ROOT");
 	if (www)
 	{
 		strcpy(dest, www);
@@ -527,7 +527,7 @@ int antd_send(void *src, const void *data_in, int len_in)
 				writelen = (len - written) > BUFFLEN ? BUFFLEN : (len - written);
 				time(&source->last_io);
 			}
-			else if (difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (count == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
+			else if ((difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME) || (count == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
 			{
 				if (written == 0)
 					written = count;
@@ -541,6 +541,76 @@ int antd_send(void *src, const void *data_in, int len_in)
 #endif
 
 	return written;
+}
+/**
+ * Read up to n bytes, not guaranty to have exactly nbytes
+ * - return -1 if false
+ * */
+int antd_recv_upto(void *src, void *data, int len)
+{
+	if (!src)
+		return -1;
+	int received = 0;
+	antd_client_t *source = (antd_client_t *)src;
+#ifdef USE_OPENSSL
+	if (source->ssl)
+	{
+		ERR_clear_error();
+		received = SSL_read(source->ssl, data, len);
+		int err = SSL_get_error(source->ssl, received);
+		if (received > 0)
+		{
+			time(&source->last_io);
+			return received;
+		}
+		else
+		{
+			switch (err)
+			{
+			case SSL_ERROR_NONE:
+			{
+				return 0;
+			}
+
+			case SSL_ERROR_ZERO_RETURN:
+			{
+				// peer disconnected...
+				return -1;
+			}
+
+			case SSL_ERROR_WANT_READ:
+			{
+				return 0;
+			}
+
+			case SSL_ERROR_WANT_WRITE:
+			{
+				return 0;
+			}
+
+			default:
+				return -1;
+			}
+		}
+	}
+	else
+	{
+#endif
+		received = recv(((int)source->sock), data, len, 0);
+		//LOG("Read : %c\n", *ptr);
+		if (received > 0)
+		{
+			time(&source->last_io);
+			return received;
+		}
+		if (received == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
+		{
+			return -1;
+		}
+		return 0;
+#ifdef USE_OPENSSL
+	}
+#endif
 }
 int antd_recv(void *src, void *data, int len)
 {
@@ -688,7 +758,8 @@ int antd_recv(void *src, void *data, int len)
 				time(&source->last_io);
 				//LOG("Read len is %d\n", readlen);
 			}
-			else if (difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (errno != EAGAIN && errno != EWOULDBLOCK))
+			else if ((read == 0) ||
+					 difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (errno != EAGAIN && errno != EWOULDBLOCK))
 			{
 				//ERROR("Error while reading: %s", strerror(errno));
 				if (read == 0)

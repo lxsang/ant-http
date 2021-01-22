@@ -24,35 +24,37 @@ THE SOFTWARE.
 #ifndef DICTIONARY_H
 #define DICTIONARY_H
 
-#define DHASHSIZE 	16
-#define for_each_assoc(assoc, dic) \
-    for(unsigned int i = 0; i < dic->cap; i++) \
-    	for(assoc = dic->map[i];assoc!= NULL; assoc = assoc->next)
+#define DHASHSIZE 16
+#define for_each_assoc(assoc, dic)              \
+    for (unsigned int i = 0; i < dic->cap; i++) \
+        for (assoc = dic->map[i]; assoc != NULL; assoc = assoc->next)
 
 /**
  * Dictionary for header
  */
-typedef struct  __assoc{ 
-    struct __assoc *next; 
-    char *key; 
-    void* value;
+typedef struct __assoc
+{
+    struct __assoc *next;
+    char *key;
+    void *value;
     //char *value;
 } * chain_t;
 
-typedef  chain_t* map_t;
+typedef chain_t *map_t;
 
-typedef struct __dict{
+typedef struct __dict
+{
     unsigned int cap;
     map_t map;
     unsigned int size;
-}* dictionary_t;
+} * dictionary_t;
 
 dictionary_t dict();
 dictionary_t dict_n(unsigned int n);
-chain_t dlookup(dictionary_t,const char*);
-void* dvalue(dictionary_t, const char*);
-chain_t dput(dictionary_t,const char*, void*);
-chain_t dremove(dictionary_t, const char*);
+chain_t dlookup(dictionary_t, const char *);
+void *dvalue(dictionary_t, const char *);
+chain_t dput(dictionary_t, const char *, void *);
+chain_t dremove(dictionary_t, const char *);
 void freedict(dictionary_t);
 
 #endif

@@ -300,7 +300,7 @@ void *accept_request(void *data)
 	antd_request_t *rq = (antd_request_t *)data;
 
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t *client = (antd_client_t *)rq->client;
@@ -407,7 +407,7 @@ void *resolve_request(void *data)
 	char path[2 * BUFFLEN];
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
 	char *newurl = NULL;
 	char *rqp = NULL;
@@ -613,7 +613,7 @@ void *serve_file(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
 	char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
 	rq->client->state = ANTD_CLIENT_SERVE_FILE;
@@ -752,6 +752,174 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
 
 	return strdup(query_string);
 }
+static void *proxy_monitor(void *data)
+{
+	antd_request_t *rq = (antd_request_t *)data;
+	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
+	antd_task_t* task = antd_create_task(NULL, data, NULL, rq->client->last_io);
+	int ret, max_fd;
+	fd_set read_flags;
+	// first verify if the socket is ready
+	FD_ZERO(&read_flags);
+	FD_SET(rq->client->sock, &read_flags);
+	FD_SET(proxy->sock, &read_flags);
+	//FD_ZERO(&write_flags);
+	//FD_SET(rq->client->sock, &write_flags);
+	//FD_SET(proxy->sock, &write_flags);
+	char *buf = NULL;
+	struct timeval timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 500;
+	
+	max_fd = proxy->sock > rq->client->sock ? proxy->sock: rq->client->sock;
+
+	// select
+	ret = select(max_fd + 1, &read_flags, NULL, (fd_set *)0, &timeout);
+	if(ret == -1)
+	{
+		//antd_error(rq->client, 500, "");
+		(void)close(proxy->sock);
+		return task;
+	}
+	if(ret > 0)
+	{
+		buf = (char *)malloc(BUFFLEN);
+		if (FD_ISSET(rq->client->sock, &read_flags))
+		{
+			ret = antd_recv_upto(rq->client, buf, BUFFLEN);
+			if(ret == -1)
+			{
+				free(buf);
+				(void)close(proxy->sock);
+				return task;
+			}
+			antd_send(proxy, buf, ret);
+		}
+		if (FD_ISSET(proxy->sock, &read_flags))
+		{
+			ret = antd_recv_upto(proxy, buf, BUFFLEN);
+			if(ret == -1)
+			{
+				free(buf);
+				(void)close(proxy->sock);
+				return task;
+			}
+			antd_send(rq->client, buf, ret);
+		}
+		free(buf);
+	}
+	task->handle = proxy_monitor;
+	task->access_time = rq->client->last_io;
+	// register event
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
+	return task;
+}
+static void *proxify(void *data)
+{
+	int sock_fd, size, ret;
+	char *str = NULL;
+	chain_t it;
+	antd_request_t *rq = (antd_request_t *)data;
+	antd_client_t *proxy = NULL;
+	rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
+	char *host = dvalue(rq->request, "PROXY_HOST");
+	int port = atoi(dvalue(rq->request, "PROXY_PORT"));
+	char *path = dvalue(rq->request, "PROXY_PATH");
+	char *query = dvalue(rq->request, "PROXY_QUERY");
+	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
+	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
+	if (!xheader)
+	{
+		antd_error(rq->client, 400, "Badd Request");
+		return task;
+	}
+	sock_fd = request_socket(ip_from_hostname(host), port);
+	if (sock_fd == -1)
+	{
+		antd_error(rq->client, 503, "Service Unavailable");
+		return task;
+	}
+	proxy = (antd_client_t *)malloc(sizeof(antd_client_t));
+	proxy->sock = sock_fd;
+	proxy->ssl = NULL;
+	proxy->zstream = NULL;
+	proxy->z_level = ANTD_CNONE;
+	dput(rq->request, "PROXY_HANDLE", proxy);
+
+	str = __s("%s %s?%s HTTP/1.1\r\n", (char *)dvalue(rq->request, "METHOD"), path, query);
+	size = strlen(str);
+	ret = antd_send(proxy, str, size);
+	free(str);
+	if (ret != size)
+	{
+		antd_error(rq->client, 500, "");
+		(void)close(sock_fd);
+		return task;
+	}
+	for_each_assoc(it, xheader)
+	{
+		str = __s("%s: %s\r\n", it->key, (char *)it->value);
+		size = strlen(str);
+		ret = antd_send(proxy, str, size);
+		free(str);
+		if (ret != size)
+		{
+			antd_error(rq->client, 500, "");
+			(void)close(sock_fd);
+			return task;
+		}
+	}
+	(void)antd_send(proxy, "\r\n", 2);
+
+	// now monitor the proxy
+	task->handle = proxy_monitor;
+	task->access_time = rq->client->last_io;
+	// register event
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
+	return task;
+}
+/**
+ * Check if the current request is e reverse proxy
+ * return a proxy task if this is the case
+*/
+static void *check_proxy(antd_request_t *rq, const char *path, const char *query)
+{
+	char *pattern = "^(https?)://([^:]+):([0-9]+)(.*)$";
+	char buff[256];
+	regmatch_t matches[5];
+	int ret, size;
+	ret = regex_match(pattern, path, 5, matches);
+
+	if (!ret)
+	{
+		return NULL;
+	}
+
+	if (matches[1].rm_eo - matches[1].rm_so == 5)
+	{
+		// https is not supported for now
+		// TODO add https support
+		antd_error(rq->client, 503, "Service Unavailable");
+		return antd_create_task(NULL, (void *)rq, NULL, time(NULL));
+	}
+	// http proxy request
+	size = matches[2].rm_eo - matches[2].rm_so < (int)sizeof(buff) ? matches[2].rm_eo - matches[2].rm_so : (int)sizeof(buff);
+	(void)memcpy(buff, path + matches[2].rm_so, size);
+	buff[size] = '\0';
+	dput(rq->request, "PROXY_HOST", strdup(buff));
+
+	size = matches[3].rm_eo - matches[3].rm_so < (int)sizeof(buff) ? matches[3].rm_eo - matches[3].rm_so : (int)sizeof(buff);
+	(void)memcpy(buff, path + matches[3].rm_so, size);
+	buff[size] = '\0';
+	dput(rq->request, "PROXY_PORT", strdup(buff));
+
+	dput(rq->request, "PROXY_PATH", strdup(path + matches[4].rm_so));
+	dput(rq->request, "PROXY_QUERY", strdup(query));
+
+	return antd_create_task(proxify, (void *)rq, NULL, rq->client->last_io);
+}
 /**
  * Decode the HTTP request header
  */
@@ -771,9 +939,9 @@ void *decode_request_header(void *data)
 	char *url = (char *)dvalue(rq->request, "REQUEST_QUERY");
 	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
 	dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
-	char *port_s = (char *)dvalue(xheader, "SERVER_PORT");
+	char *port_s = (char *)dvalue(rq->request, "SERVER_PORT");
 	port_config_t *pcnf = (port_config_t *)dvalue(server_config.ports, port_s);
-	antd_task_t * task;
+	antd_task_t *task;
 	// first real all header
 	// this for check if web socket is enabled
 
@@ -808,7 +976,7 @@ void *decode_request_header(void *data)
 			antd_error(rq->client, 413, "Payload Too Large");
 			ERROR("Header size too large (%d): %d vs %d", rq->client->sock, header_size, HEADER_MAX_SIZE);
 			task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-			antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+			antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 			return task;
 		}
 	}
@@ -824,7 +992,7 @@ void *decode_request_header(void *data)
 			// 100 ms sleep
 			usleep(100000);
 			task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-			antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+			antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 			return task;
 		}
 	}
@@ -858,19 +1026,28 @@ void *decode_request_header(void *data)
 	LOG("Original query (%d): %s", rq->client->sock, url);
 	query = apply_rules(pcnf->rules, host, buf);
 	LOG("Processed query: %s", query);
+	if (cookie)
+		dput(rq->request, "COOKIE", cookie);
+	if (host)
+		free(host);
+	// check if this is a reverse proxy ?
+	task = check_proxy(rq, buf, query);
+	if (task)
+	{
+		if (query)
+			free(query);
+		return task;
+	}
+	// otherwise it a normal query
 	dput(rq->request, "RESOURCE_PATH", url_decode(buf));
 	if (query)
 	{
 		decode_url_request(query, request);
 		free(query);
 	}
-	if (cookie)
-		dput(rq->request, "COOKIE", cookie);
-	if (host)
-		free(host);
 	// header ok, now checkmethod
 	task = antd_create_task(decode_request, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	return task;
 }
 
@@ -889,7 +1066,7 @@ void *decode_request(void *data)
 		ws = 1;
 	method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	if (strcmp(method, "GET") == 0 || strcmp(method, "HEAD") == 0 || strcmp(method, "OPTIONS") == 0)
 	{
 		//if(ctype) free(ctype);
@@ -932,7 +1109,7 @@ void *decode_post_request(void *data)
 		clen = atoi(tmp);
 	char *method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	if (!method || strcmp(method, "POST") != 0)
 		return task;
 	if (ctype == NULL || clen == -1)
@@ -980,7 +1157,7 @@ void ws_confirm_request(void *client, const char *key)
 	char rkey[128];
 	char sha_d[20];
 	char base64[64];
-	strncpy(rkey, key, sizeof(rkey)-1);
+	strncpy(rkey, key, sizeof(rkey) - 1);
 	int n = (int)sizeof(rkey) - (int)strlen(key);
 	if (n < 0)
 		n = 0;
@@ -1048,7 +1225,7 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -1082,7 +1259,7 @@ void *decode_multi_part_request_data(void *data)
 	char *token, *keytoken, *valtoken;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	// search for content disposition:
@@ -1303,7 +1480,7 @@ void *execute_plugin(void *data, const char *pname)
 	char *error;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	//LOG("Plugin name '%s'", pname);
 	rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
 	//load the plugin
@@ -1341,7 +1518,7 @@ void *execute_plugin(void *data, const char *pname)
 	{
 		free(task);
 		task = antd_create_task(decode_post_request, (void *)rq, fn, rq->client->last_io);
-		antd_task_bind_event(task,rq->client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	}
 	return task;
 }

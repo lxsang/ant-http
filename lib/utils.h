@@ -96,4 +96,6 @@ void digest_to_hex(const uint8_t *, char *);
 void verify_header(char* k);
 int guard_read(int fd, void* buffer, size_t size);
 int guard_write(int fd, void* buffer, size_t size);
+int request_socket(const char *ip, int port);
+char* ip_from_hostname(const char *hostname);
 #endif

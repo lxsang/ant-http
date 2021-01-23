@@ -1,5 +1,6 @@
+//#define _GNU_SOURCE
 #include <sys/socket.h>
-#include <sys/select.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -301,24 +302,26 @@ void *accept_request(void *data)
 
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
-	fd_set read_flags, write_flags;
 	// first verify if the socket is ready
 	antd_client_t *client = (antd_client_t *)rq->client;
-	FD_ZERO(&read_flags);
-	FD_SET(rq->client->sock, &read_flags);
-	FD_ZERO(&write_flags);
-	FD_SET(rq->client->sock, &write_flags);
-	struct timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 500;
-	// select
-	int sel = select(client->sock + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
+	
+	struct pollfd pfd[1];
+
+	pfd[0].fd = client->sock;
+	pfd[0].events = POLLIN | POLLOUT;
+
+	int sel = poll(pfd, 1, POLL_EVENT_TO);
 	if (sel == -1)
 	{
 		antd_error(rq->client, 400, "Bad request");
 		return task;
 	}
-	if (sel == 0 || (!FD_ISSET(client->sock, &read_flags) && !FD_ISSET(client->sock, &write_flags)))
+	if(pfd[0].revents & POLLERR || pfd[0].revents & POLLHUP)
+	{
+		antd_error(rq->client, 400, "Bad request");
+		return task;
+	}
+	if (sel == 0 || (!(pfd[0].revents & POLLIN) && !(pfd[0].revents & POLLOUT)))
 	{
 		task->handle = accept_request;
 		return task;
@@ -354,7 +357,7 @@ void *accept_request(void *data)
 	}
 	else
 	{
-		if (!FD_ISSET(client->sock, &read_flags))
+		if (!((pfd[0].revents & POLLIN)))
 		{
 			task->handle = accept_request;
 			return task;
@@ -756,59 +759,63 @@ static void *proxy_monitor(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
-	antd_task_t* task = antd_create_task(NULL, data, NULL, rq->client->last_io);
-	int ret, max_fd;
-	fd_set read_flags, write_flags;
-	// first verify if the socket is ready
-	FD_ZERO(&read_flags);
-	FD_SET(rq->client->sock, &read_flags);
-	FD_SET(proxy->sock, &read_flags);
-	FD_ZERO(&write_flags);
-	FD_SET(rq->client->sock, &write_flags);
-	//FD_SET(proxy->sock, &write_flags);
+	char* method = (char *)dvalue(rq->request, "METHOD");
+	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
+	int ret, sz;
+	struct pollfd pfd[2];
 	char *buf = NULL;
-	struct timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 5000;
-	
-	max_fd = proxy->sock > rq->client->sock ? proxy->sock: rq->client->sock;
-	buf = (char *)malloc(BUFFLEN);
-	//printf("start proxy monitor\n");
-	// select
-	do
+
+	pfd[0].fd = rq->client->sock;
+	pfd[1].fd = proxy->sock;
+	pfd[1].events = POLLIN;
+	pfd[0].events = POLLIN;
+	if(rq->client->ssl)
 	{
-		ret = select(max_fd + 1, &read_flags, &write_flags, (fd_set *)0, &timeout);
-		if(ret > 0)
+		pfd[0].events |= POLLOUT;
+	}
+	// select
+	ret = poll(pfd, 2, POLL_EVENT_TO);
+	if (ret > 0)
+	{
+		if(
+			pfd[0].revents & POLLERR ||
+			pfd[0].revents & POLLRDHUP ||
+			pfd[0].revents & POLLHUP ||
+			pfd[0].revents & POLLNVAL||
+			pfd[1].revents & POLLERR ||
+			pfd[1].revents & POLLHUP ||
+			pfd[1].revents & POLLRDHUP ||
+			pfd[1].revents & POLLNVAL 
+			)
 		{
-			
-			memset(buf, '\0', BUFFLEN);
-			if (FD_ISSET(rq->client->sock, &read_flags) || FD_ISSET(rq->client->sock, &write_flags))
+			(void)close(proxy->sock);
+			return task;
+		}
+		buf = (char *)malloc(BUFFLEN);
+		memset(buf, '\0', BUFFLEN);
+		if ((pfd[0].revents & POLLIN) || (pfd[0].revents & POLLOUT))
+		{
+			sz = antd_recv_upto(rq->client, buf, BUFFLEN);
+			if ( (sz < 0) || (sz == 0 && !rq->client->ssl) || ( antd_send(proxy, buf, sz) != sz ))
 			{
-				ret = antd_recv_upto(rq->client, buf, BUFFLEN);
-				if(ret == -1)
-				{
-					free(buf);
-					(void)close(proxy->sock);
-					return task;
-				}
-				antd_send(proxy, buf, ret);
-			}
-			if (FD_ISSET(proxy->sock, &read_flags))
-			{
-				ret = antd_recv_upto(proxy, buf, BUFFLEN);
-				if(ret == -1)
-				{
-					free(buf);
-					(void)close(proxy->sock);
-					return task;
-				}
-				antd_send(rq->client, buf, ret);
+				free(buf);
+				(void)close(proxy->sock);
+				return task;
 			}
 		}
-	} while (ret > 0);
-	free(buf);
-	//printf("monitor return: %d\n", ret);
-	if(ret == -1)
+		if (pfd[1].revents & POLLIN)
+		{
+			if ((sz = antd_recv_upto(proxy, buf, BUFFLEN)) <= 0 || antd_send(rq->client, buf, sz) != sz)
+			{
+				free(buf);
+				(void)close(proxy->sock);
+				return task;
+			}
+		}
+		free(buf);
+	}
+	
+	if (ret < 0)
 	{
 		(void)close(proxy->sock);
 		return task;
@@ -817,7 +824,14 @@ static void *proxy_monitor(void *data)
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;
 	// register event
-	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+	if(rq->client->ssl && (EQU(method, "POST") || ws_enable(rq->request)))
+	{
+		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+	}
+	else
+	{
+		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE );
+	}
 	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
 	return task;
 }
@@ -834,6 +848,7 @@ static void *proxify(void *data)
 	char *path = dvalue(rq->request, "PROXY_PATH");
 	char *query = dvalue(rq->request, "PROXY_QUERY");
 	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
+	char* method = (char *)dvalue(rq->request, "METHOD");
 	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
 	if (!xheader)
 	{
@@ -852,6 +867,7 @@ static void *proxify(void *data)
 	proxy->ssl = NULL;
 	proxy->zstream = NULL;
 	proxy->z_level = ANTD_CNONE;
+	// store content length here
 	dput(rq->request, "PROXY_HANDLE", proxy);
 
 	str = __s("%s %s?%s HTTP/1.1\r\n", (char *)dvalue(rq->request, "METHOD"), path, query);
@@ -882,7 +898,15 @@ static void *proxify(void *data)
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;
 	// register event
-	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+	
+	if(rq->client->ssl && (EQU(method, "POST") || ws_enable(rq->request)))
+	{
+		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+	}
+	else
+	{
+		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE );
+	}
 	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
 	return task;
 }
@@ -1127,12 +1151,12 @@ void *decode_post_request(void *data)
 	if (strstr(ctype, FORM_URL_ENCODE))
 	{
 		char *pquery = post_data_decode(rq->client, clen);
-		if(pquery)
+		if (pquery)
 		{
 			decode_url_request(pquery, request);
 			free(pquery);
 		}
-		else if(clen > 0)
+		else if (clen > 0)
 		{
 			task->handle = decode_post_request;
 		}
@@ -1156,7 +1180,7 @@ void *decode_post_request(void *data)
 			dput(request, key, strdup(pquery));
 			free(pquery);
 		}
-		else if(clen > 0)
+		else if (clen > 0)
 		{
 			task->handle = decode_post_request;
 		}

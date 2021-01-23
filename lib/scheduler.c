@@ -12,7 +12,6 @@
 
 #define MAX_VALIDITY_INTERVAL 60 // 1minute
 #define MAX_FIFO_NAME_SZ 255
-#define POLL_EVENT_TO 100 // ms
 
 // callback definition
 struct _antd_callback_t
@@ -210,6 +209,7 @@ static void destroy_queue(antd_queue_t q, int is_task)
             if (it->raw_ptr)
             {
                 free(it->raw_ptr);
+                it->raw_ptr = NULL;
             }
         }
         // then free the placeholder
@@ -637,7 +637,15 @@ static void task_polls_collect(bst_node_t* node, void** argv, int argc)
         }
     }
 }
-
+static void antd_deploy_task(bst_node_t* node, void** argv, int argc)
+{
+    UNUSED(argc);
+    if(!node || !node->data)
+        return;
+    antd_scheduler_t* sched = (antd_scheduler_t*) argv[0];
+    antd_task_t* task = node->data;
+    antd_task_schedule(sched, task);
+}
 static void task_event_collect(bst_node_t* node, void** argv, int argc)
 {
     UNUSED(argc);
@@ -690,6 +698,7 @@ void *antd_scheduler_wait(void *ptr)
     void *argv[3];
     antd_queue_t exec_list = NULL;
     bst_node_t* poll_list = NULL;
+    bst_node_t* scheduled_list = NULL;
     antd_queue_item_t it = NULL;
     antd_queue_item_t curr = NULL;
     antd_task_evt_item_t *eit = NULL;
@@ -745,9 +754,12 @@ void *antd_scheduler_wait(void *ptr)
                     {
                         // find the event
                         task_node = NULL;
+                        eit = NULL;
                         node = bst_find(poll_list,i);
                         if(node)
+                        {
                             eit = (antd_task_evt_item_t *)node->data;
+                        }
                         if(eit)
                         {
                             if( ((eit->flags & TASK_EVT_ON_READABLE) && (pfds[i].revents & POLLIN))
@@ -760,7 +772,8 @@ void *antd_scheduler_wait(void *ptr)
                                     scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
                                 pthread_mutex_unlock(&scheduler->scheduler_lock);
                                 if(task_node)
-                                    antd_task_schedule(scheduler, eit->task);
+                                    scheduled_list = bst_insert(scheduled_list, eit->task->id, eit->task);
+                                    //antd_task_schedule(scheduler, eit->task);
                             }
                             else if( (pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP) ) {
                                 // task is no longer available
@@ -774,7 +787,13 @@ void *antd_scheduler_wait(void *ptr)
                             }
                         }
                     }
-                    
+                    if(scheduled_list)
+                    {
+                        argv[0] = scheduler;
+                        bst_for_each(scheduled_list, antd_deploy_task, argv, 1);
+                        bst_free(scheduled_list);
+                        scheduled_list = NULL;
+                    }
                 }
                 free(pfds);
             }
@@ -801,10 +820,14 @@ int antd_scheduler_ok(antd_scheduler_t *scheduler)
 int antd_scheduler_next_id(antd_scheduler_t *sched, int input)
 {
     int id = input;
+    if(sched->id_allocator < 0)
+    {
+        sched->id_allocator = 0;
+    }
     pthread_mutex_lock(&sched->scheduler_lock);
     if (id == 0)
     {
-         sched->id_allocator++;
+        sched->id_allocator++;
         id = sched->id_allocator;
     }
 

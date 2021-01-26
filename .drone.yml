@@ -14,7 +14,6 @@ steps:
   - automake --add-missing
   - ./configure --prefix=/usr
   - make
-  
 trigger:
   branch:
   - master

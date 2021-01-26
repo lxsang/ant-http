@@ -1149,7 +1149,7 @@ void *decode_post_request(void *data)
 	char *method = (char *)dvalue(rq->request, "METHOD");
 	task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
-	if (!method || (!EQU(method, "POST") && !EQU(method, "PUT") && EQU(method, "PATCH")))
+	if (!method || (!EQU(method, "POST") && !EQU(method, "PUT") && !EQU(method, "PATCH")))
 		return task;
 	if (ctype == NULL || clen == -1)
 	{

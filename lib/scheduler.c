@@ -702,8 +702,6 @@ void *antd_scheduler_wait(void *ptr)
     //antd_queue_t exec_list = NULL;
     bst_node_t* poll_list = NULL;
     bst_node_t* scheduled_list = NULL;
-    antd_queue_item_t it = NULL;
-    antd_queue_item_t curr = NULL;
     antd_task_evt_item_t *eit = NULL;
     bst_node_t* node, *task_node = NULL;
     struct pollfd *pfds = NULL;

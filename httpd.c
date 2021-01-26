@@ -297,6 +297,13 @@ void antd_scheduler_ext_statistic(int fd, void *user_data)
 
 void antd_scheduler_destroy_data(void *data)
 {
+	antd_request_t *rq = (antd_request_t *)data;
+	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
+	if(proxy)
+	{
+		printf("closing proxy \n");
+		close(proxy->sock);
+	}
 	finish_request(data);
 }
 

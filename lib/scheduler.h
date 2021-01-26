@@ -11,7 +11,7 @@
 #define TASK_EVT_ON_READABLE 0x02
 #define TASK_EVT_ON_WRITABLE 0x04
 #define TASK_EVT_ON_TIMEOUT 0x08
-#define POLL_EVENT_TO 100 // ms
+#define POLL_EVENT_TO 50 // ms
 
 typedef struct _antd_scheduler_t antd_scheduler_t;
 typedef struct _antd_callback_t antd_callback_t;

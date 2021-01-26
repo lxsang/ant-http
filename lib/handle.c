@@ -603,11 +603,11 @@ int antd_recv_upto(void *src, void *data, int len)
 			time(&source->last_io);
 			return received;
 		}
-		if (received == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
+		if (received <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
 		{
-			return -1;
+			return 0;
 		}
-		return 0;
+		return -1;
 #ifdef USE_OPENSSL
 	}
 #endif

@@ -5,9 +5,17 @@ name: default
 platform:
   os: linux
   arch: arm64
+clone:
+  disable: true
 steps:
+- name: clone
+  commands:
+  - pwd
+  - git clone git@iohub.dev:lxsang/ant-http.git
+  - cd ./ant-http && git checkout master
 - name: build
   commands:
+  - cd ./ant-http
   - libtoolize
   - aclocal
   - autoconf

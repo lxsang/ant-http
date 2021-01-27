@@ -12,8 +12,9 @@ steps:
   - aclocal
   - autoconf
   - automake --add-missing
-  - ./configure --prefix=/usr
+  - ./configure --prefix=/opt/cloud/cuser
   - make
+  - make install
 trigger:
   branch:
   - master

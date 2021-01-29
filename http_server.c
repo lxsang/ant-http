@@ -1495,7 +1495,7 @@ char *post_data_decode(void *client, int len)
 	char *ptr = query;
 	int readlen = len > BUFFLEN ? BUFFLEN : len;
 	int read = 0, stat = 1;
-	while (readlen > 0 && stat > 0)
+	while (readlen > 0 && stat >= 0)
 	{
 		stat = antd_recv_upto(client, ptr + read, readlen);
 		if (stat > 0)

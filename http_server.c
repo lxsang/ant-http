@@ -785,7 +785,7 @@ static void *proxy_monitor(void *data)
 			ret = 0;
 			break;
 		}
-		sz2 = read_buf(proxy, buf, BUFFLEN);
+		sz2 = antd_recv_upto(proxy, buf, BUFFLEN);
 		if (sz2 < 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
 		{
 			ret = 0;
@@ -812,9 +812,17 @@ static void *proxy_monitor(void *data)
 			return task;
 		}
 	}
+	if(pfd[0].revents & POLLIN)
+	{
+		antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
+	}
+	else
+	{
+		antd_task_bind_event(task, proxy->sock, 100u, TASK_EVT_ON_TIMEOUT);
+	}
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;
-	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
+	
 	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
 	return task;
 }

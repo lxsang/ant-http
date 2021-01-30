@@ -308,12 +308,12 @@ void antd_scheduler_destroy_data(void *data)
 
 int antd_task_data_id(void *data)
 {
-	/*antd_request_t *rq = (antd_request_t *)data;
+	antd_request_t *rq = (antd_request_t *)data;
 	if(!rq)
 		return 0; 
-	return antd_scheduler_next_id(scheduler,rq->client->sock);*/
-	UNUSED(data);
-	return antd_scheduler_next_id(scheduler,0);
+	return antd_scheduler_next_id(scheduler,rq->client->sock);
+	/*UNUSED(data);
+	return antd_scheduler_next_id(scheduler,0);*/
 }
 
 int main(int argc, char *argv[])

@@ -762,31 +762,36 @@ static void *proxy_monitor(void *data)
 	rq->client->state = ANTD_CLIENT_PROXY_MONITOR;
 	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
 	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
-	int ret, sz1, sz2;
+	int ret, sz1 = 0, sz2 = 0;
 	char *buf = NULL;
 	buf = (char *)malloc(BUFFLEN);
 	struct pollfd pfd[1];
 	memset(pfd, 0, sizeof(pfd));
 	pfd[0].fd = proxy->sock;
 	pfd[0].events = POLLIN;
-
 	ret = 1;
-	sz1 = antd_recv_upto(rq->client, buf, BUFFLEN);
-
-	if ((sz1 < 0) || (sz1 > 0 && antd_send(proxy, buf, sz1) != sz1))
-	{
-		ret = 0;
-	}
 
 	if (poll(pfd, 1, 0) < 0)
 	{
-		ret = 0;
+		(void)close(proxy->sock);
+		return task;
 	}
-	sz2 = antd_recv_upto(proxy, buf, BUFFLEN);
-	if (sz2 < 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
+	do
 	{
-		ret = 0;
-	}
+		sz1 = antd_recv_upto(rq->client, buf, BUFFLEN);
+
+		if ((sz1 < 0) || (sz1 > 0 && antd_send(proxy, buf, sz1) != sz1))
+		{
+			ret = 0;
+			break;
+		}
+		sz2 = read_buf(proxy, buf, BUFFLEN);
+		if (sz2 < 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
+		{
+			ret = 0;
+			break;
+		}
+	} while (sz1 > 0 || sz2 > 0);
 	free(buf);
 
 	if (ret == 0)
@@ -794,27 +799,23 @@ static void *proxy_monitor(void *data)
 		(void)close(proxy->sock);
 		return task;
 	}
-
 	if (sz2 == 0)
 	{
 		if (
 			pfd[0].revents & POLLERR ||
 			pfd[0].revents & POLLRDHUP ||
 			pfd[0].revents & POLLHUP ||
-			pfd[0].revents & POLLNVAL ||
-			pfd[0].revents & POLLIN)
+			pfd[0].revents & POLLNVAL) //||
+			//pfd[0].revents & POLLIN)
 		{
 			(void)close(proxy->sock);
 			return task;
 		}
-		usleep(10000);
 	}
-
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;
-
+	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
 	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
-	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
 	return task;
 }
 
@@ -1115,7 +1116,7 @@ void *decode_request(void *data)
 		task->handle = resolve_request;
 		return task;
 	}
-	else if(EQU(method, "HEAD") || EQU(method, "OPTIONS") || EQU(method, "DELETE") )
+	else if (EQU(method, "HEAD") || EQU(method, "OPTIONS") || EQU(method, "DELETE"))
 	{
 		task->handle = resolve_request;
 		return task;

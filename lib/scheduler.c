@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include <poll.h>
 #include "scheduler.h"
 #include "utils.h"
@@ -24,6 +25,7 @@ typedef struct
 {
     int flags;
     int fd;
+    struct timeval stamp;
     int timeout; // seconds
     antd_task_t *task;
 } antd_task_evt_item_t;
@@ -655,6 +657,7 @@ static void task_event_collect(bst_node_t* node, void** argv, int argc)
     antd_task_t* task = (antd_task_t*) node->data;
     bst_node_t** exec_list = (bst_node_t**) argv[0];
     bst_node_t** poll_list = (bst_node_t**) argv[1];
+    struct timeval now;
     int* pollsize = (int*) argv[2];
     if(!task->events)
     {
@@ -671,7 +674,10 @@ static void task_event_collect(bst_node_t* node, void** argv, int argc)
         else if(it->evt->flags & TASK_EVT_ON_TIMEOUT)
         {
             // check if timeout
-            if(difftime(time(NULL),task->stamp) > it->evt->timeout )
+            gettimeofday(&now, NULL);
+            //do stuff 
+            int diff = (int)(((now.tv_sec - it->evt->stamp.tv_sec) * 1000000 + now.tv_usec - it->evt->stamp.tv_usec) / 1000);
+            if( diff >= it->evt->timeout )
             {
                 *exec_list = bst_insert(*exec_list,task->id, task);
             }
@@ -692,6 +698,7 @@ void antd_task_bind_event(antd_task_t *task, int fd, int timeout, int flags)
     eit->timeout = timeout;
     eit->flags = flags;
     eit->task = task;
+    gettimeofday(&eit->stamp, NULL);
     enqueue(&task->events, eit);
 }
 

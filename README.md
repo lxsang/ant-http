@@ -44,8 +44,6 @@ cd antd-x.x.x
 make
 sudo make install
 ```
-The script will ask for a place to put the binaries (should be an absolute path, otherwise the build will fail) and the default HTTP port for the server config.
-
 ### Generate distribution
 ```sh
 libtoolize

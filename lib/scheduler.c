@@ -785,9 +785,9 @@ void *antd_scheduler_wait(void *ptr)
                                 // task is no longer available
                                 ERROR("Poll: Task %d is no longer valid. Remove it", eit->task->id);
                                 eit->task->access_time = 0;
-                                eit->task->handle = NULL;
+                                /*eit->task->handle = NULL;
                                 antd_scheduler_destroy_data(eit->task->data);
-                                eit->task->data = NULL;
+                                eit->task->data = NULL;*/
                                 scheduled_list = bst_insert(scheduled_list, eit->task->id, eit->task);
                             }
                         }

@@ -230,7 +230,6 @@ static void *work(antd_worker_t *worker)
         pthread_mutex_lock(&scheduler->worker_lock);
         it = dequeue(&scheduler->workers_queue);
         pthread_mutex_unlock(&scheduler->worker_lock);
-        worker->current_task = it->task;
         // execute the task
         //LOG("task executed by worker %d\n", worker->pid);
         // no task to execute, just sleep wait
@@ -241,6 +240,7 @@ static void *work(antd_worker_t *worker)
         }
         else
         {
+            worker->current_task = it->task;
             //LOG("task executed by worker %d\n", worker->id);
             antd_execute_task(scheduler, it->task);
             free(it);
@@ -446,6 +446,7 @@ antd_scheduler_t *antd_scheduler_init(int n, const char *stat_name)
         {
             scheduler->workers[i].id = -1;
             scheduler->workers[i].manager = (void *)scheduler;
+            scheduler->workers[i].current_task = NULL;
             if (pthread_create(&scheduler->workers[i].tid, NULL, (void *(*)(void *))work, (void *)&scheduler->workers[i]) != 0)
             {
                 ERROR("pthread_create: cannot create worker: %s", strerror(errno));

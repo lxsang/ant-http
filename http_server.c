@@ -877,6 +877,7 @@ static void *proxify(void *data)
 	proxy->ssl = NULL;
 	proxy->zstream = NULL;
 	proxy->z_level = ANTD_CNONE;
+	time(&proxy->last_io);
 
 	// store content length here
 	dput(rq->request, "PROXY_HANDLE", proxy);
@@ -1177,8 +1178,9 @@ void *decode_post_request(void *data)
 		else if (clen > 0)
 		{
 			// WARN: this may not work on ssl socket
-			antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
-			task->handle = decode_post_request;
+			// antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+			// task->handle = decode_post_request;
+			antd_error(rq->client, 400, "Bad Request, missing content data");
 			return task;
 		}
 	}
@@ -1202,8 +1204,9 @@ void *decode_post_request(void *data)
 		}
 		else if (clen > 0)
 		{
-			task->handle = decode_post_request;
-			antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+			//task->handle = decode_post_request;
+			//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
+			antd_error(rq->client, 400, "Bad Request, missing content data");
 			return task;
 		}
 	}
@@ -1511,6 +1514,10 @@ char *post_data_decode(void *client, int len)
 		{
 			read += stat;
 			readlen = (len - read) > BUFFLEN ? BUFFLEN : (len - read);
+		}
+		if (stat == 0)
+		{
+			usleep(POLL_EVENT_TO*1000);
 		}
 	}
 

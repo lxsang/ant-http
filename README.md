@@ -25,6 +25,7 @@ A lightweight and portable HTTP/HTTPs web server written in  C:
 ### server dependencies
 * libssl-dev (expecting openssl v1.1.1d, only support TLSv1.2 and TLSv1.3)
 * libsqlite3-dev
+* zlib-dev
 
 ### build
 When all dependencies are installed, the build can be done with a few single command lines:

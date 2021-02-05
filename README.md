@@ -52,7 +52,3 @@ autoconf
 automake --add-missing
 make distcheck
 ``` 
-
-
-### To do
-- remove static strings, replace it by configurations

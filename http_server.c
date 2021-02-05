@@ -1517,7 +1517,14 @@ char *post_data_decode(void *client, int len)
 		}
 		if (stat == 0)
 		{
-			usleep(POLL_EVENT_TO*1000);
+			if (difftime(time(NULL), ((antd_client_t*)client)->last_io) > MAX_IO_WAIT_TIME)
+			{
+				stat = -1;
+			}
+			else
+			{
+				usleep(POLL_EVENT_TO*1000);
+			}
 		}
 	}
 

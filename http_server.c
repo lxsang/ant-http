@@ -1291,8 +1291,8 @@ void *decode_multi_part_request(void *data, const char *ctype)
 	int len;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
-	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
+	//antd_task_bind_event(task, rq->client->sock, 0, );
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	//dictionary dic = NULL;
 	boundary = strsep(&str_copy, "="); //discard first part
 	boundary = str_copy;
@@ -1326,14 +1326,13 @@ void *decode_multi_part_request_data(void *data)
 	char *token, *keytoken, *valtoken;
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-	//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
+	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 	char *boundary = (char *)dvalue(rq->request, "MULTI_PART_BOUNDARY");
 	dictionary_t dic = (dictionary_t)dvalue(rq->request, "REQUEST_DATA");
 	// search for content disposition:
 	while (((len = read_buf(rq->client, buf, sizeof(buf))) > 0) && !strstr(buf, "Content-Disposition:"))
 		;
 	;
-
 	if (len <= 0 || !strstr(buf, "Content-Disposition:"))
 	{
 		return task;
@@ -1448,18 +1447,18 @@ void *decode_multi_part_request_data(void *data)
 	{
 		//LOG("End request %s", boundend);
 		free(boundend);
-		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
+		//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
 		return task;
 	}
 	free(boundend);
 	if (line && strstr(line, boundary))
 	{
 		// continue upload
-		antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
+		//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
 		task->handle = decode_multi_part_request_data;
 		return task;
 	}
-	antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
+	//antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
 	return task;
 }
 /**

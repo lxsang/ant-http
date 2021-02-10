@@ -839,6 +839,7 @@ static void *proxify(void *data)
 	int port = atoi(dvalue(rq->request, "PROXY_PORT"));
 	char *path = dvalue(rq->request, "PROXY_PATH");
 	char *query = dvalue(rq->request, "PROXY_QUERY");
+	char* ptr, *ip;
 	dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
 	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
 	if (!xheader)
@@ -846,7 +847,24 @@ static void *proxify(void *data)
 		antd_error(rq->client, 400, "Badd Request");
 		return task;
 	}
-	sock_fd = request_socket(ip_from_hostname(host), port);
+	pthread_mutex_lock(&server_mux);
+	ip = NULL;
+	// ip_from_host is not threadsafe, need to lock it
+	ptr = ip_from_hostname(host);
+	if(ptr)
+	{
+		ip = strdup(ptr);
+	}
+	pthread_mutex_unlock(&server_mux);
+
+	if(!ip)
+	{
+		antd_error(rq->client, 502, "Badd address");
+		return task;
+	}
+
+	sock_fd = request_socket(ip, port);
+	free(ip);
 	if (sock_fd == -1)
 	{
 		antd_error(rq->client, 503, "Service Unavailable");

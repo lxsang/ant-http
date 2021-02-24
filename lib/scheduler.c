@@ -5,12 +5,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include <poll.h>
 #include "scheduler.h"
 #include "utils.h"
 #include "bst.h"
 
-#define MAX_VALIDITY_INTERVAL 60 // 1minute
+#define MAX_VALIDITY_INTERVAL 30 // s
 #define MAX_FIFO_NAME_SZ 255
 
 // callback definition
@@ -24,6 +25,7 @@ typedef struct
 {
     int flags;
     int fd;
+    struct timeval stamp;
     int timeout; // seconds
     antd_task_t *task;
 } antd_task_evt_item_t;
@@ -47,6 +49,7 @@ typedef struct
 {
     int id;
     pthread_t tid;
+    antd_task_t* current_task;
     void *manager;
 } antd_worker_t;
 
@@ -237,12 +240,47 @@ static void *work(antd_worker_t *worker)
         }
         else
         {
+            worker->current_task = it->task;
             //LOG("task executed by worker %d\n", worker->id);
             antd_execute_task(scheduler, it->task);
             free(it);
+            worker->current_task = NULL;
         }
     }
     return NULL;
+}
+static void antd_task_dump(int fd, antd_task_t* task, char* buffer)
+{
+    if (task == NULL || fd < 0)
+    {
+        return;
+    }
+    int ret;
+    // send statistic on task data
+    snprintf(buffer, MAX_FIFO_NAME_SZ, "---- Task %d created at: %lu ----\n", task->id, task->stamp);
+    ret = write(fd, buffer, strlen(buffer));
+
+    // send statistic on task data
+    snprintf(buffer, MAX_FIFO_NAME_SZ, "Access time: %lu\nn", (unsigned long)task->access_time);
+    ret = write(fd, buffer, strlen(buffer));
+
+    snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
+    ret = write(fd, buffer, strlen(buffer));
+
+    if (task->handle)
+    {
+        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has handle: yes\n");
+        ret = write(fd, buffer, strlen(buffer));
+    }
+
+    if (task->callback)
+    {
+        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has callback: yes\n");
+        ret = write(fd, buffer, strlen(buffer));
+    }
+    UNUSED(ret);
+    // now print all task data statistic
+    antd_scheduler_ext_statistic(fd, task->data);
 }
 static void print_static_info(bst_node_t *node, void **args, int argc)
 {
@@ -250,35 +288,10 @@ static void print_static_info(bst_node_t *node, void **args, int argc)
     {
         return;
     }
-    int ret;
     char *buffer = args[0];
     int *fdp = args[1];
     antd_task_t *task = (antd_task_t *)node->data;
-    // send statistic on task data
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "---- Task %d created at: %lu ----\n", task->id, task->stamp);
-    ret = write(*fdp, buffer, strlen(buffer));
-
-    // send statistic on task data
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "Access time: %lu\nn", (unsigned long)task->access_time);
-    ret = write(*fdp, buffer, strlen(buffer));
-
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
-    ret = write(*fdp, buffer, strlen(buffer));
-
-    if (task->handle)
-    {
-        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has handle: yes\n");
-        ret = write(*fdp, buffer, strlen(buffer));
-    }
-
-    if (task->callback)
-    {
-        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has callback: yes\n");
-        ret = write(*fdp, buffer, strlen(buffer));
-    }
-    UNUSED(ret);
-    // now print all task data statistic
-    antd_scheduler_ext_statistic(*fdp, task->data);
+    antd_task_dump(*fdp, task, buffer);
 }
 static void *statistic(antd_scheduler_t *scheduler)
 {
@@ -329,6 +342,18 @@ static void *statistic(antd_scheduler_t *scheduler)
                     bst_for_each(scheduler->task_queue, print_static_info, argc, 2);
 
                     pthread_mutex_unlock(&scheduler->scheduler_lock);
+
+                    // write worker current task
+                    for (int i = 0; i < scheduler->n_workers; i++)
+                    {
+                        snprintf(buffer, MAX_FIFO_NAME_SZ, "Worker: %d. Detail:\n", i);
+                        ret = write(scheduler->stat_fd, buffer, strlen(buffer));
+                        if(scheduler->workers[i].current_task)
+                        {
+                            antd_task_dump(scheduler->stat_fd, scheduler->workers[i].current_task, buffer);
+                        }
+                    }
+                    
                     ret = close(scheduler->stat_fd);
                     scheduler->stat_fd = -1;
                     usleep(5000);
@@ -421,6 +446,7 @@ antd_scheduler_t *antd_scheduler_init(int n, const char *stat_name)
         {
             scheduler->workers[i].id = -1;
             scheduler->workers[i].manager = (void *)scheduler;
+            scheduler->workers[i].current_task = NULL;
             if (pthread_create(&scheduler->workers[i].tid, NULL, (void *(*)(void *))work, (void *)&scheduler->workers[i]) != 0)
             {
                 ERROR("pthread_create: cannot create worker: %s", strerror(errno));
@@ -644,33 +670,40 @@ static void antd_deploy_task(bst_node_t* node, void** argv, int argc)
         return;
     antd_scheduler_t* sched = (antd_scheduler_t*) argv[0];
     antd_task_t* task = node->data;
+    pthread_mutex_lock(&sched->scheduler_lock);
+    sched->task_queue = bst_delete(sched->task_queue, task->id);
+    pthread_mutex_unlock(&sched->scheduler_lock);
     antd_task_schedule(sched, task);
 }
 static void task_event_collect(bst_node_t* node, void** argv, int argc)
 {
     UNUSED(argc);
     antd_task_t* task = (antd_task_t*) node->data;
-    antd_queue_t* exec_list = (antd_queue_t*) argv[0];
+    bst_node_t** exec_list = (bst_node_t**) argv[0];
     bst_node_t** poll_list = (bst_node_t**) argv[1];
+    struct timeval now;
     int* pollsize = (int*) argv[2];
     if(!task->events)
     {
-        enqueue(exec_list, task);
+        *exec_list = bst_insert(*exec_list,task->id, task);
         return;
     }
     antd_queue_item_t it = task->events;
     while(it)
     {
-        if(it->evt->flags & TASK_EVT_ALWAY_ON)
+        if((it->evt->flags & TASK_EVT_ALWAY_ON) || antd_scheduler_validate_data(task) == 0 )
         {
-            enqueue(exec_list, task);
+            *exec_list = bst_insert(*exec_list,task->id, task);
         }
         else if(it->evt->flags & TASK_EVT_ON_TIMEOUT)
         {
             // check if timeout
-            if(difftime(time(NULL),task->stamp) > it->evt->timeout )
+            gettimeofday(&now, NULL);
+            //do stuff 
+            int diff = (int)(((now.tv_sec - it->evt->stamp.tv_sec) * 1000000 + now.tv_usec - it->evt->stamp.tv_usec) / 1000);
+            if( diff >= it->evt->timeout )
             {
-                enqueue(exec_list, task);
+                *exec_list = bst_insert(*exec_list,task->id, task);
             }
         }
         else
@@ -689,6 +722,7 @@ void antd_task_bind_event(antd_task_t *task, int fd, int timeout, int flags)
     eit->timeout = timeout;
     eit->flags = flags;
     eit->task = task;
+    gettimeofday(&eit->stamp, NULL);
     enqueue(&task->events, eit);
 }
 
@@ -696,11 +730,9 @@ void *antd_scheduler_wait(void *ptr)
 {
     int pollsize, ready;
     void *argv[3];
-    antd_queue_t exec_list = NULL;
+    //antd_queue_t exec_list = NULL;
     bst_node_t* poll_list = NULL;
     bst_node_t* scheduled_list = NULL;
-    antd_queue_item_t it = NULL;
-    antd_queue_item_t curr = NULL;
     antd_task_evt_item_t *eit = NULL;
     bst_node_t* node, *task_node = NULL;
     struct pollfd *pfds = NULL;
@@ -709,14 +741,14 @@ void *antd_scheduler_wait(void *ptr)
     while (scheduler->status)
     {
         pollsize = 0;
-         argv[0] = &exec_list;
+         argv[0] = &scheduled_list;
         argv[1] = &poll_list;
         argv[2] = &pollsize;
         pthread_mutex_lock(&scheduler->scheduler_lock);
         bst_for_each(scheduler->task_queue, task_event_collect, argv, 3);
         pthread_mutex_unlock(&scheduler->scheduler_lock);
         // schedule exec list first
-        it = exec_list;
+        /*it = exec_list;
         while(it)
         {
             if(it->task)
@@ -730,7 +762,7 @@ void *antd_scheduler_wait(void *ptr)
             curr = it;
             it = it->next;
             free(curr);
-        }
+        }*/
         // Detect event on pollist
         if(pollsize > 0)
         {
@@ -768,37 +800,34 @@ void *antd_scheduler_wait(void *ptr)
                                 // event triggered schedule the task
                                 pthread_mutex_lock(&scheduler->scheduler_lock);
                                 task_node = bst_find(scheduler->task_queue, eit->task->id);
-                                if(task_node)
-                                    scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
                                 pthread_mutex_unlock(&scheduler->scheduler_lock);
                                 if(task_node)
                                     scheduled_list = bst_insert(scheduled_list, eit->task->id, eit->task);
                                     //antd_task_schedule(scheduler, eit->task);
                             }
-                            else if( (pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP) ) {
+                            else if( (pfds[i].revents & POLLERR) || (pfds[i].revents & POLLHUP)) {
                                 // task is no longer available
                                 ERROR("Poll: Task %d is no longer valid. Remove it", eit->task->id);
-                                // remove task from task queue
-                                pthread_mutex_lock(&scheduler->scheduler_lock);
-                                scheduler->task_queue = bst_delete(scheduler->task_queue, eit->task->id);
-                                pthread_mutex_unlock(&scheduler->scheduler_lock);
+                                eit->task->access_time = 0;
+                                eit->task->handle = NULL;
+                                /*
                                 antd_scheduler_destroy_data(eit->task->data);
-                                destroy_task(eit->task);
+                                eit->task->data = NULL;*/
+                                scheduled_list = bst_insert(scheduled_list, eit->task->id, eit->task);
                             }
                         }
-                    }
-                    if(scheduled_list)
-                    {
-                        argv[0] = scheduler;
-                        bst_for_each(scheduled_list, antd_deploy_task, argv, 1);
-                        bst_free(scheduled_list);
-                        scheduled_list = NULL;
                     }
                 }
                 free(pfds);
             }
         }
-        exec_list = NULL;
+        if(scheduled_list)
+        {
+            argv[0] = scheduler;
+            bst_for_each(scheduled_list, antd_deploy_task, argv, 1);
+            bst_free(scheduled_list);
+            scheduled_list = NULL;
+        }
         bst_free(poll_list);
         poll_list = NULL;
 

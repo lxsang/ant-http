@@ -605,7 +605,11 @@ int request_socket(const char *ip, int port)
 {
 	int sockfd;
 	struct sockaddr_in dest;
-
+    if(!ip)
+    {
+        ERROR("Invalid IP address");
+        return -1;
+    }
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		ERROR("Socket: %s", strerror(errno));
@@ -638,6 +642,10 @@ char* ip_from_hostname(const char *hostname)
 	struct hostent *he;
 	struct in_addr **addr_list;
 	int i;
+    if(!hostname)
+    {
+        return NULL;
+    }
 	if ((he = gethostbyname(hostname)) == NULL)
 	{
 		// get the host info

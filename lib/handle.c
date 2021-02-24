@@ -565,6 +565,10 @@ int antd_recv_upto(void *src, void *data, int len)
 		}
 		else
 		{
+			/*if (difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME)
+			{
+				return -1;
+			}*/
 			switch (err)
 			{
 			case SSL_ERROR_NONE:
@@ -603,11 +607,15 @@ int antd_recv_upto(void *src, void *data, int len)
 			time(&source->last_io);
 			return received;
 		}
-		if (received == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
+		/*else if (difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME)
 		{
 			return -1;
+		}*/
+		if (received <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+		{
+			return 0;
 		}
-		return 0;
+		return -1;
 #ifdef USE_OPENSSL
 	}
 #endif

@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/lxsang/ant-http.svg?branch=master)](https://travis-ci.org/lxsang/ant-http)
 
 A lightweight and portable HTTP/HTTPs web server written in  C:
-- New 1.0.6b version (BETA feature): Nonblocking event driven base server with configurable number of thread pool workers
+- Nonblocking event driven base server with configurable number of thread pool workers
 - Initial goal is for embedded Linux, but can be used as general purpose web server. 
 - Support SSL via open SSL, database via Sqlite 3, web socket integrated
 - It is also extensible via its extension mechanism that allows to extends the server capability.

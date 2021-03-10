@@ -3,12 +3,16 @@
 [![Build Status](https://ci.iohub.dev/api/badges/lxsang/ant-http/status.svg)](https://ci.iohub.dev/lxsang/ant-http)
 [![Build Status](https://travis-ci.org/lxsang/ant-http.svg?branch=master)](https://travis-ci.org/lxsang/ant-http)
 
-A lightweight and portable HTTP/HTTPs web server written in  C:
-- Nonblocking event driven base server with configurable number of thread pool workers
+A lightweight HTTP/HTTPs (1.1) web server written in  C:
+- Nonblocking event driven base server with configurable number of thread pool workers.
 - Initial goal is for embedded Linux, but can be used as general purpose web server. 
-- Support SSL via open SSL, database via Sqlite 3, web socket integrated
+- Support:
+  - SSL via open SSL,
+  - basic API database via Sqlite 3,
+  - web socket,
+  - reverse proxy.
 - It is also extensible via its extension mechanism that allows to extends the server capability.
-- Page compression with gzip, deflate
+- Page compression with gzip, deflate, cache control
 
 ## Plugins:
 * CGI interface for external scripting language (e.g. PHP): [https://github.com/lxsang/antd-cgi-plugin](https://github.com/lxsang/antd-cgi-plugin)

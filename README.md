@@ -32,7 +32,7 @@ A lightweight HTTP/HTTPs (1.1) web server written in  C:
 * zlib-dev
 
 ### build
-When all dependencies are installed, the build can be done with a few single command lines:
+With all dependencies installed:
 
 ```bash
 mkdir antd

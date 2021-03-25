@@ -20,9 +20,9 @@ steps:
   - aclocal
   - autoconf
   - automake --add-missing
-  - ./configure --prefix=/opt/cloud/artifacts
+  - ./configure --prefix=/usr
   - make
-  - make install
+  - DESTDIR=/opt/cloud/artifacts make install
 trigger:
   branch:
   - master

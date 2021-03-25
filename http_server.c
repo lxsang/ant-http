@@ -762,7 +762,7 @@ static void *proxy_monitor(void *data)
 	rq->client->state = ANTD_CLIENT_PROXY_MONITOR;
 	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
 	antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
-	int ret, sz1 = 0, sz2 = 0;
+	int pret, ret, sz1 = 0, sz2 = 0;
 	char *buf = NULL;
 	buf = (char *)malloc(BUFFLEN);
 	struct pollfd pfd[1];
@@ -771,11 +771,6 @@ static void *proxy_monitor(void *data)
 	pfd[0].events = POLLIN;
 	ret = 1;
 
-	if (poll(pfd, 1, 0) < 0)
-	{
-		(void)close(proxy->sock);
-		return task;
-	}
 	do
 	{
 		sz1 = antd_recv_upto(rq->client, buf, BUFFLEN);
@@ -785,8 +780,27 @@ static void *proxy_monitor(void *data)
 			ret = 0;
 			break;
 		}
-		sz2 = antd_recv_upto(proxy, buf, BUFFLEN);
-		if (sz2 < 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
+		pret = poll(pfd, 1, 0);
+		if ( pret < 0)
+		{
+			(void)close(proxy->sock);
+			return task;
+		}
+		sz2 = 0;
+		if(pret > 0 && (pfd[0].revents & POLLIN))
+		{
+			sz2 = antd_recv_upto(proxy, buf, BUFFLEN);
+			if (sz2 <= 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
+			{
+				ret = 0;
+				break;
+			}
+		}
+		if ( (pret > 0) && (
+			pfd[0].revents & POLLERR ||
+			pfd[0].revents & POLLRDHUP ||
+			pfd[0].revents & POLLHUP ||
+			pfd[0].revents & POLLNVAL))
 		{
 			ret = 0;
 			break;
@@ -799,19 +813,7 @@ static void *proxy_monitor(void *data)
 		(void)close(proxy->sock);
 		return task;
 	}
-	if (sz2 == 0)
-	{
-		if (
-			pfd[0].revents & POLLERR ||
-			pfd[0].revents & POLLRDHUP ||
-			pfd[0].revents & POLLHUP ||
-			pfd[0].revents & POLLNVAL) //||
-			//pfd[0].revents & POLLIN)
-		{
-			(void)close(proxy->sock);
-			return task;
-		}
-	}
+
 	if(pfd[0].revents & POLLIN)
 	{
 		antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
@@ -928,7 +930,6 @@ static void *proxify(void *data)
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;
 	// register event
-
 	antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
 	return task;
 }

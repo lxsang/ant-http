@@ -820,7 +820,7 @@ static void *proxy_monitor(void *data)
 	}
 	else
 	{
-		antd_task_bind_event(task, proxy->sock, 100u, TASK_EVT_ON_TIMEOUT);
+		antd_task_bind_event(task, proxy->sock, 10u, TASK_EVT_ON_TIMEOUT);
 	}
 	task->handle = proxy_monitor;
 	task->access_time = rq->client->last_io;

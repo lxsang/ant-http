@@ -11,7 +11,7 @@ steps:
 - name: clone
   commands:
   - pwd
-  - git clone ssh://git@iohub.dev:2222/lxsang/ant-http.git
+  - git clone ssh://git@iohub.dev/lxsang/ant-http.git
   - cd ./ant-http && git checkout master
 - name: build
   commands:

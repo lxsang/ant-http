@@ -8,7 +8,7 @@ A lightweight HTTP/HTTPs (1.1) web server written in  C:
 - Initial goal is for embedded Linux, but can be used as general purpose web server. 
 - Support:
   - SSL via open SSL,
-  - built in support Sqlite 3,
+  - builtin support Sqlite 3,
   - web socket,
   - reverse proxy
 - It is also extensible via its extension mechanism that allows to extends the server capability.

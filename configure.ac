@@ -70,13 +70,13 @@ AC_DEFINE([_GNU_SOURCE], [1],[Use GNU source])
 # AC_CANONICAL_HOST is needed to access the 'host_os' variable    
 
 # debug option
-AC_ARG_ENABLE([debug],
-    [  --enable-debug    Turn on debugging],
-    [case "${enableval}" in
-        yes) AC_DEFINE([DEBUG], [1],[Enable debug]) ;;
-        no) ;;
-        *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
-    esac],[debug=false])
+#AC_ARG_ENABLE([debug],
+#    [  --enable-debug    Turn on debugging],
+#    [case "${enableval}" in
+#        yes) AC_DEFINE([DEBUG], [1],[Enable debug]) ;;
+#        no) ;;
+#        *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+#    esac],[debug=false])
 
 AC_CANONICAL_HOST
 build_linux=no

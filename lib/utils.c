@@ -48,22 +48,6 @@ THE SOFTWARE.
 // #include <time.h>
 
 
-
-void error_log(const char* fmt, ...)
-{
-	UNUSED(fmt);
-	return;
-}
-#ifdef DEBUG
-void server_log(const char* fmt, ...)
-{
-	UNUSED(fmt);
-	return;
-}
-#endif
-
-
-
 /**
  * Trim a string by a character on both ends
  * @param str   The target string

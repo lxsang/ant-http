@@ -309,7 +309,6 @@ void antd_scheduler_destroy_data(void *data)
 int antd_scheduler_validate_data(antd_task_t *task)
 {
 	config_t *conf = config();
-	LOG("Use server configured scheduler timeout %d", conf->scheduler_timeout);
 	return !(difftime(time(NULL), task->access_time) > conf->scheduler_timeout);
 }
 

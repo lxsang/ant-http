@@ -1471,6 +1471,11 @@ void *decode_multi_part_request_data(void *data)
 		}
 		free(part_name);
 	}
+	/**
+	 * The upload procedure may take time, the task access time should be updated
+	 * after the procedure finish
+	*/
+	task->access_time = rq->client->last_io;
 	// check if end of request
 	if (line && strstr(line, boundend))
 	{

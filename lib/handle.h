@@ -93,6 +93,7 @@ typedef struct
     char *sslkey;
     char *ssl_cipher;
     int gzip_enable;
+    int debug_enable;
     list_t gzip_types;
     dictionary_t mimes;
     dictionary_t ports;

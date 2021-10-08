@@ -339,7 +339,14 @@ int main(int argc, char *argv[])
 
 	config_t *conf = config();
 	// start syslog
-	setlogmask(LOG_UPTO(LOG_NOTICE));
+	if(conf->debug_enable == 1)
+	{
+		setlogmask(LOG_UPTO(LOG_NOTICE));
+	}
+	else
+	{
+		setlogmask(LOG_UPTO(LOG_ERR));
+	}
 	openlog(SERVER_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
 #ifdef USE_OPENSSL

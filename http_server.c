@@ -161,6 +161,10 @@ static int config_handler(void *conf, const char *section, const char *name,
 	{
 		pconfig->n_workers = atoi(value);
 	}
+	else if (MATCH("SERVER", "debug_enable"))
+	{
+		pconfig->debug_enable = atoi(value);
+	}
 #ifdef USE_ZLIB
 	else if (MATCH("SERVER", "gzip_enable"))
 	{
@@ -269,6 +273,7 @@ void load_config(const char *file)
 	server_config.ssl_cipher = NULL;
 	server_config.gzip_enable = 0;
 	server_config.gzip_types = NULL;
+	server_config.debug_enable = 0;
 	// put it default mimes
 	for (int i = 0; _mimes[i].type != NULL; i++)
 	{

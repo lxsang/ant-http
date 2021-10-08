@@ -58,11 +58,6 @@ typedef struct{
 	const char* ext;
 } mime_t;
 
-
-void __attribute__((weak)) error_log(const char*, ...);
-#ifdef DEBUG
-void __attribute__((weak)) server_log(const char*, ...);
-#endif
 dictionary_t __attribute__((weak)) mimes_list();
 char* __s(const char*,...);
 void trim(char*,const char);

@@ -11,7 +11,7 @@
 #include "utils.h"
 #include "bst.h"
 
-#define MAX_VALIDITY_INTERVAL 30 // s
+#define MAX_VALIDITY_INTERVAL 30
 #define MAX_FIFO_NAME_SZ 255
 
 // callback definition

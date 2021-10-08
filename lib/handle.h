@@ -86,6 +86,7 @@ typedef struct
     int maxcon;
     int connection;
     int n_workers;
+    int scheduler_timeout;
     int max_upload_size;
     // ssl
     int enable_ssl;

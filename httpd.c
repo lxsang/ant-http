@@ -21,7 +21,7 @@
 	snprintf(buff, BUFFLEN, ##__VA_ARGS__); \
 	ret = write(fd, buff, strlen(buff));
 
-static antd_scheduler_t* scheduler;
+static antd_scheduler_t *scheduler;
 
 #ifdef USE_OPENSSL
 
@@ -241,7 +241,7 @@ static void antd_monitor(port_config_t *pcnf)
 			antd_scheduler_unlock(scheduler);
 			// create callback for the server
 			task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
-			antd_task_bind_event(task,client->sock,0, TASK_EVT_ON_WRITABLE| TASK_EVT_ON_READABLE);
+			antd_task_bind_event(task, client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
 			antd_scheduler_add_task(scheduler, task);
 		}
 	}
@@ -299,19 +299,26 @@ void antd_scheduler_destroy_data(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_client_t *proxy = (antd_client_t *)dvalue(rq->request, "PROXY_HANDLE");
-	if(proxy)
+	if (proxy)
 	{
 		close(proxy->sock);
 	}
 	finish_request(data);
 }
 
+int antd_scheduler_validate_data(antd_task_t *task)
+{
+	config_t *conf = config();
+	LOG("Use server configured scheduler timeout %d", conf->scheduler_timeout);
+	return !(difftime(time(NULL), task->access_time) > conf->scheduler_timeout);
+}
+
 int antd_task_data_id(void *data)
 {
 	antd_request_t *rq = (antd_request_t *)data;
-	if(!rq)
-		return 0; 
-	return antd_scheduler_next_id(scheduler,rq->client->sock);
+	if (!rq)
+		return 0;
+	return antd_scheduler_next_id(scheduler, rq->client->sock);
 	/*UNUSED(data);
 	return antd_scheduler_next_id(scheduler,0);*/
 }
@@ -339,7 +346,7 @@ int main(int argc, char *argv[])
 
 	config_t *conf = config();
 	// start syslog
-	if(conf->debug_enable == 1)
+	if (conf->debug_enable == 1)
 	{
 		setlogmask(LOG_UPTO(LOG_NOTICE));
 	}
@@ -361,7 +368,7 @@ int main(int argc, char *argv[])
 #endif
 	// enable scheduler
 	// default to 4 workers
-	scheduler = antd_scheduler_init( conf->n_workers, conf->stat_fifo_path);
+	scheduler = antd_scheduler_init(conf->n_workers, conf->stat_fifo_path);
 	if (scheduler == NULL)
 	{
 		ERROR("Unable to initialise scheduler. Exit");

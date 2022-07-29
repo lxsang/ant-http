@@ -1,7 +1,5 @@
 ![Logo](https://github.com/lxsang/ant-http/raw/master/ant-logo.png)
 # ant-http
-[![Build Status](https://ci.iohub.dev/api/badges/lxsang/ant-http/status.svg)](https://ci.iohub.dev/lxsang/ant-http)
-[![Build Status](https://travis-ci.org/lxsang/ant-http.svg?branch=master)](https://travis-ci.org/lxsang/ant-http)
 
 A lightweight HTTP/HTTPs (1.1) web server written in  C:
 - Nonblocking event driven base server with configurable number of thread pool workers.

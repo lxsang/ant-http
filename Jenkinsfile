@@ -10,11 +10,11 @@ node {
   stage('Build') {
     sshCommand remote: remote, command: '\
     cd $(dirname $(find ~/jenkins/workspace/ant-http@script -name "Jenkinsfile")); \
-    libtoolize \
-    aclocal \
-    autoconf \
-    automake --add-missing \
-    make \
+    libtoolize; \
+    aclocal; \
+    autoconf; \
+    automake --add-missing; \
+    make; \
     '
   }
 }

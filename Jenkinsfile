@@ -45,9 +45,9 @@ pipeline{
           '''
         script {
             // only useful for any master branch
-            if (env.BRANCH_NAME =~ /^master/) {
-                archiveArtifacts artifacts: 'build/', fingerprint: true
-            }
+            //if (env.BRANCH_NAME =~ /^master/) {
+            archiveArtifacts artifacts: 'build/', fingerprint: true
+            //}
         }
       }
     }

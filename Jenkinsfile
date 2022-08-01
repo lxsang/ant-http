@@ -37,6 +37,7 @@ pipeline{
             aclocal
             autoconf
             automake --add-missing
+            ./configure --prefix=/usr
             make
           '''
       }

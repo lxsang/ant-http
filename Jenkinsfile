@@ -29,17 +29,26 @@ pipeline{
   {
     stage('Build') {
       steps {
-          sshCommand remote: remote, command: '''
+        sshCommand remote: remote, command: '''
             set -e
             export WORKSPACE="jenkins/workspace/ant-http"
             cd $WORKSPACE
+            [ -d build ] && rm build
+            mkdir build
             libtoolize
             aclocal
             autoconf
             automake --add-missing
             ./configure --prefix=/usr
             make
+            DESTDIR=./build make install
           '''
+        script {
+            // only useful for any master branch
+            if (env.BRANCH_NAME =~ /^master/) {
+                archiveArtifacts artifacts: 'build/', fingerprint: true
+            }
+        }
       }
     }
   }

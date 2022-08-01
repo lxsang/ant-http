@@ -37,7 +37,7 @@ mkdir antd
 cd antd
 # Replace x.x.x by the version number
 # build without plugin
-wget -O- https://get.bitdojo.dev/antd | bash -s "x.x.x"
+wget -O- https://get.iohub.dev/antd | bash -s "x.x.x"
 
 # or from the distribution tarball
 tar xvzf antd-x.x.x.tar.gz

@@ -31,7 +31,7 @@ pipeline{
       steps {
         sshCommand remote: remote, command: '''
             set -e
-            export WORKSPACE="jenkins/workspace/ant-http"
+            export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
             cd $WORKSPACE
             [ -d build ] && rm build
             mkdir build
@@ -41,7 +41,7 @@ pipeline{
             automake --add-missing
             ./configure --prefix=/usr
             make
-            DESTDIR=./build make install
+            DESTDIR=$WORKSPACE/build make install
           '''
         script {
             // only useful for any master branch

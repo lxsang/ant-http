@@ -3,7 +3,6 @@ def build_antd()
   sh '''
   set -e
   cd $WORKSPACE
-  [ -d build ] && rm -rf build
   mkdir -p build/$arch/etc/systemd/system/
   mkdir -p build/$arch/opt/www
   [ -f Makefile ] && make clean

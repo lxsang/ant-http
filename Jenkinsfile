@@ -34,7 +34,7 @@ pipeline{
             export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
             cd $WORKSPACE
             [ -d build ] && rm build
-            mkdir build
+            mkdir -p build/etc/systemd/system/
             libtoolize
             aclocal
             autoconf

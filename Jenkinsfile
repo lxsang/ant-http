@@ -2,7 +2,6 @@ def build_antd()
 {
   sh '''
   set -e
-  export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
   cd $WORKSPACE
   [ -d build ] && rm -rf build
   mkdir -p build/$arch/etc/systemd/system/

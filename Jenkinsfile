@@ -2,20 +2,8 @@ def build_antd()
 {
   docker.image("xsangle/ci-tools:latest-" + env.arch).withRun("bash") {
     sh '''
-    set -e
-    cd $WORKSPACE
-    [ -d build ] && rm -rf build
-    mkdir -p build/$arch/etc/systemd/system/
-    mkdir -p build/$arch/opt/www
-    [ -f Makefile ] && make clean
-    libtoolize
-    aclocal
-    autoconf
-    automake --add-missing
-    ./configure --prefix=/usr
-    make
-    DESTDIR=$WORKSPACE/build/$arch make install
-    cp  $WORKSPACE/build/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
+    printenv
+    uname -a
     '''
   }
 }
@@ -43,7 +31,7 @@ pipeline{
     stage('Build AMD64') {
       steps {
         script{
-          env.arch = "amd64"
+          env.arch = "arm64"
         }
         build_antd()
       }

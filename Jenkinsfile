@@ -43,7 +43,7 @@ pipeline{
             ./configure --prefix=/usr
             make
             DESTDIR=$WORKSPACE/build make install
-            ln -sf ../../usr/etc/antd-config.ini build/opt/www/config.ini.example
+            cp  $WORKSPACE/build/usr/etc/antd-config.ini build/opt/www/config.ini.example
           '''
         script {
             // only useful for any master branch

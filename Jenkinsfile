@@ -4,7 +4,6 @@ def build_antd()
     printenv
     uname -a
   ''')
-  }
 }
 
 pipeline{

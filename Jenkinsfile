@@ -42,7 +42,7 @@ pipeline{
     stage('Build AMD64') {
       agent {
           docker {
-              image ' xsangle/ci-tools:latest-amd64'
+              image 'xsangle/ci-tools:latest-amd64'
               // Run the container on the node specified at the
               // top-level of the Pipeline, in the same workspace,
               // rather than on a new node entirely:
@@ -60,7 +60,7 @@ pipeline{
     stage('Build ARM64') {
       agent {
           docker {
-              image ' xsangle/ci-tools:latest-arm64'
+              image 'xsangle/ci-tools:latest-arm64'
               // Run the container on the node specified at the
               // top-level of the Pipeline, in the same workspace,
               // rather than on a new node entirely:
@@ -78,7 +78,7 @@ pipeline{
     stage('Build ARM') {
       agent {
           docker {
-              image ' xsangle/ci-tools:latest-arm'
+              image 'xsangle/ci-tools:latest-arm'
               // Run the container on the node specified at the
               // top-level of the Pipeline, in the same workspace,
               // rather than on a new node entirely:

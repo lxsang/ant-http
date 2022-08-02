@@ -1,12 +1,10 @@
 def build_antd()
 {
-  docker.image("xsangle/ci-tools:latest-" + env.arch).withRun("bash") {
-    docker.image("xsangle/ci-tools:latest-" + env.arch).inside {
-      sh '''
+  docker.image("xsangle/ci-tools:latest-" + env.arch).withRun("-it bash") {
+    sh '''
     printenv
     uname -a
     '''
-    }
   }
 }
 

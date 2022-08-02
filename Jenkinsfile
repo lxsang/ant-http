@@ -14,7 +14,7 @@ def build_antd()
   ./configure --prefix=/usr
   make
   DESTDIR=$WORKSPACE/build/$arch make install
-  cp  $WORKSPACE/build/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
+  cp  build/$arch/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
   '''
 }
 

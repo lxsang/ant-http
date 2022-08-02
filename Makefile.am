@@ -54,8 +54,8 @@ antd_LDADD = libantd.la
 sysconf_DATA = antd-config.ini
 
 install-data-local:
-	- install -c ant-d $(prefix)/bin
-	- [ -d /etc/systemd/system/ ] && cp antd.service /etc/systemd/system/
+	- install -c ant-d $(DESTDIR)/$(prefix)/bin
+	- [ -d $(DESTDIR)/etc/systemd/system/ ] && cp antd.service $(DESTDIR)/etc/systemd/system/
 
 #install-data-local: $(srcdir)/conf/config.file $(srcdir)/conf/sub1/config.file
 #        mkdir $(sysconfdir)/conf

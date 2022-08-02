@@ -1,22 +1,11 @@
 def build_antd()
 {
-  sh '''
-  set -e
-  export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
-  cd $WORKSPACE
-  [ -d build ] && rm -rf build
-  mkdir -p build/$arch/etc/systemd/system/
-  mkdir -p build/$arch/opt/www
-  [ -f Makefile ] && make clean
-  libtoolize
-  aclocal
-  autoconf
-  automake --add-missing
-  ./configure --prefix=/usr
-  make
-  DESTDIR=$WORKSPACE/build/$arch make install
-  cp  $WORKSPACE/build/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
-  '''
+  docker.image("xsangle/ci-tools:latest-" + env.arch).inside {
+    sh '''
+    printenv
+    uname -a
+    '''
+  }
 }
 
 pipeline{
@@ -40,21 +29,11 @@ pipeline{
   stages
   {
     stage('Build AMD64') {
-      agent {
-          docker {
-              image ' xsangle/ci-tools:latest-amd64'
-              // Run the container on the node specified at the
-              // top-level of the Pipeline, in the same workspace,
-              // rather than on a new node entirely:
-              reuseNode true
-          }
-          alwaysPull false
-      }
       steps {
         script{
           env.arch = "amd64"
         }
-        // call
+        build_antd()
       }
     }
     stage('Build ARM64') {
@@ -71,7 +50,7 @@ pipeline{
         script{
           env.arch = "arm64"
         }
-        // call
+        build_antd()
       }
     }
     stage('Build ARM') {
@@ -88,7 +67,7 @@ pipeline{
         script{
           env.arch = "arm"
         }
-        // call
+        build_antd()
       }
     }
     stage("Archive") {

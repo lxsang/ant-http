@@ -1,11 +1,23 @@
-def remote = [:]
-remote.name = 'workstation'
-remote.host = 'workstation'
-remote.user = 'dany'
-remote.identityFile = '/var/jenkins_home/.ssh/id_rsa'
-remote.allowAnyHosts = true
-remote.agent = false
-remote.logLevel = 'INFO'
+def build_antd()
+{
+  sh '''
+  set -e
+  export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
+  cd $WORKSPACE
+  [ -d build ] && rm -rf build
+  mkdir -p build/$arch/etc/systemd/system/
+  mkdir -p build/$arch/opt/www
+  [ -f Makefile ] && make clean
+  libtoolize
+  aclocal
+  autoconf
+  automake --add-missing
+  ./configure --prefix=/usr
+  make
+  DESTDIR=$WORKSPACE/build/$arch make install
+  cp  $WORKSPACE/build/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
+  '''
+}
 
 pipeline{
   agent { node{ label'master' }}
@@ -27,29 +39,61 @@ pipeline{
   }
   stages
   {
-    stage('Build') {
+    stage('Build AMD64') {
+      agent {
+          docker {
+              image ' xsangle/ci-tools:latest-amd64'
+              // Run the container on the node specified at the
+              // top-level of the Pipeline, in the same workspace,
+              // rather than on a new node entirely:
+              reuseNode true
+          }
+      }
       steps {
-        sshCommand remote: remote, command: '''
-            set -e
-            export WORKSPACE=$(realpath "./jenkins/workspace/ant-http")
-            cd $WORKSPACE
-            [ -d build ] && rm -rf build
-            mkdir -p build/etc/systemd/system/
-            mkdir -p build/opt/www
-            libtoolize
-            aclocal
-            autoconf
-            automake --add-missing
-            ./configure --prefix=/usr
-            make
-            DESTDIR=$WORKSPACE/build make install
-            cp  $WORKSPACE/build/usr/etc/antd-config.ini build/opt/www/config.ini.example
-          '''
+        script{
+          env.arch = "amd64"
+        }
+        // call
+      }
+    }
+    stage('Build ARM64') {
+      agent {
+          docker {
+              image ' xsangle/ci-tools:latest-arm64'
+              // Run the container on the node specified at the
+              // top-level of the Pipeline, in the same workspace,
+              // rather than on a new node entirely:
+              reuseNode true
+          }
+      }
+      steps {
+        script{
+          env.arch = "arm64"
+        }
+        // call
+      }
+    }
+    stage('Build ARM') {
+      agent {
+          docker {
+              image ' xsangle/ci-tools:latest-arm'
+              // Run the container on the node specified at the
+              // top-level of the Pipeline, in the same workspace,
+              // rather than on a new node entirely:
+              reuseNode true
+          }
+      }
+      steps {
+        script{
+          env.arch = "arm"
+        }
+        // call
+      }
+    }
+    stage("Archive") {
+      steps{
         script {
-            // only useful for any master branch
-            //if (env.BRANCH_NAME =~ /^master/) {
             archiveArtifacts artifacts: 'build/', fingerprint: true, onlyIfSuccessful: true
-            //}
         }
       }
     }

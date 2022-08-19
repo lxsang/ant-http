@@ -1228,8 +1228,7 @@ void *decode_post_request(void *data)
 			key = ctype;
 		if (pquery)
 		{
-			dput(request, key, strdup(pquery));
-			free(pquery);
+			dput(request, key, pquery);
 		}
 		else if (clen > 0)
 		{

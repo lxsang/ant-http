@@ -1,0 +1,73 @@
+{
+    "name": "ant-http",
+    "targets":{
+        "configure": {
+            "require": ["linux"],
+            "jobs": [
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"libtoolize",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                },
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"aclocal",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                },
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"autoconf",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                },
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"automake --add-missing",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                },
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"./configure --prefix=/usr --enable-debug=no",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                }
+            ]
+        },
+        "clean": {
+            "require": ["linux"],
+            "jobs": [
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"make clean",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                }
+            ]
+        },
+        "build": {
+            "require": ["linux"],
+            "jobs": [
+                {
+                    "name": "linux-exec",
+                    "data": {
+                        "cmd":"make",
+                        "pwd": "home://workspace/ant-http"
+                    }
+                }
+            ]
+        },
+        "clean and build": {
+            "depend": ["clean", "build"],
+            "jobs": []
+        }
+    }
+}

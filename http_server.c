@@ -423,19 +423,20 @@ void *resolve_request(void *data)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
-	char *newurl = NULL;
-	char *rqp = NULL;
-	char *oldrqp = NULL;
+	//char *newurl = NULL;
+	//char *rqp = NULL;
+	//char *oldrqp = NULL;
 	rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
 	htdocs(rq, path);
 	strcat(path, url);
-	//LOG("Path is : %s", path);
+	LOG("URL is : %s", url);
+	LOG("Resource Path is : %s", path);
 	//if (path[strlen(path) - 1] == '/')
 	//	strcat(path, "index.html");
 	if (stat(path, &st) == -1)
 	{
 		free(task);
-		rqp = strdup((char *)dvalue(rq->request, "REQUEST_PATH"));
+		rqp = strdup(url);
 		oldrqp = rqp;
 		trim(rqp, '/');
 		newurl = strsep(&rqp, "/");
@@ -444,6 +445,7 @@ void *resolve_request(void *data)
 		else
 			rqp = strdup(rqp);
 		dput(rq->request, "RESOURCE_PATH", rqp);
+		LOG("Execute plugin %s", newurl);
 		task = execute_plugin(rq, newurl);
 		free(oldrqp);
 		return task;

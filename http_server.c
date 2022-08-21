@@ -578,7 +578,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
 		free(query);
 		return 0;
 	}
-	LOG("Match found on", target);
+	LOG("Match found on %s", target);
 	tmp = (char *)v;
 	char *search = "<([a-zA-Z0-9]+)>";
 	while ((ret = regex_match(search, tmp, 2, val_matches)))

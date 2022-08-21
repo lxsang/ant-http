@@ -562,6 +562,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
 	char *tmp, rep[10];
 	int idx = 0;
 	memset(rep, 0, 10);
+	LOG("Verify %s on %s or %s", k, url, host);
 	// 1 group
 	if (!host || !(ret = regex_match(k, host, 10, key_matches)))
 	{
@@ -577,6 +578,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
 		free(query);
 		return 0;
 	}
+	LOG("Match found on", target);
 	tmp = (char *)v;
 	char *search = "<([a-zA-Z0-9]+)>";
 	while ((ret = regex_match(search, tmp, 2, val_matches)))
@@ -621,6 +623,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
 	}
 	free(url);
 	free(query);
+	LOG("New URI is %s", buf);
 	return 1;
 }
 

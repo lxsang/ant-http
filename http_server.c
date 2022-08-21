@@ -423,9 +423,9 @@ void *resolve_request(void *data)
 	antd_request_t *rq = (antd_request_t *)data;
 	antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
 	char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
-	//char *newurl = NULL;
-	//char *rqp = NULL;
-	//char *oldrqp = NULL;
+	char *newurl = NULL;
+	char *rqp = NULL;
+	char *oldrqp = NULL;
 	rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
 	htdocs(rq, path);
 	strcat(path, url);

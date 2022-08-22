@@ -766,8 +766,7 @@ int antd_recv(void *src, void *data, int len)
 				time(&source->last_io);
 				//LOG("Read len is %d\n", readlen);
 			}
-			else if ((read == 0) ||
-					 difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (errno != EAGAIN && errno != EWOULDBLOCK))
+			else if (difftime(time(NULL), source->last_io) > MAX_IO_WAIT_TIME || (errno != EAGAIN && errno != EWOULDBLOCK))
 			{
 				//ERROR("Error while reading: %s", strerror(errno));
 				if (read == 0)

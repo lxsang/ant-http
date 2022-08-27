@@ -29,7 +29,7 @@
 
 #define HEADER_MAX_SIZE 8192
 
-//define all basic mime here
+// define all basic mime here
 static mime_t _mimes[] = {
     {"image/bmp", "bmp"},
     {"image/jpeg", "jpg,jpeg"},
@@ -102,10 +102,10 @@ static int config_handler(void *conf, const char *section, const char *name,
     config_t *pconfig = (config_t *)conf;
     regmatch_t port_matches[2];
     struct stat st;
-    //trim(section, ' ');
-    //trim(value,' ');
-    //trim(name,' ');
-    //char * ppath = NULL;
+    // trim(section, ' ');
+    // trim(value,' ');
+    // trim(name,' ');
+    // char * ppath = NULL;
     if (MATCH("SERVER", "plugins"))
     {
         if (pconfig->plugins_dir)
@@ -164,6 +164,7 @@ static int config_handler(void *conf, const char *section, const char *name,
     }
     else if (MATCH("SERVER", "debug_enable"))
     {
+        (void)setenv("ANTD_DEBUG", value, 1);
         pconfig->debug_enable = atoi(value);
     }
     else if (MATCH("SERVER", "scheduler_timeout"))
@@ -262,14 +263,14 @@ void load_config(const char *file)
     server_config.plugins_dir = strdup("plugins/");
     server_config.plugins_ext = strdup(".dylib");
     server_config.db_path = strdup("databases/");
-    //server_config.htdocs = "htdocs/";
+    // server_config.htdocs = "htdocs/";
     server_config.tmpdir = strdup("tmp/");
     server_config.stat_fifo_path = strdup("/var/run/antd_stat");
     server_config.n_workers = 4;
     server_config.backlog = 1000;
     server_config.handlers = dict();
     server_config.maxcon = 100;
-    server_config.max_upload_size = 10000000; //10Mb
+    server_config.max_upload_size = 10000000; // 10Mb
     server_config.connection = 0;
     server_config.mimes = dict();
     server_config.enable_ssl = 0;
@@ -344,7 +345,7 @@ void *accept_request(void *data)
     int ret = -1, stat;
     if (client->ssl && client->state == ANTD_CLIENT_ACCEPT)
     {
-        //LOG("Atttempt %d\n", client->attempt);
+        // LOG("Atttempt %d\n", client->attempt);
         if (SSL_accept((SSL *)client->ssl) == -1)
         {
             stat = SSL_get_error((SSL *)client->ssl, ret);
@@ -358,14 +359,14 @@ void *accept_request(void *data)
             default:
                 ERROR("Error performing SSL handshake %d %d %s", stat, ret, ERR_error_string(ERR_get_error(), NULL));
                 antd_error(rq->client, 400, "Invalid SSL request");
-                //server_config.connection++;
+                // server_config.connection++;
                 ERR_print_errors_fp(stderr);
                 return task;
             }
         }
         client->state = ANTD_CLIENT_HANDSHAKE;
         task->handle = accept_request;
-        //LOG("Handshake finish for %d\n", client->sock);
+        // LOG("Handshake finish for %d\n", client->sock);
         return task;
     }
     else
@@ -377,8 +378,8 @@ void *accept_request(void *data)
         }
     }
 #endif
-    //LOG("Ready for reading %d\n", client->sock);
-    //server_config.connection++;
+    // LOG("Ready for reading %d\n", client->sock);
+    // server_config.connection++;
     client->state = ANTD_CLIENT_PROTO_CHECK;
     read_buf(rq->client, buf, sizeof(buf));
     line = buf;
@@ -387,7 +388,7 @@ void *accept_request(void *data)
     token = strsep(&line, " ");
     if (!line)
     {
-        //LOG("No method found");
+        // LOG("No method found");
         antd_error(rq->client, 405, "No method found");
         return task;
     }
@@ -398,7 +399,7 @@ void *accept_request(void *data)
     token = strsep(&line, " ");
     if (!line)
     {
-        //LOG("No request found");
+        // LOG("No request found");
         antd_error(rq->client, 400, "Bad request");
         return task;
     }
@@ -432,8 +433,8 @@ void *resolve_request(void *data)
     strcat(path, url);
     LOG("URL is : %s", url);
     LOG("Resource Path is : %s", path);
-    //if (path[strlen(path) - 1] == '/')
-    //    strcat(path, "index.html");
+    // if (path[strlen(path) - 1] == '/')
+    //     strcat(path, "index.html");
     if (stat(path, &st) == -1)
     {
         free(task);
@@ -481,7 +482,7 @@ void *resolve_request(void *data)
                     antd_error(rq->client, 404, "Resource Not Found");
                     return task;
                 }
-                //if(url) free(url); this is freed in the dput function
+                // if(url) free(url); this is freed in the dput function
                 url = newurl;
                 dput(rq->request, "RESOURCE_PATH", url);
             }
@@ -504,10 +505,10 @@ void *resolve_request(void *data)
             }
             if (h)
             {
-                //sprintf(path,"/%s%s",h,url);
-                //LOG("WARNING::::Access octetstream via handle %s", h);
-                //if(execute_plugin(client,buf,method,rq) < 0)
-                //    cannot_execute(client);
+                // sprintf(path,"/%s%s",h,url);
+                // LOG("WARNING::::Access octetstream via handle %s", h);
+                // if(execute_plugin(client,buf,method,rq) < 0)
+                //     cannot_execute(client);
                 free(task);
                 return execute_plugin(rq, h);
             }
@@ -611,7 +612,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
             idx += val_matches[1].rm_eo + 2 - val_matches[1].rm_so;
         }
         tmp += val_matches[1].rm_eo + 1;
-        //break;
+        // break;
     }
     // now modify the match 2 group
     if (idx > 0)
@@ -655,7 +656,7 @@ void *serve_file(void *data)
         {
             strptime(last_modif_since, "%a, %d %b %Y %H:%M:%S GMT", &tm);
             t = timegm(&tm);
-            //t = mktime(localtime(&t));
+            // t = mktime(localtime(&t));
         }
 
         if (last_modif_since && st.st_ctime == t)
@@ -746,7 +747,7 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
         *query_string = '\0';
         query_string++;
     }
-    //char* oldurl = strdup(url);
+    // char* oldurl = strdup(url);
     chain_t it;
     char *k;
     char *v;
@@ -797,13 +798,13 @@ static void *proxy_monitor(void *data)
             break;
         }
         pret = poll(pfd, 1, 0);
-        if ( pret < 0)
+        if (pret < 0)
         {
             (void)close(proxy->sock);
             return task;
         }
         sz2 = 0;
-        if(pret > 0 && (pfd[0].revents & POLLIN))
+        if (pret > 0 && (pfd[0].revents & POLLIN))
         {
             sz2 = antd_recv_upto(proxy, buf, BUFFLEN);
             if (sz2 <= 0 || (sz2 > 0 && antd_send(rq->client, buf, sz2) != sz2))
@@ -812,11 +813,10 @@ static void *proxy_monitor(void *data)
                 break;
             }
         }
-        if ( (pret > 0) && (
-            pfd[0].revents & POLLERR ||
-            pfd[0].revents & POLLRDHUP ||
-            pfd[0].revents & POLLHUP ||
-            pfd[0].revents & POLLNVAL))
+        if ((pret > 0) && (pfd[0].revents & POLLERR ||
+                           pfd[0].revents & POLLRDHUP ||
+                           pfd[0].revents & POLLHUP ||
+                           pfd[0].revents & POLLNVAL))
         {
             ret = 0;
             break;
@@ -830,7 +830,7 @@ static void *proxy_monitor(void *data)
         return task;
     }
 
-    if(pfd[0].revents & POLLIN)
+    if (pfd[0].revents & POLLIN)
     {
         antd_task_bind_event(task, proxy->sock, 0, TASK_EVT_ON_READABLE);
     }
@@ -840,7 +840,7 @@ static void *proxy_monitor(void *data)
     }
     task->handle = proxy_monitor;
     task->access_time = rq->client->last_io;
-    
+
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
     return task;
 }
@@ -857,7 +857,7 @@ static void *proxify(void *data)
     int port = atoi(dvalue(rq->request, "PROXY_PORT"));
     char *path = dvalue(rq->request, "PROXY_PATH");
     char *query = dvalue(rq->request, "PROXY_QUERY");
-    char* ptr, *ip;
+    char *ptr, *ip;
     dictionary_t xheader = dvalue(rq->request, "REQUEST_HEADER");
     antd_task_t *task = antd_create_task(NULL, data, NULL, rq->client->last_io);
     if (!xheader)
@@ -869,13 +869,13 @@ static void *proxify(void *data)
     ip = NULL;
     // ip_from_host is not threadsafe, need to lock it
     ptr = ip_from_hostname(host);
-    if(ptr)
+    if (ptr)
     {
         ip = strdup(ptr);
     }
     pthread_mutex_unlock(&server_mux);
 
-    if(!ip)
+    if (!ip)
     {
         antd_error(rq->client, 502, "Badd address");
         return task;
@@ -952,7 +952,7 @@ static void *proxify(void *data)
 /**
  * Check if the current request is e reverse proxy
  * return a proxy task if this is the case
-*/
+ */
 static void *check_proxy(antd_request_t *rq, const char *path, const char *query)
 {
     char *pattern = "^(https?)://([^:]+):([0-9]+)(.*)$";
@@ -1053,7 +1053,7 @@ void *decode_request_header(void *data)
     }
     if (ret == 0)
     {
-        //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
+        // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
         task = antd_create_task(decode_request_header, (void *)rq, NULL, rq->client->last_io);
         antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
         return task;
@@ -1097,7 +1097,7 @@ void *decode_request_header(void *data)
         rq->client->z_level = ANTD_CNONE;
     }
 #endif
-    //if(line) free(line);
+    // if(line) free(line);
     memset(buf, 0, sizeof(buf));
     strncat(buf, url, sizeof(buf) - 1);
     LOG("Original query (%d): %s", rq->client->sock, url);
@@ -1144,10 +1144,10 @@ void *decode_request(void *data)
         ws = 1;
     method = (char *)dvalue(rq->request, "METHOD");
     task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-    //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
+    // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
     if (EQU(method, "GET"))
     {
-        //if(ctype) free(ctype);
+        // if(ctype) free(ctype);
         if (ws && ws_key != NULL)
         {
             ws_confirm_request(rq->client, ws_key);
@@ -1193,7 +1193,7 @@ void *decode_post_request(void *data)
         clen = atoi(tmp);
     char *method = (char *)dvalue(rq->request, "METHOD");
     task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-    //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
+    // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
     if (!method || (!EQU(method, "POST") && !EQU(method, "PUT") && !EQU(method, "PATCH")))
         return task;
     if (ctype == NULL || clen == -1)
@@ -1226,33 +1226,18 @@ void *decode_post_request(void *data)
     }
     else
     {
-        char *pquery = post_data_decode(rq->client, clen);
-        char *key = strstr(ctype, "/");
-        if (key)
-            key++;
-        else
-            key = ctype;
-        if (pquery)
-        {
-            dput(request, key, pquery);
-        }
-        else if (clen > 0)
-        {
-            //task->handle = decode_post_request;
-            //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
-            antd_error(rq->client, 400, "Bad Request, missing content data");
-            return task;
-        }
+        /*let plugin hande this data as we dont known how to deal with it*/
+        dput(request, "HAS_RAW_BODY", strdup("true"));
     }
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
     return task;
 }
 
 /**
-* Send header to the client to confirm 
-* that the websocket is accepted by
-* our server
-*/
+ * Send header to the client to confirm
+ * that the websocket is accepted by
+ * our server
+ */
 void ws_confirm_request(void *client, const char *key)
 {
     char buf[256];
@@ -1325,17 +1310,17 @@ void *decode_multi_part_request(void *data, const char *ctype)
     int len;
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-    //antd_task_bind_event(task, rq->client->sock, 0, );
+    // antd_task_bind_event(task, rq->client->sock, 0, );
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
-    //dictionary dic = NULL;
-    boundary = strsep(&str_copy, "="); //discard first part
+    // dictionary dic = NULL;
+    boundary = strsep(&str_copy, "="); // discard first part
     boundary = str_copy;
     if (boundary && strlen(boundary) > 0)
     {
-        //dic = dict();
+        // dic = dict();
         trim(boundary, ' ');
         dput(rq->request, "MULTI_PART_BOUNDARY", strdup(boundary));
-        //find first boundary
+        // find first boundary
         while (((len = read_buf(rq->client, line, sizeof(line))) > 0) && !strstr(line, boundary))
             ;
         if (len > 0)
@@ -1355,7 +1340,7 @@ void *decode_multi_part_request_data(void *data)
     char buf[BUFFLEN];
     char *field;
     int len;
-    //dictionary dic = NULL;
+    // dictionary dic = NULL;
     int fd = -1;
     char *token, *keytoken, *valtoken;
     antd_request_t *rq = (antd_request_t *)data;
@@ -1400,11 +1385,11 @@ void *decode_multi_part_request_data(void *data)
     }
     line = NULL;
     // get the binary data
-	LOG("Part file: %s part name: %s", part_file, part_name);
+    LOG("Part file: %s part name: %s", part_file, part_name);
     if (part_name != NULL)
     {
         // go to the beginning of data bock
-        while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && strncmp(buf, "\r\n",2) != 0)
+        while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && strncmp(buf, "\r\n", 2) != 0)
             ;
         ;
 
@@ -1438,21 +1423,21 @@ void *decode_multi_part_request_data(void *data)
             if (fd > 0)
             {
                 int totalsize = 0, len = 0;
-                //read until the next boundary
-                // TODO: this is not efficient for big file
-                // need a solution
+                // read until the next boundary
+                //  TODO: this is not efficient for big file
+                //  need a solution
                 while ((len = read_buf(rq->client, buf, sizeof(buf))) > 0 && !strstr(buf, boundary))
                 {
                     len = guard_write(fd, buf, len);
                     totalsize += len;
                 }
-				
-                //remove \r\n at the end
+
+                // remove \r\n at the end
                 lseek(fd, 0, SEEK_SET);
-                //fseek(fp,-2, SEEK_CUR);
+                // fseek(fp,-2, SEEK_CUR);
                 totalsize -= 2;
                 int stat = ftruncate(fd, totalsize);
-				LOG("Write %d bytes to %s", totalsize, file_path);
+                LOG("Write %d bytes to %s", totalsize, file_path);
                 UNUSED(stat);
                 close(fd);
                 line = buf;
@@ -1482,29 +1467,29 @@ void *decode_multi_part_request_data(void *data)
     /**
      * The upload procedure may take time, the task access time should be updated
      * after the procedure finish
-    */
+     */
     task->access_time = rq->client->last_io;
     // check if end of request
     if (line && strstr(line, boundend))
     {
-        //LOG("End request %s", boundend);
+        // LOG("End request %s", boundend);
         free(boundend);
-        //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
+        // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
         return task;
     }
     free(boundend);
     if (line && strstr(line, boundary))
     {
         // continue upload
-        //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
+        // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE);
         task->handle = decode_multi_part_request_data;
         return task;
     }
-    //antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
+    // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE);
     return task;
 }
 /**
- * Decode a query string (GET request or POST URL encoded) to  
+ * Decode a query string (GET request or POST URL encoded) to
  * a dictionary of key-value
  * @param  query : the query string
  * @return       a dictionary of key-value
@@ -1513,13 +1498,13 @@ void decode_url_request(const char *query, dictionary_t dic)
 {
     if (query == NULL)
         return;
-    //str_copy = ;
+    // str_copy = ;
     char *token;
     if (strlen(query) == 0)
         return;
     char *str_copy = strdup(query);
     char *org_copy = str_copy;
-    //dictionary dic = dict();
+    // dictionary dic = dict();
     while ((token = strsep(&str_copy, "&")))
     {
         char *key;
@@ -1537,11 +1522,11 @@ void decode_url_request(const char *query, dictionary_t dic)
         }
     }
     free(org_copy);
-    //return dic;
+    // return dic;
 }
 /**
-* Decode post query string to string
-*/
+ * Decode post query string to string
+ */
 char *post_data_decode(void *client, int len)
 {
     char *query = (char *)malloc((len + 1) * sizeof(char));
@@ -1558,13 +1543,13 @@ char *post_data_decode(void *client, int len)
         }
         if (stat == 0)
         {
-            if (difftime(time(NULL), ((antd_client_t*)client)->last_io) > MAX_IO_WAIT_TIME)
+            if (difftime(time(NULL), ((antd_client_t *)client)->last_io) > MAX_IO_WAIT_TIME)
             {
                 stat = -1;
             }
             else
             {
-                usleep(POLL_EVENT_TO*1000);
+                usleep(POLL_EVENT_TO * 1000);
             }
         }
     }
@@ -1583,7 +1568,7 @@ char *post_data_decode(void *client, int len)
  * Execute a plugin based on the http requeset
  * First decode the http request header to find the correct plugin
  * and the correct function on the plugin
- * Second, decode all parameters necessary of the request and pass it 
+ * Second, decode all parameters necessary of the request and pass it
  * to the callback function.
  * Execute the callback function if sucess
  * @param  client       soket client
@@ -1603,9 +1588,9 @@ void *execute_plugin(void *data, const char *pname)
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
-    //LOG("Plugin name '%s'", pname);
+    // LOG("Plugin name '%s'", pname);
     rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
-    //load the plugin
+    // load the plugin
     if ((plugin = plugin_lookup((char *)pname)) == NULL)
     {
         pthread_mutex_lock(&server_mux);

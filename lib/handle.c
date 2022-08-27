@@ -296,6 +296,7 @@ void antd_send_header(void *cl, antd_response_header_t *res)
                         }
                         else
                         {
+                            LOG("Gzip enable on stream %d", client->sock);
                             client->z_status = Z_NO_FLUSH;
                             dput(res->header, "Content-Encoding", strdup("gzip"));
                         }
@@ -310,6 +311,7 @@ void antd_send_header(void *cl, antd_response_header_t *res)
                         }
                         else
                         {
+                            LOG("deflate enable on stream %d", client->sock);
                             client->z_status = Z_NO_FLUSH;
                             dput(res->header, "Content-Encoding", strdup("deflate"));
                         }

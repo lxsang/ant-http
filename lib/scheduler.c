@@ -295,7 +295,7 @@ static void print_static_info(bst_node_t *node, void **args, int argc)
 }
 static void *statistic(antd_scheduler_t *scheduler)
 {
-    fd_set fd_out;
+    struct pollfd pfd;
     int ret;
     char buffer[MAX_FIFO_NAME_SZ];
     void *argc[2];
@@ -316,9 +316,9 @@ static void *statistic(antd_scheduler_t *scheduler)
         }
         argc[0] = buffer;
         argc[1] = &scheduler->stat_fd;
-        FD_ZERO(&fd_out);
-        FD_SET(scheduler->stat_fd, &fd_out);
-        ret = select(scheduler->stat_fd + 1, NULL, &fd_out, NULL, NULL);
+        pfd.fd = scheduler->stat_fd;
+        pfd.events = POLLOUT;
+        ret = poll(&pfd, 1, -1);
         switch (ret)
         {
         case -1:
@@ -330,7 +330,7 @@ static void *statistic(antd_scheduler_t *scheduler)
             break;
         // we have data
         default:
-            if (FD_ISSET(scheduler->stat_fd, &fd_out))
+            if (pfd.revents & POLLOUT)
             {
                 if (scheduler->pending_task > 0)
                 {

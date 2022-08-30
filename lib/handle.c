@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <errno.h>
@@ -418,8 +419,7 @@ int antd_send(void *src, const void *data_in, int len_in)
         ptr = (char *)data;
         writelen = len > BUFFLEN ? BUFFLEN : len;
         written = 0;
-        fd_set fds;
-        struct timeval timeout;
+        struct pollfd pfd;
         while (writelen > 0) //source->attempt < MAX_ATTEMPT
         {
             // clear the error queue
@@ -463,14 +463,11 @@ int antd_send(void *src, const void *data_in, int len_in)
                     // no data available right now, wait a few seconds in case new data arrives...
                     //printf("SSL_ERROR_WANT_READ\n");
 
-                    int sock = SSL_get_rfd(source->ssl);
-                    FD_ZERO(&fds);
-                    FD_SET(sock, &fds);
-
-                    timeout.tv_sec = 0;
-                    timeout.tv_usec = 500;
-                    err = select(sock + 1, &fds, NULL, NULL, &timeout);
-                    if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                    int sock = SSL_get_rfd(source->ssl);                   
+                    pfd.fd = sock;
+                    pfd.events = POLLIN;
+                    err  = poll(&pfd, 1, 500);
+                    if (err == 0 || (err > 0 && (pfd.revents & POLLIN)))
                     {
                         //source->attempt++;
                         continue; // more data to read...
@@ -484,14 +481,10 @@ int antd_send(void *src, const void *data_in, int len_in)
                     // socket not writable right now, wait a few seconds and try again...
                     //printf("SSL_ERROR_WANT_WRITE \n");
                     int sock = SSL_get_wfd(source->ssl);
-                    FD_ZERO(&fds);
-                    FD_SET(sock, &fds);
-
-                    timeout.tv_sec = 0;
-                    timeout.tv_usec = 500;
-
-                    err = select(sock + 1, NULL, &fds, NULL, &timeout);
-                    if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                    pfd.fd = sock;
+                    pfd.events = POLLOUT;
+                    err  = poll(&pfd, 1, 500);
+                    if (err == 0 || (err > 0 && (pfd.revents & POLLOUT)))
                     {
                         //source->attempt++;
                         continue; // can write more data now...
@@ -637,8 +630,7 @@ int antd_recv(void *src, void *data, int len)
         ptr = (char *)data;
         readlen = len > BUFFLEN ? BUFFLEN : len;
         read = 0;
-        fd_set fds;
-        struct timeval timeout;
+        struct pollfd pfd;
         while (readlen > 0) //&& source->attempt < MAX_ATTEMPT
         {
             ERR_clear_error();
@@ -683,13 +675,10 @@ int antd_recv(void *src, void *data, int len)
                     //printf("SSL_ERROR_WANT_READ\n");
 
                     int sock = SSL_get_rfd(source->ssl);
-                    FD_ZERO(&fds);
-                    FD_SET(sock, &fds);
-
-                    timeout.tv_sec = 0;
-                    timeout.tv_usec = 500;
-                    err = select(sock + 1, &fds, NULL, NULL, &timeout);
-                    if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                    pfd.fd = sock;
+                    pfd.events = POLLIN;
+                    err  = poll(&pfd, 1, 500);
+                    if (err == 0 || (err > 0 && (pfd.revents & POLLIN)))
                     {
                         //source->attempt++;
                         continue; // more data to read...
@@ -703,14 +692,10 @@ int antd_recv(void *src, void *data, int len)
                     // socket not writable right now, wait a few seconds and try again...
                     //printf("SSL_ERROR_WANT_WRITE \n");
                     int sock = SSL_get_wfd(source->ssl);
-                    FD_ZERO(&fds);
-                    FD_SET(sock, &fds);
-
-                    timeout.tv_sec = 0;
-                    timeout.tv_usec = 500;
-
-                    err = select(sock + 1, NULL, &fds, NULL, &timeout);
-                    if (err == 0 || (err > 0 && FD_ISSET(sock, &fds)))
+                    pfd.fd = sock;
+                    pfd.events = POLLOUT;
+                    err  = poll(&pfd, 1, 500);
+                    if (err == 0 || (err > 0 && (pfd.revents & POLLOUT)))
                     {
                         //source->attempt++;
                         continue; // can write more data now...

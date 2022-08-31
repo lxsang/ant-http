@@ -36,7 +36,7 @@ ws_msg_header_t *ws_read_header(void *client)
 	ws_msg_header_t *header = (ws_msg_header_t *)malloc(sizeof(*header));
 
 	// get first byte
-	if (antd_recv(client, &byte, sizeof(byte)) < 0)
+	if (antd_recv(client, &byte, sizeof(byte)) <= 0)
 		goto fail;
 	if (BITV(byte, 6) || BITV(byte, 5) || BITV(byte, 4))
 		goto fail; // all RSV bit must be 0
@@ -47,7 +47,7 @@ ws_msg_header_t *ws_read_header(void *client)
 	header->opcode = (byte & 0x0F);
 
 	// get next byte
-	if (antd_recv(client, &byte, sizeof(byte)) < 0)
+	if (antd_recv(client, &byte, sizeof(byte)) <= 0)
 		goto fail;
 
 	//printf("MASK: %d paylen:%d\n", BITV(byte,7), (byte & 0x7F));
@@ -67,21 +67,21 @@ ws_msg_header_t *ws_read_header(void *client)
 	}
 	else if (len == 126)
 	{
-		if (antd_recv(client, bytes, 2 * sizeof(uint8_t)) < 0)
+		if (antd_recv(client, bytes, 2 * sizeof(uint8_t)) <= 0)
 			goto fail;
 		header->plen = (bytes[0] << 8) + bytes[1];
 	}
 	else
 	{
 		//read only last 4 byte
-		if (antd_recv(client, bytes, 8 * sizeof(uint8_t)) < 0)
+		if (antd_recv(client, bytes, 8 * sizeof(uint8_t)) <= 0)
 			goto fail;
 		header->plen = (bytes[4] << 24) + (bytes[5] << 16) + (bytes[6] << 8) + bytes[7];
 	}
 	//printf("len: %d\n", header->plen);
 	// last step is to get the maskey
 	if (header->mask)
-		if (antd_recv(client, header->mask_key, 4 * sizeof(uint8_t)) < 0)
+		if (antd_recv(client, header->mask_key, 4 * sizeof(uint8_t)) <= 0)
 			goto fail;
 	//printf("key 0: %d key 1: %d key2:%d, key3: %d\n",header->mask_key[0],header->mask_key[1],header->mask_key[2], header->mask_key[3] );
 
@@ -121,7 +121,7 @@ int ws_read_data(void *client, ws_msg_header_t *header, int len, uint8_t *data)
 	if (header->plen == 0)
 		return 0;
 	int dlen = (len == -1 || len > (int)header->plen) ? (int)header->plen : len;
-	if ((dlen = antd_recv(client, data, dlen)) < 0)
+	if ((dlen = antd_recv(client, data, dlen)) <= 0)
 		return -1;
 	header->plen = header->plen - dlen;
 	// unmask received data

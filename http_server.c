@@ -126,7 +126,7 @@ static int config_handler(void *conf, const char *section, const char *name,
             free(pconfig->db_path);
         pconfig->db_path = strdup(value);
         if (stat(pconfig->db_path, &st) == -1)
-            mkdirp(pconfig->db_path, 0755);
+            mkdirp(pconfig->db_path, 0700);
     }
     else if (MATCH("SERVER", "tmpdir"))
     {

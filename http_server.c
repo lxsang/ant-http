@@ -10,6 +10,8 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
 
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
@@ -101,6 +103,7 @@ static int config_handler(void *conf, const char *section, const char *name,
 {
     config_t *pconfig = (config_t *)conf;
     regmatch_t port_matches[2];
+    char * tmp;
     struct stat st;
     // trim(section, ' ');
     // trim(value,' ');
@@ -122,22 +125,42 @@ static int config_handler(void *conf, const char *section, const char *name,
     }
     else if (MATCH("SERVER", "database"))
     {
-        if (pconfig->db_path)
-            free(pconfig->db_path);
-        pconfig->db_path = strdup(value);
-        if (stat(pconfig->db_path, &st) == -1)
-            mkdirp(pconfig->db_path, 0700);
+        if (stat(value, &st) == -1)
+            mkdirp(value, 0700);
+        tmp = realpath(value, NULL);
+        if(!tmp)
+        {
+            ERROR("Unable to query real path for %s: %s", value, strerror(errno));
+        }
+        else
+        {
+            if (pconfig->db_path)
+                free(pconfig->db_path);
+            pconfig->db_path = tmp;
+            LOG("Database root is %s", pconfig->db_path);
+        }
     }
     else if (MATCH("SERVER", "tmpdir"))
     {
-        if (pconfig->tmpdir)
-            free(pconfig->tmpdir);
-        pconfig->tmpdir = strdup(value);
-        if (stat(pconfig->tmpdir, &st) == -1)
-            mkdirp(pconfig->tmpdir, 0755);
+        if (stat(value, &st) == -1)
+        {
+            mkdirp(value, 0755);
+        }
         else
         {
-            removeAll(pconfig->tmpdir, 0);
+            removeAll(value, 0);
+        }
+        tmp = realpath(value, NULL);
+        if(!tmp)
+        {
+            ERROR("Unable to query real path for %s: %s", value, strerror(errno));
+        }
+        else
+        {
+            if (pconfig->tmpdir)
+                free(pconfig->tmpdir);
+            pconfig->tmpdir = tmp;
+            LOG("TMP root is %s", pconfig->tmpdir);
         }
     }
     else if (MATCH("SERVER", "statistic_fifo"))
@@ -232,10 +255,19 @@ static int config_handler(void *conf, const char *section, const char *name,
         }
         if (strcmp(name, "htdocs") == 0)
         {
-            p->htdocs = strdup(value);
-            if (stat(p->htdocs, &st) == -1)
+            if (stat(value, &st) == -1)
             {
-                mkdirp(p->htdocs, 0755);
+                mkdirp(value, 0755);
+            }
+            p->htdocs = realpath(value, NULL);
+            if(!p->htdocs)
+            {
+                ERROR("Unable to query real path for %s: %s", value, strerror(errno));
+                p->htdocs = strdup(value);
+            }
+            else
+            {
+                LOG("Server root is %s", p->htdocs);
             }
         }
         else if (strcmp(name, "ssl.enable") == 0)
@@ -261,10 +293,10 @@ void load_config(const char *file)
 {
     server_config.ports = dict();
     server_config.plugins_dir = strdup("plugins/");
-    server_config.plugins_ext = strdup(".dylib");
+    server_config.plugins_ext = strdup(".so");
     server_config.db_path = strdup("databases/");
     // server_config.htdocs = "htdocs/";
-    server_config.tmpdir = strdup("tmp/");
+    server_config.tmpdir = strdup("/tmp/");
     server_config.stat_fifo_path = strdup("/var/run/antd_stat");
     server_config.n_workers = 4;
     server_config.backlog = 1000;

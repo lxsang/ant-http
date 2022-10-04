@@ -72,7 +72,7 @@ void * plugin_from_file(char* name)
 {
 	void *lib_handle;
   char* error;
-  char* path = __s("%s%s%s",config()->plugins_dir,name,config()->plugins_ext);
+  char* path = __s("%s/%s%s",config()->plugins_dir,name,config()->plugins_ext);
   void (*fn)(const char*);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 

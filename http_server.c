@@ -123,7 +123,7 @@ static int config_handler(void *conf, const char *section, const char *name,
             if (pconfig->plugins_dir)
                 free(pconfig->plugins_dir);
             pconfig->plugins_dir = tmp;
-            LOG("Database root is %s", pconfig->plugins_dir);
+            LOG("Plugin root is %s", pconfig->plugins_dir);
         }
     }
     else if (MATCH("SERVER", "plugins_ext"))

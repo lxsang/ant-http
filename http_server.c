@@ -111,11 +111,20 @@ static int config_handler(void *conf, const char *section, const char *name,
     // char * ppath = NULL;
     if (MATCH("SERVER", "plugins"))
     {
-        if (pconfig->plugins_dir)
-            free(pconfig->plugins_dir);
-        pconfig->plugins_dir = strdup(value);
-        if (stat(pconfig->plugins_dir, &st) == -1)
-            mkdirp(pconfig->plugins_dir, 0755);
+        if (stat(value, &st) == -1)
+            mkdirp(value, 0755);
+        tmp = realpath(value, NULL);
+        if(!tmp)
+        {
+            ERROR("Unable to query real path for %s: %s", value, strerror(errno));
+        }
+        else
+        {
+            if (pconfig->plugins_dir)
+                free(pconfig->plugins_dir);
+            pconfig->plugins_dir = tmp;
+            LOG("Database root is %s", pconfig->plugins_dir);
+        }
     }
     else if (MATCH("SERVER", "plugins_ext"))
     {

@@ -1459,7 +1459,7 @@ void *decode_multi_part_request_data(void *data)
         }
         else
         {
-            file_path = __s("%s%s.%u", server_config.tmpdir, part_file, (unsigned)time(NULL));
+            file_path = __s("%s/%s.%u", server_config.tmpdir, part_file, (unsigned)time(NULL));
             fd = open(file_path, O_WRONLY | O_CREAT, 0600);
             if (fd > 0)
             {

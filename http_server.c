@@ -669,7 +669,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
     char *tmp, rep[10];
     int idx = 0;
     memset(rep, 0, 10);
-    LOG("Verify %s on %s or %s", k, url, host);
+    LOG("Verify %s=%s on %s or %s", k, v , url, host);
     // 1 group
     if (!host || !(ret = regex_match(k, host, 10, key_matches)))
     {
@@ -708,6 +708,11 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
             int i = atoi(rep);
             memcpy(buf + idx, target + key_matches[i].rm_so, key_matches[i].rm_eo - key_matches[i].rm_so);
             idx += key_matches[i].rm_eo - key_matches[i].rm_so;
+        }
+        else if (strcasecmp(rep, "break") == 0)
+        {
+            // ignore it
+            LOG("Found break command, will break after this rule");
         }
         else
         { // just keep it
@@ -854,21 +859,35 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
     chain_t it;
     char *k;
     char *v;
+    int should_break = 0;
     for_each_assoc(it, rules)
     {
         k = it->key;
-        v = (char *)it->value;
-        // 1 group
-        if (rule_check(k, v, host, url, query_string, url))
+        if(it->value)
         {
-            query_string = url;
-
-            while ((*query_string != '?') && (*query_string != '\0'))
-                query_string++;
-            if (*query_string == '?')
+            v = (char *)it->value;
+            // 1 group
+            if (regex_match("<break>$",v, 0, NULL))
             {
-                *query_string = '\0';
-                query_string++;
+                should_break = 1;
+            }
+            if (rule_check(k, v, host, url, query_string, url))
+            {
+                query_string = url;
+
+                while ((*query_string != '?') && (*query_string != '\0'))
+                    query_string++;
+                if (*query_string == '?')
+                {
+                    *query_string = '\0';
+                    query_string++;
+                }
+                if(should_break)
+                {
+                    i = rules->cap;
+                    LOG("Break rule check as matched found at %s -> %s", k, v);
+                    break;
+                }
             }
         }
     }

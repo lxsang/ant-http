@@ -115,15 +115,15 @@ void htdocs(antd_request_t *rq, char *dest)
         strcpy(dest, www);
     }
 }
-void dbdir(char *dest)
+void dbdir(char **dest)
 {
     UNUSED(dest);
 }
-void tmpdir(char *dest)
+void tmpdir(char **dest)
 {
     UNUSED(dest);
 }
-void plugindir(char *dest)
+void plugindir(char **dest)
 {
     UNUSED(dest);
 }

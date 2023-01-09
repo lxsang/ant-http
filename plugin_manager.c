@@ -4,6 +4,10 @@
 #include "lib/utils.h"
 #include "lib/handle.h"
 #include "http_server.h"
+
+static void unload_plugin_by_name(const char*);
+static void * plugin_from_file(char* name, dictionary_t conf);
+
 /**
  * Plugin table to store the loaded plugin
  */
@@ -25,7 +29,7 @@ struct plugin_entry *plugin_lookup(char *s)
 
 int require_plugin(const char* name)
 {
-	struct plugin_entry* ptr = plugin_load((char*)name);
+	struct plugin_entry* ptr = plugin_load((char*)name, NULL);
 	return ptr != NULL;
 }
 
@@ -33,13 +37,24 @@ int require_plugin(const char* name)
  * Load a plugin to the plugin table
  * Only load when not available in the plugin table
  * @param  name plugin name
+ * @param config: plugin configuration
  * @return      pointer to the loaded plugin
  */
-struct plugin_entry *plugin_load(char *name)
+struct plugin_entry *plugin_load(char *name, dictionary_t config)
 {
+	char* pname = NULL;
     struct plugin_entry *np;
     unsigned hashval;
+	if(config)
+	{
+		pname = dvalue(config, "name");
+	}
+	if(!pname)
+	{
+		pname = name;
+	}
     if ((np = plugin_lookup(name)) == NULL) { /* not found */
+		LOG("Loading plugin: %s -> %s", name, pname);
         np = (struct plugin_entry *) malloc(sizeof(*np));
         if (np == NULL || name == NULL)
         {
@@ -47,7 +62,7 @@ struct plugin_entry *plugin_load(char *name)
 			return NULL;
 		}
 		np->pname = strdup(name);
-        if ((np->handle = plugin_from_file(name)) == NULL)
+        if ((np->handle = plugin_from_file(pname,config)) == NULL)
 		{
 			if(np->pname) free(np->pname);
 			if(np) free(np);
@@ -68,12 +83,12 @@ struct plugin_entry *plugin_load(char *name)
  * @param  name Name of the plugin
  * @return      
  */
-void * plugin_from_file(char* name)
+static void * plugin_from_file(char* name, dictionary_t conf)
 {
-	void *lib_handle;
+  void *lib_handle;
   char* error;
   char* path = __s("%s/%s%s",config()->plugins_dir,name,config()->plugins_ext);
-  void (*fn)(const char*);
+  void (*fn)(const char*, dictionary_t);
    lib_handle = dlopen(path, RTLD_LAZY);
    if (!lib_handle) 
    {
@@ -83,11 +98,11 @@ void * plugin_from_file(char* name)
       return NULL;
    }
    // set database path
-   fn = (void (*)(const char *))dlsym(lib_handle, "__init_plugin__");
+   fn = (void (*)(const char*, dictionary_t))dlsym(lib_handle, "__init_plugin__");
   if ((error = dlerror()) != NULL)  
   		ERROR("Problem when finding plugin init function for %s : %s", name,error);
   else
-	(*fn)(name); 
+	(*fn)(name, conf); 
   if(path)
 	free(path);
    return lib_handle;

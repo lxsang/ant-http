@@ -58,6 +58,7 @@ config_t *config()
 }
 void destroy_config()
 {
+    chain_t it;
     freedict(server_config.handlers);
     if (server_config.plugins_dir)
         free(server_config.plugins_dir);
@@ -75,9 +76,16 @@ void destroy_config()
         freedict(server_config.mimes);
     if (server_config.stat_fifo_path)
         free(server_config.stat_fifo_path);
+    if(server_config.plugins)
+    {
+        for_each_assoc(it, server_config.plugins)
+        {
+            freedict((dictionary_t) it->value);
+        }
+        freedict(server_config.plugins);
+    }
     if (server_config.ports)
     {
-        chain_t it;
         port_config_t *cnf;
         for_each_assoc(it, server_config.ports)
         {
@@ -102,7 +110,8 @@ static int config_handler(void *conf, const char *section, const char *name,
                           const char *value)
 {
     config_t *pconfig = (config_t *)conf;
-    regmatch_t port_matches[2];
+    regmatch_t regex_matches[2];
+    char buf[255];
     char * tmp;
     struct stat st;
     // trim(section, ' ');
@@ -237,21 +246,14 @@ static int config_handler(void *conf, const char *section, const char *name,
     {
         dput(pconfig->handlers, name, strdup(value));
     }
-    else if (strcmp(section, "AUTOSTART") == 0 || strcmp(section, "AUTOLOAD") == 0)
-    {
-        // The server section must be added before the autostart section
-        // auto start plugin
-        plugin_load((char *)value);
-    }
     else if (strcmp(section, "MIMES") == 0)
     {
         dput(pconfig->mimes, name, strdup(value));
     }
-    else if (regex_match("PORT:\\s*([0-9]+)", section, 2, port_matches))
+    else if (regex_match("PORT:\\s*([0-9]+)", section, 2, regex_matches))
     {
-        char buf[20];
         memset(buf, '\0', sizeof(buf));
-        memcpy(buf, section + port_matches[1].rm_so, port_matches[1].rm_eo - port_matches[1].rm_so);
+        memcpy(buf, section + regex_matches[1].rm_so, regex_matches[1].rm_eo - regex_matches[1].rm_so);
         port_config_t *p = dvalue(pconfig->ports, buf);
         if (!p)
         {
@@ -291,6 +293,19 @@ static int config_handler(void *conf, const char *section, const char *name,
             dput(p->rules, name, strdup(value));
         }
     }
+    // plugin configuration
+    else if (regex_match("PLUGIN:\\s*(.*)", section, 2, regex_matches))
+    {
+        memset(buf, '\0', sizeof(buf));
+        memcpy(buf, section + regex_matches[1].rm_so, regex_matches[1].rm_eo - regex_matches[1].rm_so);
+        dictionary_t p = dvalue(pconfig->plugins, buf);
+        if (!p)
+        {
+            p = dict();
+            dput(pconfig->plugins, buf, p);
+        }
+        dput(p, name, strdup(value));
+    }
     else
     {
         return 0; /* unknown section/name, error */
@@ -298,9 +313,35 @@ static int config_handler(void *conf, const char *section, const char *name,
     return 1;
 }
 
+static void init_plugins()
+{
+    chain_t it, it2;
+    dictionary_t config;
+    const char* value;
+    for_each_assoc(it, server_config.plugins)
+    {
+        config = (dictionary_t) it -> value;
+        if(config)
+        {
+            for_each_assoc(it2, config)
+            {
+                LOG("Plugin %s: [%s] -> [%s]", it->key, it2->key, (char*) it2->value);
+            }
+            value = (char*)dvalue(config,"autoload");
+            if( value && (strncmp(value,"1", 1) == 0  || strncmp(value, "true", 3) == 0 ) )
+            {
+                // load the plugin
+                LOG("Plugin %s: autoloading...", it->key);
+                plugin_load(it->key, config);
+            }
+        }
+    }
+}
+
 void load_config(const char *file)
 {
     server_config.ports = dict();
+    server_config.plugins = dict();
     server_config.plugins_dir = strdup("plugins/");
     server_config.plugins_ext = strdup(".so");
     server_config.db_path = strdup("databases/");
@@ -345,6 +386,8 @@ void load_config(const char *file)
 #endif
     }
     LOG("%d mimes entries found", server_config.mimes->size);
+    // Init plugins if necessary
+    init_plugins();
 }
 
 void *accept_request(void *data)
@@ -1632,16 +1675,13 @@ void *execute_plugin(void *data, const char *pname)
     // LOG("Plugin name '%s'", pname);
     rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
     // load the plugin
-    if ((plugin = plugin_lookup((char *)pname)) == NULL)
+    pthread_mutex_lock(&server_mux);
+    plugin = plugin_load((char *)pname, dvalue(server_config.plugins, pname));
+    pthread_mutex_unlock(&server_mux);
+    if (plugin == NULL)
     {
-        pthread_mutex_lock(&server_mux);
-        plugin = plugin_load((char *)pname);
-        pthread_mutex_unlock(&server_mux);
-        if (plugin == NULL)
-        {
-            antd_error(rq->client, 503, "Requested service not found");
-            return task;
-        }
+        antd_error(rq->client, 503, "Requested service not found");
+        return task;
     }
     // check if the plugin want rawbody or decoded body
     metafn = (plugin_header_t * (*)()) dlsym(plugin->handle, "meta");
@@ -1675,17 +1715,17 @@ dictionary_t mimes_list()
     return server_config.mimes;
 }
 
-void dbdir(char *dest)
+void dbdir(char **dest)
 {
-    strncpy(dest, server_config.db_path, 512);
+    *dest = server_config.db_path;
 }
-void tmpdir(char *dest)
+void tmpdir(char **dest)
 {
-    strncpy(dest, server_config.tmpdir, 512);
+    *dest = server_config.tmpdir;
 }
-void plugindir(char *dest)
+void plugindir(char **dest)
 {
-    strncpy(dest, server_config.plugins_dir, 512);
+    *dest =server_config.plugins_dir;
 }
 
 #ifdef USE_ZLIB

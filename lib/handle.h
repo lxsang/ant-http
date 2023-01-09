@@ -98,23 +98,25 @@ typedef struct
     list_t gzip_types;
     dictionary_t mimes;
     dictionary_t ports;
+    dictionary_t plugins;
     // #endif
 } config_t;
 
 typedef struct
 {
     char name[128];
-    char dbpath[512];
-    char tmpdir[512];
-    char pdir[512];
+    char* dbpath;
+    char* tmpdir;
+    char* pdir;
+    dictionary_t config;
     int raw_body;
 } plugin_header_t;
 
 int __attribute__((weak)) require_plugin(const char *);
 void __attribute__((weak)) htdocs(antd_request_t *rq, char *dest);
-void __attribute__((weak)) dbdir(char *dest);
-void __attribute__((weak)) tmpdir(char *dest);
-void __attribute__((weak)) plugindir(char *dest);
+void __attribute__((weak)) dbdir(char **dest);
+void __attribute__((weak)) tmpdir(char **dest);
+void __attribute__((weak)) plugindir(char **dest);
 
 int __attribute__((weak)) compressable(char *ctype);
 

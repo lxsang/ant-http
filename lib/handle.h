@@ -42,6 +42,7 @@ typedef struct
     unsigned int port;
     int usessl;
     char *htdocs;
+    char* plugins;
     int sock;
     dictionary_t rules;
 } port_config_t;

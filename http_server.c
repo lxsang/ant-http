@@ -94,6 +94,8 @@ void destroy_config()
             {
                 if (cnf->htdocs != NULL)
                     free(cnf->htdocs);
+                if(cnf->plugins)
+                    free(cnf->plugins);
                 if (cnf->sock > 0)
                 {
                     close(cnf->sock);
@@ -242,10 +244,6 @@ static int config_handler(void *conf, const char *section, const char *name,
         pconfig->ssl_cipher = strdup(value);
     }
 #endif
-    else if (strcmp(section, "FILEHANDLER") == 0)
-    {
-        dput(pconfig->handlers, name, strdup(value));
-    }
     else if (strcmp(section, "MIMES") == 0)
     {
         dput(pconfig->mimes, name, strdup(value));
@@ -259,6 +257,7 @@ static int config_handler(void *conf, const char *section, const char *name,
         {
             p = (port_config_t *)malloc(sizeof(port_config_t));
             p->htdocs = NULL;
+            p->plugins = NULL;
             p->sock = -1;
             p->rules = dict_n(1);
             dput(pconfig->ports, buf, p);
@@ -280,6 +279,10 @@ static int config_handler(void *conf, const char *section, const char *name,
             {
                 LOG("Server root is %s", p->htdocs);
             }
+        }
+        else if(strcmp(name, "plugins") == 0)
+        {
+            p->plugins = strdup(value);
         }
         else if (strcmp(name, "ssl.enable") == 0)
         {
@@ -326,6 +329,22 @@ static void init_plugins()
             for_each_assoc(it2, config)
             {
                 LOG("Plugin %s: [%s] -> [%s]", it->key, it2->key, (char*) it2->value);
+                if(strncmp(it2->key, "file_type", 9) == 0 && it2->value)
+                {
+                    char* file_type = strdup((char*) it2->value);
+                    char* token;
+                    char *stringp = file_type;
+                    while((token = strsep(&stringp,",")))
+                    {
+                        trim(token, ' ');
+                        if(strlen(token) > 0) 
+                        {
+                            dput(server_config.handlers,token, strdup((char*)it->key));
+                            LOG("Plugin %s: support %s file", it->key, token);
+                        }
+                    }
+                    free(file_type);
+                }
             }
             value = (char*)dvalue(config,"autoload");
             if( value && (strncmp(value,"1", 1) == 0  || strncmp(value, "true", 3) == 0 ) )
@@ -1669,9 +1688,24 @@ void *execute_plugin(void *data, const char *pname)
     plugin_header_t *meta = NULL;
     struct plugin_entry *plugin;
     char *error;
+    char pattern[256];
+
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
+
+    snprintf(pattern, sizeof(pattern), "\\b%s\\b", pname);
+    char *port_s = (char *)dvalue(rq->request, "SERVER_PORT");
+    port_config_t *pcnf = (port_config_t *)dvalue(server_config.ports, port_s);
+
+    // check if plugin is enabled on this port
+    if(!pcnf->plugins || !regex_match(pattern, pcnf->plugins , 0,NULL))
+    {
+        LOG("No plugin matched in [%s] using pattern [%s]", pcnf->plugins, pattern);
+        antd_error(rq->client, 403, "Access forbidden");
+        return task;
+    }
+
     // LOG("Plugin name '%s'", pname);
     rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
     // load the plugin

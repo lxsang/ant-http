@@ -28,6 +28,9 @@
 #define ANTD_CLIENT_RQ_DATA_DECODE 0x7
 #define ANTD_CLIENT_PROXY_MONITOR 0x8
 
+#define ANTD_PLUGIN_READY 0x0
+#define ANTD_PLUGIN_PANNIC 0x1
+
 typedef enum
 {
     ANTD_CGZ,
@@ -111,6 +114,7 @@ typedef struct
     char* pdir;
     dictionary_t config;
     int raw_body;
+    int status;
 } plugin_header_t;
 
 int __attribute__((weak)) require_plugin(const char *);

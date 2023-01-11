@@ -45,6 +45,9 @@ struct plugin_entry *plugin_load(char *name, dictionary_t config)
 	char* pname = NULL;
     struct plugin_entry *np;
     unsigned hashval;
+	plugin_header_t *(*metafn)();
+    plugin_header_t *meta = NULL;
+	char* error;
 	if(config)
 	{
 		pname = dvalue(config, "name");
@@ -75,7 +78,25 @@ struct plugin_entry *plugin_load(char *name, dictionary_t config)
     {
     	LOG("The plugin %s id already loaded", name);
     }
-   
+
+	// check if plugin is ready
+	metafn = (plugin_header_t * (*)()) dlsym(np->handle, "meta");
+    if ((error = dlerror()) != NULL)
+    {
+		ERROR("Unable to fetch plugin meta-data: [%s] %s", name, error);
+        unload_plugin_by_name(name);
+		free(np);
+		return NULL;
+    }
+	meta = metafn();
+	LOG("PLugin status: [%s] %d", name, meta->status);
+	if(!meta || meta->status != ANTD_PLUGIN_READY)
+	{
+		ERROR("Plugin is not ready or error: [%s].", name);
+        unload_plugin_by_name(name);
+		free(np);
+		return NULL;
+	}
     return np;
 }
 /**

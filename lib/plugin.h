@@ -33,6 +33,11 @@ void use_raw_body();
 STATIC PART, should be included in any plugin
 */
 #ifdef PLUGIN_IMPLEMENT
+
+#define PLUGIN_PANIC(a,...) \
+		ERROR("%s: "a,__plugin__.name, ##__VA_ARGS__); \
+		__plugin__.status = ANTD_PLUGIN_PANNIC;
+
 static plugin_header_t __plugin__;
 // private function
 void __init_plugin__(const char* pl, dictionary_t* conf){
@@ -42,6 +47,7 @@ void __init_plugin__(const char* pl, dictionary_t* conf){
 	tmpdir(&__plugin__.tmpdir); 
 	__plugin__.config = conf;
 	__plugin__.raw_body = 0;
+	__plugin__.status = ANTD_PLUGIN_READY;
 	init();
 }; 
 void  use_raw_body()

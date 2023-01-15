@@ -76,11 +76,11 @@ void destroy_config()
         freedict(server_config.mimes);
     if (server_config.stat_fifo_path)
         free(server_config.stat_fifo_path);
-    if(server_config.plugins)
+    if (server_config.plugins)
     {
         for_each_assoc(it, server_config.plugins)
         {
-            freedict((dictionary_t) it->value);
+            freedict((dictionary_t)it->value);
         }
         freedict(server_config.plugins);
     }
@@ -94,7 +94,7 @@ void destroy_config()
             {
                 if (cnf->htdocs != NULL)
                     free(cnf->htdocs);
-                if(cnf->plugins)
+                if (cnf->plugins)
                     free(cnf->plugins);
                 if (cnf->sock > 0)
                 {
@@ -114,7 +114,7 @@ static int config_handler(void *conf, const char *section, const char *name,
     config_t *pconfig = (config_t *)conf;
     regmatch_t regex_matches[2];
     char buf[255];
-    char * tmp;
+    char *tmp;
     struct stat st;
     // trim(section, ' ');
     // trim(value,' ');
@@ -125,7 +125,7 @@ static int config_handler(void *conf, const char *section, const char *name,
         if (stat(value, &st) == -1)
             mkdirp(value, 0755);
         tmp = realpath(value, NULL);
-        if(!tmp)
+        if (!tmp)
         {
             ERROR("Unable to query real path for %s: %s", value, strerror(errno));
         }
@@ -148,7 +148,7 @@ static int config_handler(void *conf, const char *section, const char *name,
         if (stat(value, &st) == -1)
             mkdirp(value, 0700);
         tmp = realpath(value, NULL);
-        if(!tmp)
+        if (!tmp)
         {
             ERROR("Unable to query real path for %s: %s", value, strerror(errno));
         }
@@ -171,7 +171,7 @@ static int config_handler(void *conf, const char *section, const char *name,
             removeAll(value, 0);
         }
         tmp = realpath(value, NULL);
-        if(!tmp)
+        if (!tmp)
         {
             ERROR("Unable to query real path for %s: %s", value, strerror(errno));
         }
@@ -270,7 +270,7 @@ static int config_handler(void *conf, const char *section, const char *name,
                 mkdirp(value, 0755);
             }
             p->htdocs = realpath(value, NULL);
-            if(!p->htdocs)
+            if (!p->htdocs)
             {
                 ERROR("Unable to query real path for %s: %s", value, strerror(errno));
                 p->htdocs = strdup(value);
@@ -280,7 +280,7 @@ static int config_handler(void *conf, const char *section, const char *name,
                 LOG("Server root is %s", p->htdocs);
             }
         }
-        else if(strcmp(name, "plugins") == 0)
+        else if (strcmp(name, "plugins") == 0)
         {
             p->plugins = strdup(value);
         }
@@ -320,34 +320,34 @@ static void init_plugins()
 {
     chain_t it, it2;
     dictionary_t config;
-    const char* value;
+    const char *value;
     for_each_assoc(it, server_config.plugins)
     {
-        config = (dictionary_t) it -> value;
-        if(config)
+        config = (dictionary_t)it->value;
+        if (config)
         {
             for_each_assoc(it2, config)
             {
-                LOG("Plugin %s: [%s] -> [%s]", it->key, it2->key, (char*) it2->value);
-                if(strncmp(it2->key, "file_type", 9) == 0 && it2->value)
+                LOG("Plugin %s: [%s] -> [%s]", it->key, it2->key, (char *)it2->value);
+                if (strncmp(it2->key, "file_type", 9) == 0 && it2->value)
                 {
-                    char* file_type = strdup((char*) it2->value);
-                    char* token;
+                    char *file_type = strdup((char *)it2->value);
+                    char *token;
                     char *stringp = file_type;
-                    while((token = strsep(&stringp,",")))
+                    while ((token = strsep(&stringp, ",")))
                     {
                         trim(token, ' ');
-                        if(strlen(token) > 0) 
+                        if (strlen(token) > 0)
                         {
-                            dput(server_config.handlers,token, strdup((char*)it->key));
+                            dput(server_config.handlers, token, strdup((char *)it->key));
                             LOG("Plugin %s: support %s file", it->key, token);
                         }
                     }
                     free(file_type);
                 }
             }
-            value = (char*)dvalue(config,"autoload");
-            if( value && (strncmp(value,"1", 1) == 0  || strncmp(value, "true", 3) == 0 ) )
+            value = (char *)dvalue(config, "autoload");
+            if (value && (strncmp(value, "1", 1) == 0 || strncmp(value, "true", 3) == 0))
             {
                 // load the plugin
                 LOG("Plugin %s: autoloading...", it->key);
@@ -532,8 +532,7 @@ void *resolve_request(void *data)
     char *rqp = NULL;
     char *oldrqp = NULL;
     rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
-    htdocs(rq, path);
-    strcat(path, url);
+    snprintf(path, sizeof(path), "%s/%s", (char *)dvalue(rq->request, "SERVER_WWW_ROOT"), url);
     LOG("URL is : %s", url);
     LOG("Resource Path is : %s", path);
     // if (path[strlen(path) - 1] == '/')
@@ -567,8 +566,7 @@ void *resolve_request(void *data)
                 {
                     newurl = __s("%s/index.%s", url, it->key);
                     memset(path, 0, sizeof(path));
-                    htdocs(rq, path);
-                    strcat(path, newurl);
+                    snprintf(path, sizeof(path), "%s/%s", (char *)dvalue(rq->request, "SERVER_WWW_ROOT"), newurl);
                     if (stat(path, &st) != 0)
                     {
                         free(newurl);
@@ -669,7 +667,7 @@ int rule_check(const char *k, const char *v, const char *host, const char *_url,
     char *tmp, rep[10];
     int idx = 0;
     memset(rep, 0, 10);
-    LOG("Verify %s=%s on %s or %s", k, v , url, host);
+    LOG("Verify %s=%s on %s or %s", k, v, url, host);
     // 1 group
     if (!host || !(ret = regex_match(k, host, 10, key_matches)))
     {
@@ -863,11 +861,11 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
     for_each_assoc(it, rules)
     {
         k = it->key;
-        if(it->value)
+        if (it->value)
         {
             v = (char *)it->value;
             // 1 group
-            if (regex_match("<break>$",v, 0, NULL))
+            if (regex_match("<break>$", v, 0, NULL))
             {
                 should_break = 1;
             }
@@ -882,7 +880,7 @@ char *apply_rules(dictionary_t rules, const char *host, char *url)
                     *query_string = '\0';
                     query_string++;
                 }
-                if(should_break)
+                if (should_break)
                 {
                     i = rules->cap;
                     LOG("Break rule check as matched found at %s -> %s", k, v);
@@ -1718,7 +1716,7 @@ void *execute_plugin(void *data, const char *pname)
     port_config_t *pcnf = (port_config_t *)dvalue(server_config.ports, port_s);
 
     // check if plugin is enabled on this port
-    if(!pcnf->plugins || !regex_match(pattern, pcnf->plugins , 0,NULL))
+    if (!pcnf->plugins || !regex_match(pattern, pcnf->plugins, 0, NULL))
     {
         LOG("No plugin matched in [%s] using pattern [%s]", pcnf->plugins, pattern);
         antd_error(rq->client, 403, "Access forbidden");
@@ -1766,19 +1764,6 @@ void *execute_plugin(void *data, const char *pname)
 dictionary_t mimes_list()
 {
     return server_config.mimes;
-}
-
-void dbdir(char **dest)
-{
-    *dest = server_config.db_path;
-}
-void tmpdir(char **dest)
-{
-    *dest = server_config.tmpdir;
-}
-void plugindir(char **dest)
-{
-    *dest =server_config.plugins_dir;
 }
 
 #ifdef USE_ZLIB

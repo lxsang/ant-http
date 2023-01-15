@@ -106,28 +106,6 @@ int compressable(char *ctype)
     return 0;
 }
 
-void htdocs(antd_request_t *rq, char *dest)
-{
-    //dictionary_t xheader = (dictionary_t)dvalue(rq->request, "REQUEST_HEADER");
-    char *www = (char *)dvalue(rq->request, "SERVER_WWW_ROOT");
-    if (www)
-    {
-        strcpy(dest, www);
-    }
-}
-void dbdir(char **dest)
-{
-    UNUSED(dest);
-}
-void tmpdir(char **dest)
-{
-    UNUSED(dest);
-}
-void plugindir(char **dest)
-{
-    UNUSED(dest);
-}
-
 const char *get_status_str(int stat)
 {
     switch (stat)

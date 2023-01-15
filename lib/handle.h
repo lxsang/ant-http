@@ -30,6 +30,8 @@
 
 #define ANTD_PLUGIN_READY 0x0
 #define ANTD_PLUGIN_PANNIC 0x1
+#define ANTD_PLUGIN_INIT 0x2
+#define MAX_PATH_LEN 256
 
 typedef enum
 {
@@ -108,25 +110,21 @@ typedef struct
 
 typedef struct
 {
-    char name[128];
-    char* dbpath;
-    char* tmpdir;
-    char* pdir;
+    char name[MAX_PATH_LEN];
+    char dbpath[MAX_PATH_LEN];
+    char tmpdir[MAX_PATH_LEN];
+    char pdir[MAX_PATH_LEN];
     dictionary_t config;
     int raw_body;
     int status;
 } plugin_header_t;
 
-int __attribute__((weak)) require_plugin(const char *);
-void __attribute__((weak)) htdocs(antd_request_t *rq, char *dest);
-void __attribute__((weak)) dbdir(char **dest);
-void __attribute__((weak)) tmpdir(char **dest);
-void __attribute__((weak)) plugindir(char **dest);
 
-int __attribute__((weak)) compressable(char *ctype);
 
 void set_nonblock(int socket);
 //void set_block(int socket);
+
+int __attribute__((weak)) compressable(char *ctype);
 
 void antd_send_header(void *, antd_response_header_t *);
 const char *get_status_str(int stat);

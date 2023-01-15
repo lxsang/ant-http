@@ -40,13 +40,8 @@ STATIC PART, should be included in any plugin
 
 static plugin_header_t __plugin__;
 // private function
-void __init_plugin__(const char* pl, dictionary_t* conf){
-	strcpy(__plugin__.name,pl);
-	dbdir(&__plugin__.dbpath);
-	plugindir(&__plugin__.pdir);
-	tmpdir(&__plugin__.tmpdir); 
-	__plugin__.config = conf;
-	__plugin__.raw_body = 0;
+void __init_plugin__(plugin_header_t* pl, dictionary_t* conf){
+	(void) memcpy(&__plugin__, pl, sizeof(plugin_header_t));
 	__plugin__.status = ANTD_PLUGIN_READY;
 	init();
 }; 

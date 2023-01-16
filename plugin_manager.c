@@ -195,6 +195,7 @@ void unload_plugin(struct plugin_entry *np)
         (*fn)();
     }
     dlclose(np->handle);
+    LOG("Unloaded %s", np->pname);
     // free((void *) np->handle);
     if (np->pname)
         free((void *)np->pname);

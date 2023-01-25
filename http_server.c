@@ -527,12 +527,13 @@ void *resolve_request(void *data)
     char path[2 * BUFFLEN];
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-    char *url = (char *)dvalue(rq->request, "RESOURCE_PATH");
+    char *url = (char *)dvalue(rq->request, "REQUEST_URI");
     char *newurl = NULL;
     char *rqp = NULL;
     char *oldrqp = NULL;
     rq->client->state = ANTD_CLIENT_RESOLVE_REQUEST;
-    snprintf(path, sizeof(path), "%s/%s", (char *)dvalue(rq->request, "SERVER_WWW_ROOT"), url);
+    char * root = (char *)dvalue(rq->request, "SERVER_WWW_ROOT");
+    snprintf(path, sizeof(path), "%s/%s", root, url);
     LOG("URL is : %s", url);
     LOG("Resource Path is : %s", path);
     // if (path[strlen(path) - 1] == '/')
@@ -548,7 +549,8 @@ void *resolve_request(void *data)
             rqp = strdup("/");
         else
             rqp = strdup(rqp);
-        dput(rq->request, "RESOURCE_PATH", rqp);
+        dput(rq->request, "REQUEST_URI", rqp);
+        dput(rq->request, "RESOURCE_PATH", __s("%s/%s", root,rqp));
         LOG("Execute plugin %s", newurl);
         task = execute_plugin(rq, newurl);
         free(oldrqp);
@@ -562,19 +564,15 @@ void *resolve_request(void *data)
             if (stat(path, &st) == -1)
             {
                 chain_t it;
+                newurl = NULL;
                 for_each_assoc(it, server_config.handlers)
                 {
-                    newurl = __s("%s/index.%s", url, it->key);
                     memset(path, 0, sizeof(path));
-                    snprintf(path, sizeof(path), "%s/%s", (char *)dvalue(rq->request, "SERVER_WWW_ROOT"), newurl);
-                    if (stat(path, &st) != 0)
-                    {
-                        free(newurl);
-                        newurl = NULL;
-                    }
-                    else
+                    snprintf(path, sizeof(path), "%s/%s/index.%s", root, url, it->key);
+                    if (stat(path, &st) == 0)
                     {
                         i = server_config.handlers->cap;
+                        newurl = path;
                         break;
                     }
                 }
@@ -583,12 +581,9 @@ void *resolve_request(void *data)
                     antd_error(rq->client, 404, "Resource Not Found");
                     return task;
                 }
-                // if(url) free(url); this is freed in the dput function
-                url = newurl;
-                dput(rq->request, "RESOURCE_PATH", url);
             }
         }
-        dput(rq->request, "ABS_RESOURCE_PATH", strdup(path));
+        dput(rq->request, "RESOURCE_PATH", strdup(path));
         // check if the mime is supported
         // if the mime is not supported
         // find an handler plugin to process it
@@ -741,7 +736,7 @@ void *serve_file(void *data)
 {
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
-    char *path = (char *)dvalue(rq->request, "ABS_RESOURCE_PATH");
+    char *path = (char *)dvalue(rq->request, "RESOURCE_PATH");
     char *mime_type = (char *)dvalue(rq->request, "RESOURCE_MIME");
     rq->client->state = ANTD_CLIENT_SERVE_FILE;
     struct stat st;
@@ -1236,12 +1231,14 @@ void *decode_request_header(void *data)
             free(query);
         return task;
     }
-
-    dput(rq->request, "RESOURCE_PATH", url_decode(buf));
+    LOG("REQUEST_URI:%s", buf);
+    dput(rq->request, "REQUEST_URI", url_decode(buf));
     if (query)
     {
         decode_url_request(query, request);
-        free(query);
+        dput(rq->request, "REQUEST_QUERY", query);
+        //if(url)
+        //    free(url);
     }
     // header ok, now checkmethod
     task = antd_create_task(decode_request, (void *)rq, NULL, rq->client->last_io);

@@ -356,7 +356,7 @@ void ws_client_close(ws_client_t *wsclient)
 	if (wsclient->ssl_ctx)
 	{
 		SSL_CTX_free(wsclient->ssl_ctx);
-		FIPS_mode_set(0);
+		// DEPRECATED: FIPS_mode_set(0);
 		// DEPRECATED: CONF_modules_unload(1);
 		EVP_cleanup();
 		EVP_PBE_cleanup();

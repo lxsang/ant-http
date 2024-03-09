@@ -151,9 +151,8 @@ static void stop_serve(int dummy)
     antd_scheduler_destroy(scheduler);
     unload_all_plugin();
 #ifdef USE_OPENSSL
-    FIPS_mode_set(0);
+    // DEPRECATED FIPS_mode_set(0);
     SSL_CTX_free(ctx);
-    FIPS_mode_set(0);
     // DEPRECATED: CONF_modules_unload(1);
     EVP_cleanup();
     EVP_PBE_cleanup();

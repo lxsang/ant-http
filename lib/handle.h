@@ -40,6 +40,12 @@ typedef enum
     ANTD_CNONE
 } antd_compress_t;
 
+typedef enum {
+    ANTD_PROTO_IP_4,
+    ANTD_PROTO_IP_6,
+    ANTD_PROTO_ALL
+} antd_proto_t;
+
 //extern config_t server_config;
 
 typedef struct
@@ -49,6 +55,7 @@ typedef struct
     char *htdocs;
     char* plugins;
     int sock;
+    antd_proto_t type;
     dictionary_t rules;
 } port_config_t;
 

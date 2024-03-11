@@ -12,7 +12,7 @@
 #include "bst.h"
 
 #define MAX_VALIDITY_INTERVAL 30
-#define MAX_FIFO_NAME_SZ 255
+#define MAX_NAME_SZ 255
 
 // callback definition
 struct _antd_callback_t
@@ -70,7 +70,9 @@ struct _antd_scheduler_t
     int n_workers;
     int pending_task;
     int id_allocator;
-    char stat_fifo[MAX_FIFO_NAME_SZ];
+    char stat_fifo[MAX_NAME_SZ];
+    char sched_name[MAX_NAME_SZ];
+    char worker_hub[MAX_NAME_SZ];
     int stat_fd;
     pthread_t stat_tid;
 };
@@ -122,13 +124,14 @@ static void stop(antd_scheduler_t *scheduler)
             pthread_join(scheduler->workers[i].tid, NULL);
     if (scheduler->workers)
         free(scheduler->workers);
-    (void)pthread_cancel(scheduler->stat_tid);
+    if(scheduler->stat_tid)
+        (void)pthread_cancel(scheduler->stat_tid);
     // destroy all the mutex
     pthread_mutex_destroy(&scheduler->scheduler_lock);
     pthread_mutex_destroy(&scheduler->worker_lock);
     pthread_mutex_destroy(&scheduler->pending_lock);
-    sem_unlink("scheduler");
-    sem_unlink("worker");
+    sem_unlink(scheduler->sched_name);
+    sem_unlink(scheduler->worker_hub);
     sem_close(scheduler->scheduler_sem);
     sem_close(scheduler->worker_sem);
 }
@@ -257,25 +260,25 @@ static void antd_task_dump(int fd, antd_task_t* task, char* buffer)
     }
     int ret;
     // send statistic on task data
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "---- Task %d created at: %lu ----\n", task->id, task->stamp);
+    snprintf(buffer, MAX_NAME_SZ, "---- Task %d created at: %lu ----\n", task->id, task->stamp);
     ret = write(fd, buffer, strlen(buffer));
 
     // send statistic on task data
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "Access time: %lu\nn", (unsigned long)task->access_time);
+    snprintf(buffer, MAX_NAME_SZ, "Access time: %lu\nn", (unsigned long)task->access_time);
     ret = write(fd, buffer, strlen(buffer));
 
-    snprintf(buffer, MAX_FIFO_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
+    snprintf(buffer, MAX_NAME_SZ, "Current time: %lu\n", (unsigned long)time(NULL));
     ret = write(fd, buffer, strlen(buffer));
 
     if (task->handle)
     {
-        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has handle: yes\n");
+        snprintf(buffer, MAX_NAME_SZ, "Has handle: yes\n");
         ret = write(fd, buffer, strlen(buffer));
     }
 
     if (task->callback)
     {
-        snprintf(buffer, MAX_FIFO_NAME_SZ, "Has callback: yes\n");
+        snprintf(buffer, MAX_NAME_SZ, "Has callback: yes\n");
         ret = write(fd, buffer, strlen(buffer));
     }
     UNUSED(ret);
@@ -297,7 +300,7 @@ static void *statistic(antd_scheduler_t *scheduler)
 {
     struct pollfd pfd;
     int ret;
-    char buffer[MAX_FIFO_NAME_SZ];
+    char buffer[MAX_NAME_SZ];
     void *argc[2];
     while (scheduler->status)
     {
@@ -336,7 +339,7 @@ static void *statistic(antd_scheduler_t *scheduler)
                 {
                     pthread_mutex_lock(&scheduler->scheduler_lock);
                     // write statistic data
-                    snprintf(buffer, MAX_FIFO_NAME_SZ, "Pending task: %d. Detail:\n", scheduler->pending_task);
+                    snprintf(buffer, MAX_NAME_SZ, "Pending task: %d. Detail:\n", scheduler->pending_task);
                     ret = write(scheduler->stat_fd, buffer, strlen(buffer));
 
                     bst_for_each(scheduler->task_queue, print_static_info, argc, 2);
@@ -346,7 +349,7 @@ static void *statistic(antd_scheduler_t *scheduler)
                     // write worker current task
                     for (int i = 0; i < scheduler->n_workers; i++)
                     {
-                        snprintf(buffer, MAX_FIFO_NAME_SZ, "Worker: %d. Detail:\n", i);
+                        snprintf(buffer, MAX_NAME_SZ, "Worker: %d. Detail:\n", i);
                         ret = write(scheduler->stat_fd, buffer, strlen(buffer));
                         if(scheduler->workers[i].current_task)
                         {
@@ -407,20 +410,25 @@ antd_scheduler_t *antd_scheduler_init(int n, const char *stat_name)
     scheduler->pending_task = 0;
     scheduler->stat_fd = -1;
     scheduler->id_allocator = 0;
-    (void)memset(scheduler->stat_fifo, 0, MAX_FIFO_NAME_SZ);
+    scheduler->stat_tid = 0;
+    int pid = getpid();
+    snprintf(scheduler->sched_name,MAX_NAME_SZ, "scheduler.%d",pid);
+    snprintf(scheduler->worker_hub,MAX_NAME_SZ, "worker.%d",pid);
+    (void)memset(scheduler->stat_fifo, 0, MAX_NAME_SZ);
     if (stat_name)
     {
-        (void)strncpy(scheduler->stat_fifo, stat_name, MAX_FIFO_NAME_SZ - 1);
+        (void)strncpy(scheduler->stat_fifo, stat_name, MAX_NAME_SZ - 1);
     }
     // init semaphore
-    scheduler->scheduler_sem = sem_open("scheduler", O_CREAT, 0600, 0);
+    
+    scheduler->scheduler_sem = sem_open(scheduler->sched_name, O_CREAT, 0644, 0);
     if (scheduler->scheduler_sem == SEM_FAILED)
     {
-        ERROR("Cannot open semaphore for scheduler");
+        ERROR("Cannot open semaphore for scheduler: %s", strerror(errno));
         free(scheduler);
         return NULL;
     }
-    scheduler->worker_sem = sem_open("worker", O_CREAT, 0600, 0);
+    scheduler->worker_sem = sem_open(scheduler->worker_hub, O_CREAT, 0600, 0);
     if (!scheduler->worker_sem)
     {
         ERROR("Cannot open semaphore for workers");
@@ -467,13 +475,14 @@ antd_scheduler_t *antd_scheduler_init(int n, const char *stat_name)
         // create the fifo file
         if (mkfifo(scheduler->stat_fifo, 0666) == -1)
         {
-            ERROR("Unable to create statictis FIFO %s: %s", scheduler->stat_fifo, strerror(errno));
+            ERROR("Unable to create statistic FIFO %s: %s", scheduler->stat_fifo, strerror(errno));
         }
         else
         {
             if (pthread_create(&scheduler->stat_tid, NULL, (void *(*)(void *))statistic, scheduler) != 0)
             {
                 ERROR("pthread_create: cannot create statistic thread: %s", strerror(errno));
+                scheduler->stat_tid = 0;
             }
         }
     }

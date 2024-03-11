@@ -165,7 +165,7 @@ static void stop_serve(int dummy)
     sigprocmask(SIG_UNBLOCK, &mask, NULL);
 }
 
-static void antd_monitor(port_config_t *pcnf)
+static void antd_monitor(port_config_t *pcnf, int sock)
 {
     antd_task_t *task = NULL;
     int client_sock = -1;
@@ -173,9 +173,9 @@ static void antd_monitor(port_config_t *pcnf)
     socklen_t client_name_len = sizeof(client_name);
     char *client_ip = NULL;
     config_t *conf = config();
-    if (pcnf->sock > 0)
+    if (sock > 0)
     {
-        client_sock = accept(pcnf->sock, (struct sockaddr *)&client_name, &client_name_len);
+        client_sock = accept(sock, (struct sockaddr *)&client_name, &client_name_len);
         if (client_sock > 0)
         {
             // just dump the scheduler when we have a connection
@@ -332,6 +332,9 @@ int main(int argc, char *argv[])
     int status, maxfd = 0;
     int nlisten = 0;
     // load the config first
+#ifdef VERSION
+    LOG("Antd server version: " VERSION);
+#endif
     if (argc == 1)
         load_config(CONFIG_FILE);
     else
@@ -379,12 +382,18 @@ int main(int argc, char *argv[])
         pcnf = (port_config_t *)it->value;
         if (pcnf)
         {
-            pcnf->sock = startup(&pcnf->port);
+            if(pcnf->type == ANTD_PROTO_IP_4)
+            {
+                pcnf->sock = startup(&pcnf->port,0);
+            }
+            else
+            {
+                pcnf->sock = startup(&pcnf->port,1);
+            }
             if (pcnf->sock > 0)
             {
                 set_nonblock(pcnf->sock);
                 FD_SET(pcnf->sock, &master_set);
-                LOG("Listening on port %d", pcnf->port);
                 maxfd = pcnf->sock > maxfd ? pcnf->sock : maxfd;
                 nlisten++;
             }
@@ -396,7 +405,7 @@ int main(int argc, char *argv[])
     }
     if (nlisten == 0)
     {
-        ERROR("No port is listenned, quit!!");
+        ERROR("No port is listened, quit!!");
         stop_serve(0);
         exit(1);
     }
@@ -441,7 +450,7 @@ int main(int argc, char *argv[])
             pcnf = (port_config_t *)it->value;
             if (pcnf && pcnf->sock > 0 && FD_ISSET(pcnf->sock, &working_set))
             {
-                antd_monitor(pcnf);
+                antd_monitor(pcnf, pcnf->sock);
             }
         }
     }

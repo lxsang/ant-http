@@ -31,6 +31,13 @@
 
 #define HEADER_MAX_SIZE 8192
 
+typedef union
+{
+    struct sockaddr_in6 addr6;
+    struct sockaddr_in  addr4;
+} antd_server_sockaddr_t;
+
+
 // define all basic mime here
 static mime_t _mimes[] = {
     {"image/bmp", "bmp"},
@@ -52,6 +59,7 @@ static mime_t _mimes[] = {
 
 static pthread_mutex_t server_mux = PTHREAD_MUTEX_INITIALIZER;
 config_t server_config;
+
 config_t *config()
 {
     return &server_config;
@@ -259,6 +267,7 @@ static int config_handler(void *conf, const char *section, const char *name,
             p->htdocs = NULL;
             p->plugins = NULL;
             p->sock = -1;
+            p->type = ANTD_PROTO_ALL;
             p->rules = dict_n(1);
             dput(pconfig->ports, buf, p);
             p->port = atoi(buf);
@@ -289,6 +298,21 @@ static int config_handler(void *conf, const char *section, const char *name,
             p->usessl = atoi(value);
             if (p->usessl)
                 pconfig->enable_ssl = 1;
+        }
+        else if(strcmp(name, "protocol") == 0)
+        {
+            if(strcmp(value, "ipv4") == 0)
+            {
+                p->type = ANTD_PROTO_IP_4;
+            }
+            else if(strcmp(value, "ipv6") == 0)
+            {
+                p->type = ANTD_PROTO_IP_6;
+            }
+            else
+            {
+                ERROR("Unknown IP protocol setting %s. Enable both.", value);
+            }
         }
         else
         {
@@ -366,7 +390,7 @@ void load_config(const char *file)
     server_config.db_path = strdup("databases/");
     // server_config.htdocs = "htdocs/";
     server_config.tmpdir = strdup("/tmp/");
-    server_config.stat_fifo_path = strdup("/var/run/antd_stat");
+    server_config.stat_fifo_path = strdup("");
     server_config.n_workers = 4;
     server_config.backlog = 1000;
     server_config.handlers = dict();
@@ -792,27 +816,42 @@ void *serve_file(void *data)
     return task;
 }
 
-int startup(unsigned *port)
+int startup(unsigned *port, int ipv6)
 {
     int httpd = 0;
-    struct sockaddr_in name;
-    httpd = socket(PF_INET, SOCK_STREAM, 0);
+    antd_server_sockaddr_t name;
+    memset(&name, 0, sizeof(name));
+    struct sockaddr *ptr;
+    // TODO: allow to set listen address
+    if(ipv6)
+    {
+        name.addr6.sin6_port = htons(*port);
+        name.addr6.sin6_family = AF_INET6;
+        name.addr6.sin6_addr = in6addr_any;
+        httpd = socket(AF_INET6, SOCK_STREAM, 0);
+        ptr = (struct sockaddr *) & name.addr6;
+    }
+    else
+    {
+        name.addr4.sin_port = htons(*port);
+        name.addr4.sin_family = AF_INET;
+        name.addr4.sin_addr.s_addr = htonl(INADDR_ANY);
+        httpd = socket(AF_INET, SOCK_STREAM, 0);
+        ptr = (struct sockaddr *) & name.addr4;
+    }
+    
     if (httpd == -1)
     {
         ERROR("Port %d - socket: %s", *port, strerror(errno));
         return -1;
     }
-
+    
     if (setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) == -1)
     {
         ERROR("Unable to set reuse address on port %d - setsockopt: %s", *port, strerror(errno));
     }
 
-    memset(&name, 0, sizeof(name));
-    name.sin_family = AF_INET;
-    name.sin_port = htons(*port);
-    name.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(httpd, (struct sockaddr *)&name, sizeof(name)) < 0)
+    if (bind(httpd, ptr, sizeof(name)) < 0)
     {
         ERROR("Port %d -bind: %s", *port, strerror(errno));
         return -1;
@@ -825,15 +864,22 @@ int startup(unsigned *port)
             ERROR("Port %d - getsockname: %s", *port, strerror(errno));
             return -1;
         }
-        *port = ntohs(name.sin_port);
+        if(ipv6)
+        {
+            *port = ntohs(name.addr6.sin6_port);
+        }
+        else
+        {
+            *port = ntohs(name.addr4.sin_port);
+        }
     }
 
-    LOG("back log is %d", server_config.backlog);
     if (listen(httpd, server_config.backlog) < 0)
     {
         ERROR("Port %d - listen: %s", *port, strerror(errno));
         return -1;
     }
+    LOG("%s Listen on port %d", ipv6?"IPv6":"IPv4", *port );
     return (httpd);
 }
 

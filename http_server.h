@@ -21,7 +21,7 @@ void cat(void *, FILE *);
 void cannot_execute(void *);
 //int get_line(int, char *, int);
 void *serve_file(void *);
-int startup(unsigned *);
+int startup(unsigned *, int);
 int rule_check(const char *, const char *, const char *, const char *, const char *, char *);
 void ws_confirm_request(void *, const char *);
 char *post_url_decode(void *client, int len);

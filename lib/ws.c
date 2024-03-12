@@ -15,6 +15,13 @@
 #include "handle.h"
 
 #include "ws.h"
+#define CONN_TIME_OUT_S 3
+#define BITV(v, i) ((v & (1 << i)) >> i)
+#define MAX_BUFF 1024
+#define PREFERRED_WS_CIPHERS "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS"
+#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+
 static void ws_gen_mask_key(ws_msg_header_t *header)
 {
 	int r = rand();
@@ -24,10 +31,10 @@ static void ws_gen_mask_key(ws_msg_header_t *header)
 	header->mask_key[3] = r & 0xFF;
 }
 /**
-* Read a frame header
-* based on this header, we'll decide
-* the appropriate handle for frame data
-*/
+ * Read a frame header
+ * based on this header, we'll decide
+ * the appropriate handle for frame data
+ */
 ws_msg_header_t *ws_read_header(void *client)
 {
 
@@ -41,8 +48,8 @@ ws_msg_header_t *ws_read_header(void *client)
 	if (BITV(byte, 6) || BITV(byte, 5) || BITV(byte, 4))
 		goto fail; // all RSV bit must be 0
 
-	//printf("FIN: %d, RSV1: %d, RSV2: %d, RSV3:%d, opcode:%d\n", BITV(byte,7), BITV(byte,6), BITV(byte,5), BITV(byte,4),(byte & 0x0F) );
-	// find and opcode
+	// printf("FIN: %d, RSV1: %d, RSV2: %d, RSV3:%d, opcode:%d\n", BITV(byte,7), BITV(byte,6), BITV(byte,5), BITV(byte,4),(byte & 0x0F) );
+	//  find and opcode
 	header->fin = BITV(byte, 7);
 	header->opcode = (byte & 0x0F);
 
@@ -50,8 +57,8 @@ ws_msg_header_t *ws_read_header(void *client)
 	if (antd_recv(client, &byte, sizeof(byte)) <= 0)
 		goto fail;
 
-	//printf("MASK: %d paylen:%d\n", BITV(byte,7), (byte & 0x7F));
-	// check mask bit, should be 1
+	// printf("MASK: %d paylen:%d\n", BITV(byte,7), (byte & 0x7F));
+	//  check mask bit, should be 1
 	header->mask = BITV(byte, 7);
 	/*if(!BITV(byte,7))
 	{
@@ -73,28 +80,28 @@ ws_msg_header_t *ws_read_header(void *client)
 	}
 	else
 	{
-		//read only last 4 byte
+		// read only last 4 byte
 		if (antd_recv(client, bytes, 8 * sizeof(uint8_t)) <= 0)
 			goto fail;
 		header->plen = (bytes[4] << 24) + (bytes[5] << 16) + (bytes[6] << 8) + bytes[7];
 	}
-	//printf("len: %d\n", header->plen);
-	// last step is to get the maskey
+	// printf("len: %d\n", header->plen);
+	//  last step is to get the maskey
 	if (header->mask)
 		if (antd_recv(client, header->mask_key, 4 * sizeof(uint8_t)) <= 0)
 			goto fail;
-	//printf("key 0: %d key 1: %d key2:%d, key3: %d\n",header->mask_key[0],header->mask_key[1],header->mask_key[2], header->mask_key[3] );
+	// printf("key 0: %d key 1: %d key2:%d, key3: %d\n",header->mask_key[0],header->mask_key[1],header->mask_key[2], header->mask_key[3] );
 
 	// check wheather it is a ping or a close message
 	// process it and return NULL
-	//otherwise return the header
-	//return the header
+	// otherwise return the header
+	// return the header
 	switch (header->opcode)
 	{
 	case WS_CLOSE: // client requests to close the connection
 		// send back a close message
 		UNUSED(ws_send_close(client, 1000, header->mask ? 0 : 1));
-		//goto fail;
+		// goto fail;
 		break;
 
 	case WS_PING: // client send a ping
@@ -112,9 +119,9 @@ fail:
 	return NULL;
 }
 /**
-* Read data from client
-* and unmask data using the key
-*/
+ * Read data from client
+ * and unmask data using the key
+ */
 int ws_read_data(void *client, ws_msg_header_t *header, int len, uint8_t *data)
 {
 	// if len  == -1 ==> read all remaining data to 'data';
@@ -137,14 +144,14 @@ int _send_header(void *client, ws_msg_header_t header)
 	uint8_t bytes[8];
 	for (int i = 0; i < 8; i++)
 		bytes[i] = 0;
-	//first byte |FIN|000|opcode|
+	// first byte |FIN|000|opcode|
 	byte = (header.fin << 7) + header.opcode;
-	//printf("BYTE: %d\n", byte);
+	// printf("BYTE: %d\n", byte);
 	if (antd_send(client, &byte, 1) != 1)
 		return -1;
 	// second byte, payload length
 	// mask may be 0 or 1
-	//if(header.mask == 1)
+	// if(header.mask == 1)
 	//	printf("Data is masked\n");
 	if (header.plen <= 125)
 	{
@@ -183,8 +190,8 @@ int _send_header(void *client, ws_msg_header_t header)
 	return 0;
 }
 /**
-* Send a frame to client
-*/
+ * Send a frame to client
+ */
 int ws_send_frame(void *client, uint8_t *data, ws_msg_header_t header)
 {
 	uint8_t *masked;
@@ -212,8 +219,8 @@ int ws_send_frame(void *client, uint8_t *data, ws_msg_header_t header)
 	return 0;
 }
 /**
-* send a text data frame to client
-*/
+ * send a text data frame to client
+ */
 int ws_send_text(void *client, const char *data, int mask)
 {
 	ws_msg_header_t header;
@@ -222,13 +229,13 @@ int ws_send_text(void *client, const char *data, int mask)
 	header.mask = mask;
 	header.plen = strlen(data);
 	//_send_header(client,header);
-	//send(client, data, header.plen,0);
+	// send(client, data, header.plen,0);
 	return ws_send_frame(client, (uint8_t *)data, header);
 }
 /**
-* send a single binary data fram to client
-* not tested yet, but should work
-*/
+ * send a single binary data fram to client
+ * not tested yet, but should work
+ */
 int ws_send_binary(void *client, uint8_t *data, int l, int mask)
 {
 	ws_msg_header_t header;
@@ -238,11 +245,11 @@ int ws_send_binary(void *client, uint8_t *data, int l, int mask)
 	header.mask = mask;
 	return ws_send_frame(client, data, header);
 	//_send_header(client,header);
-	//send(client, data, header.plen,0);
+	// send(client, data, header.plen,0);
 }
 /*
-* send a file as binary data
-*/
+ * send a file as binary data
+ */
 int ws_send_file(void *client, const char *file, int mask)
 {
 	uint8_t buff[1024];
@@ -257,7 +264,7 @@ int ws_send_file(void *client, const char *file, int mask)
 	size_t size;
 	int first_frame = 1;
 	int ret = 0;
-	//ws_send_frame(client,buff,header);
+	// ws_send_frame(client,buff,header);
 	header.mask = mask;
 	while (!feof(ptr))
 	{
@@ -275,7 +282,7 @@ int ws_send_file(void *client, const char *file, int mask)
 		else
 			header.opcode = 0;
 		header.plen = size;
-		//printf("FIN: %d OC:%d\n", header.fin, header.opcode);
+		// printf("FIN: %d OC:%d\n", header.fin, header.opcode);
 		ret += ws_send_frame(client, buff, header);
 	}
 	fclose(ptr);
@@ -286,9 +293,9 @@ int ws_send_file(void *client, const char *file, int mask)
 	return 0;
 }
 /**
-* Not tested yet
-* but should work
-*/
+ * Not tested yet
+ * but should work
+ */
 int ws_pong(void *client, ws_msg_header_t *oheader, int mask)
 {
 	ws_msg_header_t pheader;
@@ -310,7 +317,7 @@ int ws_pong(void *client, ws_msg_header_t *oheader, int mask)
 	ret = ws_send_frame(client, data, pheader);
 	free(data);
 	//_send_header(client, pheader);
-	//send(client, data, len, 0);
+	// send(client, data, len, 0);
 	return ret;
 }
 int ws_ping(void *client, const char *echo, int mask)
@@ -323,11 +330,11 @@ int ws_ping(void *client, const char *echo, int mask)
 	return ws_send_frame(client, (uint8_t *)echo, pheader);
 }
 /*
-* Not tested yet, but should work
-*/
+ * Not tested yet, but should work
+ */
 int ws_send_close(void *client, unsigned int status, int mask)
 {
-	//printf("CLOSED\n");
+	// printf("CLOSED\n");
 	ws_msg_header_t header;
 	header.fin = 1;
 	header.opcode = WS_CLOSE;
@@ -345,7 +352,7 @@ int ws_send_close(void *client, unsigned int status, int mask)
 	}*/
 	return ws_send_frame(client, bytes, header);
 	//_send_header(client, header);
-	//send(client,bytes,2,0);
+	// send(client,bytes,2,0);
 }
 
 void ws_client_close(ws_client_t *wsclient)
@@ -368,13 +375,13 @@ void ws_client_close(ws_client_t *wsclient)
 #endif
 }
 
-//this is for the client side, not use for now
-int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf)
+// this is for the client side, not use for now
+int ws_client_connect(ws_client_t *wsclient, ws_port_config_t pcnf)
 {
-	char* ip = ip_from_hostname(wsclient->host);
+	char *ip = ip_from_hostname(wsclient->host);
 	if (ip == NULL)
 		return -1;
-	int sock = request_socket(ip, pcnf.port);
+	int sock = antd_request_socket(ip, pcnf.port);
 	if (sock <= 0)
 	{
 		ERROR("Cannot request socket");
@@ -383,13 +390,13 @@ int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf)
 	// time out setting
 	struct timeval timeout;
 	timeout.tv_sec = CONN_TIME_OUT_S;
-	timeout.tv_usec = 0; //3 s
-    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+	timeout.tv_usec = 0; // 3 s
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 		ERROR("setsockopt failed:%s", strerror(errno));
 
 	if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 		ERROR("setsockopt failed:%s", strerror(errno));
-        
+
 	// will be free
 	wsclient->antdsock->sock = sock;
 	wsclient->antdsock->z_status = 0;
@@ -427,7 +434,7 @@ int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf)
 		SSL_CTX_set_options(wsclient->ssl_ctx, SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1 | SSL_OP_NO_SSLv2 | SSL_OP_NO_TICKET);
 		// set the cipher suit
 		const char *suit = wsclient->ciphersuit ? wsclient->ciphersuit : PREFERRED_WS_CIPHERS;
-		//const char* suit = "AES128-SHA";
+		// const char* suit = "AES128-SHA";
 		if (SSL_CTX_set_cipher_list(wsclient->ssl_ctx, suit) != 1)
 		{
 			ssl_err = ERR_get_error();
@@ -514,7 +521,7 @@ int ws_open_handshake(ws_client_t *client)
 	char buf[MAX_BUFF];
 	// now send ws request handshake
 	sprintf(buf, CLIENT_RQ, client->resource, client->host);
-	//printf("Send %s\n", buf);
+	// printf("Send %s\n", buf);
 	int size = antd_send(client->antdsock, buf, strlen(buf));
 	if (size != (int)strlen(buf))
 	{
@@ -538,7 +545,7 @@ int ws_open_handshake(ws_client_t *client)
 			trim(token, '\r');
 			if (strcasecmp(token, SERVER_WS_KEY) == 0)
 			{
-				//LOG("Handshake sucessfull\n");
+				// LOG("Handshake sucessfull\n");
 				done = 1;
 			}
 			else
@@ -547,30 +554,10 @@ int ws_open_handshake(ws_client_t *client)
 				return -1;
 			}
 		}
-		//if(line) free(line);
+		// if(line) free(line);
 		size = read_buf(client->antdsock, buf, MAX_BUFF);
 	}
 	if (done)
 		return 0;
 	return -1;
-}
-char *get_ip_address()
-{
-	struct ifaddrs *addrs;
-	getifaddrs(&addrs);
-	struct ifaddrs *tmp = addrs;
-	char *ip;
-	while (tmp)
-	{
-		if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
-		{
-			struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
-			ip = inet_ntoa(pAddr->sin_addr);
-			if (strcmp(ip, "127.0.0.1") != 0)
-				return ip;
-		}
-		tmp = tmp->ifa_next;
-	}
-	freeifaddrs(addrs);
-	return "127.0.0.1";
 }

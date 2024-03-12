@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <poll.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include "scheduler.h"
 #include "utils.h"
 #include "bst.h"

@@ -40,24 +40,12 @@ typedef enum
     ANTD_CNONE
 } antd_compress_t;
 
+
 typedef enum {
     ANTD_PROTO_IP_4,
     ANTD_PROTO_IP_6,
     ANTD_PROTO_ALL
 } antd_proto_t;
-
-//extern config_t server_config;
-
-typedef struct
-{
-    unsigned int port;
-    int usessl;
-    char *htdocs;
-    char* plugins;
-    int sock;
-    antd_proto_t type;
-    dictionary_t rules;
-} port_config_t;
 
 typedef struct
 {
@@ -87,36 +75,6 @@ typedef struct
 
 typedef struct
 {
-    //int port;
-    char *plugins_dir;
-    char *plugins_ext;
-    char *db_path;
-    //char* htdocs;
-    char *tmpdir;
-    char *stat_fifo_path;
-    dictionary_t handlers;
-    int backlog;
-    int maxcon;
-    int connection;
-    int n_workers;
-    int scheduler_timeout;
-    int max_upload_size;
-    // ssl
-    int enable_ssl;
-    char *sslcert;
-    char *sslkey;
-    char *ssl_cipher;
-    int gzip_enable;
-    int debug_enable;
-    list_t gzip_types;
-    dictionary_t mimes;
-    dictionary_t ports;
-    dictionary_t plugins;
-    // #endif
-} config_t;
-
-typedef struct
-{
     char name[MAX_PATH_LEN];
     char dbpath[MAX_PATH_LEN];
     char tmpdir[MAX_PATH_LEN];
@@ -124,9 +82,8 @@ typedef struct
     dictionary_t config;
     int raw_body;
     int status;
+    void *instance_data;
 } plugin_header_t;
-
-
 
 void set_nonblock(int socket);
 //void set_block(int socket);

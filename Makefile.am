@@ -34,20 +34,19 @@ pkginclude_HEADERS =  lib/ini.h \
 			lib/list.h \
 			lib/bst.h \
 			lib/scheduler.h \
-            lib/plugin.h
+			lib/plugin.h
 
 
 EXTRA_DIST = plugin_manager.h http_server.h README.md LICENSE antd-config.ini ant-d antd.service
-# check for db 
-if DB
-libantd_la_SOURCES += lib/dbhelper.c
-pkginclude_HEADERS += lib/dbhelper.h
-endif
 
 # bin
 bin_PROGRAMS = antd
 # lib source files
-antd_SOURCES = plugin_manager.c http_server.c httpd.c
+antd_SOURCES = plugin_manager.c \
+			server.c \
+			config.c \
+			decode.c \
+			httpd.c
 antd_LDADD = libantd.la
 
 

@@ -3,10 +3,6 @@
 
 #include <stdint.h>
 
-#include "handle.h"
-
-#define CONN_TIME_OUT_S 3
-#define BITV(v, i) ((v & (1 << i)) >> i)
 #define WS_TEXT 0x1
 #define WS_BIN 0x2
 #define WS_CLOSE 0x8
@@ -16,11 +12,14 @@
 #define ws_b(c, d, z) (ws_send_binary(c, d, z, 0))
 #define ws_f(c, f) (ws_send_file(c, f, 0))
 #define ws_close(c, r) (ws_send_close(c, r, 0))
-#define MAX_BUFF 1024
 
-#define PREFERRED_WS_CIPHERS "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS"
-#define CLIENT_RQ "GET /%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
-#define SERVER_WS_KEY "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+typedef struct
+{
+    unsigned int port;
+    int usessl;
+    int sock;
+    antd_proto_t type;
+} ws_port_config_t;
 
 typedef struct
 {
@@ -57,12 +56,10 @@ int ws_send_file(void *client, const char *file, int mask);
 int ws_send_binary(void *client, uint8_t *data, int l, int mask);
 
 int ws_read_data(void *, ws_msg_header_t *, int, uint8_t *);
-//int ws_open_hand_shake(const char* host, int port, const char* resource);
-char *get_ip_address();
 
 // client
 
 void ws_client_close(ws_client_t *wsclient);
-int ws_client_connect(ws_client_t *wsclient, port_config_t pcnf);
+int ws_client_connect(ws_client_t *wsclient, ws_port_config_t pcnf);
 int ws_open_handshake(ws_client_t *client);
 #endif

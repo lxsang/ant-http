@@ -4,10 +4,14 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <unistd.h>
+#include <stdio.h>
 #include "plugin_manager.h"
 #include "lib/utils.h"
 #include "lib/handle.h"
-#include "http_server.h"
+#include "config.h"
+
+extern config_t g_server_config;
+
 static void unload_plugin_by_name(const char *);
 static void *plugin_from_file(char *name, char *path, dictionary_t conf);
 
@@ -25,7 +29,7 @@ struct plugin_entry *plugin_lookup(char *s)
 {
     struct plugin_entry *np;
     for (np = plugin_table[hash(s, HASHSIZE)]; np != NULL; np = np->next)
-        if (strcmp(s, np->pname) == 0)
+        if (strcmp(s, np->name) == 0)
             return np; /* found */
     return NULL;       /* not found */
 }
@@ -45,7 +49,6 @@ struct plugin_entry *plugin_load(char *name, dictionary_t pconf)
     unsigned hashval;
     plugin_header_t *(*metafn)();
     plugin_header_t *meta = NULL;
-    config_t *sconf = config();
     int fromfd, tofd;
     char *error;
     struct stat st;
@@ -65,11 +68,11 @@ struct plugin_entry *plugin_load(char *name, dictionary_t pconf)
             return NULL;
         }
 
-        (void)snprintf(path, sizeof(path), "%s/%s%s", sconf->plugins_dir, name, sconf->plugins_ext);
+        (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.plugins_dir, name, g_server_config.plugins_ext);
         if (pname && strcmp(name, pname) != 0)
         {
             // copy plugin file to tmpdir
-            (void)snprintf(path, sizeof(path), "%s/%s%s", sconf->plugins_dir, pname, sconf->plugins_ext);
+            (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.plugins_dir, pname, g_server_config.plugins_ext);
             LOG("Original plugin file: %s", path);
             if ((fromfd = open(path, O_RDONLY)) < 0)
             {
@@ -82,7 +85,7 @@ struct plugin_entry *plugin_load(char *name, dictionary_t pconf)
                 ERROR("Unable to get file stat %s: %s", path, strerror(errno));
                 return NULL;
             }
-            (void)snprintf(path, sizeof(path), "%s/%s%s", sconf->tmpdir, name, sconf->plugins_ext);
+            (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.tmpdir, name, g_server_config.plugins_ext);
             LOG("TMP plugin file: %s", path);
             if ((tofd = open(path, O_WRONLY | O_CREAT, 0600)) < 0)
             {
@@ -100,16 +103,17 @@ struct plugin_entry *plugin_load(char *name, dictionary_t pconf)
             is_tmp = 1;
         }
 
-        np->pname = strdup(name);
+        np->name = strdup(name);
         np->handle = plugin_from_file(name, path, pconf);
         if (is_tmp)
         {
+            //TODO change this
             (void)remove(path);
         }
         if (np->handle == NULL)
         {
-            if (np->pname)
-                free(np->pname);
+            if (np->name)
+                free(np->name);
             if (np)
                 free(np);
             return NULL;
@@ -152,7 +156,6 @@ static void *plugin_from_file(char *name, char *path, dictionary_t conf)
 {
     void *lib_handle;
     char *error;
-    config_t *cnf = config();
     void (*fn)(plugin_header_t *, dictionary_t);
     lib_handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL /*| RTLD_NODELETE*/);
     if (!lib_handle)
@@ -160,7 +163,6 @@ static void *plugin_from_file(char *name, char *path, dictionary_t conf)
         ERROR("Cannot load plugin '%s' : '%s'", name, dlerror());
         return NULL;
     }
-    // set database path
     fn = (void (*)(plugin_header_t *, dictionary_t))dlsym(lib_handle, "__init_plugin__");
     if ((error = dlerror()) != NULL)
         ERROR("Problem when finding plugin init function for %s : %s", name, error);
@@ -168,9 +170,9 @@ static void *plugin_from_file(char *name, char *path, dictionary_t conf)
     {
         plugin_header_t header;
         strncpy(header.name, name, MAX_PATH_LEN - 1);
-        strncpy(header.dbpath, cnf->db_path, MAX_PATH_LEN - 1);
-        strncpy(header.tmpdir, cnf->tmpdir, MAX_PATH_LEN - 1);
-        strncpy(header.pdir, cnf->plugins_dir, MAX_PATH_LEN - 1);
+        strncpy(header.dbpath, g_server_config.db_path, MAX_PATH_LEN - 1);
+        strncpy(header.tmpdir, g_server_config.tmpdir, MAX_PATH_LEN - 1);
+        strncpy(header.pdir, g_server_config.plugins_dir, MAX_PATH_LEN - 1);
         header.config = conf;
         header.raw_body = 0;
         header.status = ANTD_PLUGIN_INIT;
@@ -188,17 +190,17 @@ void unload_plugin(struct plugin_entry *np)
     fn = (void (*)())dlsym(np->handle, "__release__");
     if ((error = dlerror()) != NULL)
     {
-        ERROR("Cant not release plugin %s : %s", np->pname, error);
+        ERROR("Cant not release plugin %s : %s", np->name, error);
     }
     if (fn)
     {
         (*fn)();
     }
     dlclose(np->handle);
-    LOG("Unloaded %s", np->pname);
+    LOG("Unloaded %s", np->name);
     // free((void *) np->handle);
-    if (np->pname)
-        free((void *)np->pname);
+    if (np->name)
+        free((void *)np->name);
 }
 /*
     Unload a plugin by its name
@@ -208,7 +210,7 @@ void unload_plugin_by_name(const char *name)
     struct plugin_entry *np;
     int hasval = hash(name, HASHSIZE);
     np = plugin_table[hasval];
-    if (strcmp(np->pname, name) == 0)
+    if (strcmp(np->name, name) == 0)
     {
         unload_plugin(np);
         plugin_table[hasval] = np->next;
@@ -217,7 +219,7 @@ void unload_plugin_by_name(const char *name)
     {
         for (np = plugin_table[hasval]; np != NULL; np = np->next)
         {
-            if (np->next != NULL && strcmp(name, np->next->pname) == 0)
+            if (np->next != NULL && strcmp(name, np->next->name) == 0)
             {
                 break;
             }

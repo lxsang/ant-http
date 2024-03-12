@@ -10,17 +10,6 @@ AC_PROG_CC
 # libtool for linking
 AC_PROG_LIBTOOL
 # check if sqlite3 header exists
-use_db=no
-AC_CHECK_HEADER([sqlite3.h],[
-    AC_DEFINE([USE_DB], [1],[Use sqlite3])
-    use_db=yes
-    # check if the library exists
-],[])
-AC_CHECK_LIB([sqlite3],[sqlite3_open],[],[
-    if test "$use_db" = "yes"; then
-        AC_MSG_ERROR([Unable to find sqlite3 shared library])
-    fi
-])
 
 use_ssl=no
 # check if libssl header exists
@@ -101,7 +90,6 @@ esac
 #    build_windows=yes
 #    ;;
 # Pass the conditionals to automake
-AM_CONDITIONAL([DB], [test "$use_db" = "yes"])
 AM_CONDITIONAL([LINUX], [test "$build_linux" = "yes"])
 AM_CONDITIONAL([WINDOWS], [test "$build_windows" = "yes"])
 AM_CONDITIONAL([OSX], [test "$build_mac" = "yes"])

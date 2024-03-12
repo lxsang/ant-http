@@ -3,14 +3,17 @@
 
 #include "lib/dictionary.h"
 
+#define PLUGIN_HANDLER "handle"
+
 struct plugin_entry { 
     struct plugin_entry *next; 
-    char *pname; 
+    char *name; 
     void *handle;
+    dictionary_t instances;
 };
-/* lookup: look for s in hashtab */
+/* lookup: look for s in hashtable */
 struct plugin_entry *plugin_lookup(char *s);
-/* install: put (name, defn) in hashtab */
+/* install: put (name, defn) in hashtable */
 struct plugin_entry *plugin_load(char *name, dictionary_t config);
 void unload_all_plugin();
 void unload_plugin(struct plugin_entry*);

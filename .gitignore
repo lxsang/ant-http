@@ -71,3 +71,4 @@ configure
 aclocal.m4
 ltmain.sh
 Makefile.in
+configure~

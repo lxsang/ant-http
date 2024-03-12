@@ -6,19 +6,8 @@
 
 #include "utils.h"
 #include "handle.h"
-#include "dbhelper.h"
  
 
-//typedef void(*call)();
-#ifdef USE_DB
-typedef sqlite3* sqldb;
-#endif
-
-
-#ifdef USE_DB
-sqldb getdb();
-sqldb __getdb(char *name);
-#endif
 
 char* config_dir();
 /*Default function for plugin*/
@@ -49,24 +38,6 @@ void  use_raw_body()
 {
 	__plugin__.raw_body = 1;
 }
-#ifdef USE_DB
-sqldb __getdb(char *name)
-{
-	int plen = strlen(name)+strlen(__plugin__.dbpath)+4;
-	char* path = (char*) malloc(plen*sizeof(char));
-	strcpy(path,__plugin__.dbpath);
-	strcat(path,name);
-	strcat(path,".db");
-	//LOG("database: %s\n", path);
-	sqldb ret = (sqldb)database(path);
-	free(path);
-	return ret;
-}
-sqldb getdb()
-{
-	return __getdb(__plugin__.name);
-}
-#endif
 
 plugin_header_t* meta()
 {

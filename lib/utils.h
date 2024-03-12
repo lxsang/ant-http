@@ -30,6 +30,7 @@ THE SOFTWARE.
 #include <stdlib.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <netinet/in.h>
 
 #include "dictionary.h"
 
@@ -57,6 +58,12 @@ typedef struct{
 	const char* type;
 	const char* ext;
 } mime_t;
+
+typedef union
+{
+    struct sockaddr_in6 addr6;
+    struct sockaddr_in  addr4;
+} antd_sockaddr_t;
 
 dictionary_t __attribute__((weak)) mimes_list();
 char* __s(const char*,...);
@@ -87,6 +94,8 @@ void digest_to_hex(const uint8_t *, char *);
 void verify_header(char* k);
 int guard_read(int fd, void* buffer, size_t size);
 int guard_write(int fd, void* buffer, size_t size);
-int request_socket(const char *ip, int port);
 char* ip_from_hostname(const char *hostname);
+
+int antd_request_socket(const char *ip, int port);
+int antd_listen(unsigned *port, int ipv6, int backlog);
 #endif

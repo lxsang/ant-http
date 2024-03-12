@@ -9,17 +9,20 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <string.h>
 #include <errno.h>
 #include <time.h>
-#include "http_server.h"
-#include "lib/ini.h"
+#include "server.h"
 #include "lib/scheduler.h"
-#include "plugin_manager.h"
 #include "lib/utils.h"
+#include "config.h"
+#include "plugin_manager.h"
 
 #define SEND_STAT(fd, buff, ret, ...)       \
     snprintf(buff, BUFFLEN, ##__VA_ARGS__); \
     ret = write(fd, buff, strlen(buff));
+
+extern config_t g_server_config;
 
 static antd_scheduler_t *scheduler;
 
@@ -97,8 +100,7 @@ static void configure_context(SSL_CTX *ctx)
     SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1 | SSL_OP_NO_SSLv2 | SSL_OP_NO_TICKET);
     SSL_CTX_set_session_id_context(ctx, (void *)&ssl_session_ctx_id, sizeof(ssl_session_ctx_id));
     // set the cipher suit
-    config_t *cnf = config();
-    const char *suit = cnf->ssl_cipher ? cnf->ssl_cipher : CIPHER_SUIT;
+    const char *suit = g_server_config.ssl_cipher ? g_server_config.ssl_cipher : CIPHER_SUIT;
     LOG("Cirpher suit used: %s", suit);
     if (SSL_CTX_set_cipher_list(ctx, suit) != 1)
     {
@@ -109,16 +111,16 @@ static void configure_context(SSL_CTX *ctx)
     /* Set the key and cert */
     /* use the full chain bundle of certificate */
     // if (SSL_CTX_use_certificate_file(ctx, server_config->sslcert, SSL_FILETYPE_PEM) <= 0) {
-    if (SSL_CTX_use_certificate_chain_file(ctx, cnf->sslcert) <= 0)
+    if (SSL_CTX_use_certificate_chain_file(ctx, g_server_config.sslcert) <= 0)
     {
-        ERROR("Fail to read SSL certificate chain file: %s", cnf->sslcert);
+        ERROR("Fail to read SSL certificate chain file: %s", g_server_config.sslcert);
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, cnf->sslkey, SSL_FILETYPE_PEM) <= 0)
+    if (SSL_CTX_use_PrivateKey_file(ctx, g_server_config.sslkey, SSL_FILETYPE_PEM) <= 0)
     {
-        ERROR("Fail to read SSL private file: %s", cnf->sslkey);
+        ERROR("Fail to read SSL private file: %s", g_server_config.sslkey);
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
@@ -169,10 +171,9 @@ static void antd_monitor(port_config_t *pcnf, int sock)
 {
     antd_task_t *task = NULL;
     int client_sock = -1;
-    struct sockaddr_in client_name;
+    antd_sockaddr_t client_name;
     socklen_t client_name_len = sizeof(client_name);
-    char *client_ip = NULL;
-    config_t *conf = config();
+    char client_ip[INET6_ADDRSTRLEN] = {0};
     if (sock > 0)
     {
         client_sock = accept(sock, (struct sockaddr *)&client_name, &client_name_len);
@@ -194,9 +195,16 @@ static void antd_monitor(port_config_t *pcnf, int sock)
             /*
                     get the remote IP
                 */
-            if (client_name.sin_family == AF_INET)
+            if ( pcnf->type == ANTD_PROTO_IP_4 &&  client_name.addr4.sin_family == AF_INET)
             {
-                client_ip = inet_ntoa(client_name.sin_addr);
+                inet_ntop(AF_INET,&client_name.addr4,client_ip,INET6_ADDRSTRLEN);
+            }
+            else if(client_name.addr6.sin6_family == AF_INET6)
+            {
+                inet_ntop(AF_INET6,&client_name.addr6,client_ip,INET6_ADDRSTRLEN);
+            }
+            if(client_ip[0] != '\0')
+            {
                 LOG("Connect to client IP: %s on port:%d (%d)", client_ip, pcnf->port, client_sock);
                 // ip address
                 dput(request->request, "REMOTE_ADDR", (void *)strdup(client_ip));
@@ -236,7 +244,7 @@ static void antd_monitor(port_config_t *pcnf, int sock)
             }
 #endif
             antd_scheduler_lock(scheduler);
-            conf->connection++;
+            g_server_config.connection++;
             antd_scheduler_unlock(scheduler);
             // create callback for the server
             task = antd_create_task(accept_request, (void *)request, finish_request, client->last_io);
@@ -307,8 +315,7 @@ void antd_scheduler_destroy_data(void *data)
 
 int antd_scheduler_validate_data(antd_task_t *task)
 {
-    config_t *conf = config();
-    return !(difftime(time(NULL), task->access_time) > conf->scheduler_timeout);
+    return !(difftime(time(NULL), task->access_time) > g_server_config.scheduler_timeout);
 }
 
 int antd_task_data_id(void *data)
@@ -344,10 +351,8 @@ int main(int argc, char *argv[])
     signal(SIGPIPE, SIG_IGN);
     signal(SIGABRT, SIG_IGN);
     signal(SIGINT, stop_serve);
-
-    config_t *conf = config();
     // start syslog
-    if (conf->debug_enable == 1)
+    if (g_server_config.debug_enable == 1)
     {
         setlogmask(LOG_UPTO(LOG_NOTICE));
     }
@@ -358,7 +363,7 @@ int main(int argc, char *argv[])
     openlog(SERVER_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
 #ifdef USE_OPENSSL
-    if (conf->enable_ssl == 1)
+    if (g_server_config.enable_ssl == 1)
     {
         init_openssl();
         ctx = create_context();
@@ -369,7 +374,7 @@ int main(int argc, char *argv[])
 #endif
     // enable scheduler
     // default to 4 workers
-    scheduler = antd_scheduler_init(conf->n_workers, conf->stat_fifo_path);
+    scheduler = antd_scheduler_init(g_server_config.n_workers, g_server_config.stat_fifo_path);
     if (scheduler == NULL)
     {
         ERROR("Unable to initialise scheduler. Exit");
@@ -377,18 +382,18 @@ int main(int argc, char *argv[])
         exit(1);
     }
     FD_ZERO(&master_set);
-    for_each_assoc(it, conf->ports)
+    for_each_assoc(it, g_server_config.ports)
     {
         pcnf = (port_config_t *)it->value;
         if (pcnf)
         {
             if(pcnf->type == ANTD_PROTO_IP_4)
             {
-                pcnf->sock = startup(&pcnf->port,0);
+                pcnf->sock = antd_listen(&pcnf->port,0,g_server_config.backlog);
             }
             else
             {
-                pcnf->sock = startup(&pcnf->port,1);
+                pcnf->sock = antd_listen(&pcnf->port,1,g_server_config.backlog);
             }
             if (pcnf->sock > 0)
             {
@@ -424,9 +429,9 @@ int main(int argc, char *argv[])
 
     while (antd_scheduler_ok(scheduler))
     {
-        if (conf->connection > conf->maxcon)
+        if (g_server_config.connection > g_server_config.maxcon)
         {
-            // ERROR("Reach max connection %d", conf->connection);
+            // ERROR("Reach max connection %d", g_server_config.connection);
             timeout.tv_sec = 0;
             timeout.tv_usec = 10000; // 5 ms
             select(0, NULL, NULL, NULL, &timeout);
@@ -445,7 +450,7 @@ int main(int argc, char *argv[])
         {
             continue;
         }
-        for_each_assoc(it, conf->ports)
+        for_each_assoc(it, g_server_config.ports)
         {
             pcnf = (port_config_t *)it->value;
             if (pcnf && pcnf->sock > 0 && FD_ISSET(pcnf->sock, &working_set))

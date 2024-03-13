@@ -100,11 +100,31 @@ int require_plugin(const char *name)
     return 0;
 }
 
+#ifdef USE_ZLIB
+static list_t g_gzip_types = NULL;
+void set_gzip_types(list_t list)
+{
+    g_gzip_types = list;
+}
 int compressable(char *ctype)
 {
-    UNUSED(ctype);
+    if (g_gzip_types == NULL)
+        return 0;
+    item_t it;
+    list_for_each(it, g_gzip_types)
+    {
+        if(it->type == LIST_TYPE_POINTER && it->value.ptr)
+        {
+            //LOG("Checking content type %s against GZIP support %s", ctype,(const char *)it->value.ptr);
+            if (regex_match((const char *)it->value.ptr, ctype, 0, NULL))
+            {
+                return 1;
+            }
+        }
+    }
     return 0;
 }
+#endif
 
 const char *get_status_str(int stat)
 {

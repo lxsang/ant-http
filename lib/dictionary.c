@@ -152,6 +152,7 @@ void free_association(chain_t *asoc)
 
 		if (a->key)
 		{
+			//printf("Free key %s\n", a->key);
 			free(a->key);
 			if (a->value)
 				free(a->value);

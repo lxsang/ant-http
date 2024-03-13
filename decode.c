@@ -254,6 +254,7 @@ static void *check_proxy(antd_request_t *rq, const char *path, const char *query
 
     if (!ret)
     {
+        free(task);
         return NULL;
     }
 
@@ -367,7 +368,7 @@ void *decode_request_header(void *data)
     dictionary_t request = dvalue(rq->request, "REQUEST_DATA");
     char *port_s = (char *)dvalue(rq->request, "SERVER_PORT");
     port_config_t *pcnf = (port_config_t *)dvalue(g_server_config.ports, port_s);
-    antd_task_t *task;
+    antd_task_t *task = NULL;
     // first real all header
     // this for check if web socket is enabled
 
@@ -757,7 +758,6 @@ void *decode_post_request(void *data)
         {
             // WARN: this may not work on ssl socket
             // antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_READABLE | TASK_EVT_ON_WRITABLE);
-            // task->handle = decode_post_request;
             antd_error(rq->client, 400, "Bad Request, missing content data");
             return task;
         }

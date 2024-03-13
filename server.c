@@ -3,7 +3,6 @@
 #endif
 #include <sys/socket.h>
 #include <poll.h>
-#include <dlfcn.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
@@ -534,13 +533,8 @@ void *proxify(void *data)
  */
 void *execute_plugin(void *data, const char *pname)
 {
-    void *(*fn)(void *);
-    plugin_header_t *(*metafn)();
-    plugin_header_t *meta = NULL;
-    struct plugin_entry *plugin;
-    char *error;
     char pattern[256];
-
+    antd_plugin_ctx_t* ctx;
     antd_request_t *rq = (antd_request_t *)data;
     antd_task_t *task = antd_create_task(NULL, (void *)rq, NULL, rq->client->last_io);
     antd_task_bind_event(task, rq->client->sock, 0, TASK_EVT_ON_WRITABLE | TASK_EVT_ON_READABLE);
@@ -561,58 +555,23 @@ void *execute_plugin(void *data, const char *pname)
     rq->client->state = ANTD_CLIENT_PLUGIN_EXEC;
     // load the plugin
     pthread_mutex_lock(&server_mux);
-    plugin = plugin_load((char *)pname, dvalue(g_server_config.plugins, pname));
+    ctx = antd_plugin_load(pname);
     pthread_mutex_unlock(&server_mux);
-    if (plugin == NULL)
+    if (ctx == NULL)
     {
         antd_error(rq->client, 503, "Requested service not found");
         return task;
     }
-    // check if the plugin want rawbody or decoded body
-    metafn = (plugin_header_t * (*)()) dlsym(plugin->handle, "meta");
-    if ((error = dlerror()) == NULL)
-    {
-        meta = metafn();
-    }
-    // load the function
-    fn = (void *(*)(void *))dlsym(plugin->handle, PLUGIN_HANDLER);
-    if ((error = dlerror()) != NULL)
-    {
-        ERROR("Problem when finding %s method from %s : %s", PLUGIN_HANDLER, pname, error);
-        antd_error(rq->client, 503, "Requested service not found");
-        return task;
-    }
+    rq->context = ctx;
     // check if we need the raw data or not
-    if (meta && meta->raw_body == 1)
+    if (antd_plugin_is_raw_body(ctx) == 1)
     {
-        task->handle = fn;
+        task->handle = antd_get_ctx_handle(ctx);
     }
     else
     {
         free(task);
-        task = antd_create_task(decode_post_request, (void *)rq, fn, rq->client->last_io);
+        task = antd_create_task(decode_post_request, (void *)rq, antd_get_ctx_handle(ctx), rq->client->last_io);
     }
     return task;
 }
-
-dictionary_t mimes_list()
-{
-    return g_server_config.mimes;
-}
-
-#ifdef USE_ZLIB
-int compressable(char *ctype)
-{
-    if (!g_server_config.gzip_enable || g_server_config.gzip_types == NULL)
-        return 0;
-    item_t it;
-    list_for_each(it, g_server_config.gzip_types)
-    {
-        if (it->type == LIST_TYPE_POINTER && it->value.ptr && regex_match((const char *)it->value.ptr, ctype, 0, NULL))
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-#endif

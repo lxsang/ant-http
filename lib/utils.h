@@ -34,6 +34,7 @@ THE SOFTWARE.
 
 #include "dictionary.h"
 
+#define STRINGIFY(x) #x
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 #define EQU(a,b) (strcmp(a,b) == 0)
 #define IEQU(a,b) (strcasecmp(a,b) == 0)
@@ -44,9 +45,9 @@ THE SOFTWARE.
 #define true 1
 #define false 0
 
-#define LOG(a,...) syslog (LOG_NOTICE,"ANTD_LOG@[%s: %d]: " a "\n", __FILE__, \
+#define LOG(a,...) syslog (LOG_NOTICE,"ANTD_LOG@[%s:%d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
-#define ERROR(a,...) syslog (LOG_ERR, "ANTD_ERROR@[%s: %d]: " a "\n", __FILE__, \
+#define ERROR(a,...) syslog (LOG_ERR, "ANTD_ERROR@[%s:%d]: " a "\n", __FILE__, \
 		__LINE__, ##__VA_ARGS__)
 // add this to the utils
 #define UNUSED(x) (void)(x)
@@ -65,7 +66,8 @@ typedef union
     struct sockaddr_in  addr4;
 } antd_sockaddr_t;
 
-dictionary_t __attribute__((weak)) mimes_list();
+dictionary_t mimes_list();
+void set_mimes_list(dictionary_t);
 char* __s(const char*,...);
 void trim(char*,const char);
 void removeAll(const char* path,int mode);

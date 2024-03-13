@@ -46,6 +46,8 @@ THE SOFTWARE.
 #include "dictionary.h"
 // #include <time.h>
 
+static dictionary_t g_mime_list = NULL;
+
 /**
  * Trim a string by a character on both ends
  * @param str   The target string
@@ -184,8 +186,14 @@ void verify_header(char *k)
 
 dictionary_t mimes_list()
 {
-    return NULL;
+    return g_mime_list;
 }
+
+void set_mimes_list(dictionary_t dict)
+{
+    g_mime_list = dict;
+}
+
 /*get mime file info from type*/
 mime_t mime_from_type(const char *type)
 {

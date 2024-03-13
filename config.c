@@ -63,8 +63,8 @@ static void init_plugins()
             if (value && (strncmp(value, "1", 1) == 0 || strncmp(value, "true", 3) == 0))
             {
                 // load the plugin
-                LOG("Plugin %s: autoloading...", it->key);
-                plugin_load(it->key, config);
+                LOG("Plugin %s: auto loading...", it->key);
+                UNUSED(antd_plugin_load(it->key));
             }
         }
     }
@@ -104,23 +104,6 @@ static int config_handler(void *conf, const char *section, const char *name,
         if (pconfig->plugins_ext)
             free(pconfig->plugins_ext);
         pconfig->plugins_ext = strdup(value);
-    }
-    else if (MATCH("SERVER", "database"))
-    {
-        if (stat(value, &st) == -1)
-            mkdirp(value, 0700);
-        tmp = realpath(value, NULL);
-        if (!tmp)
-        {
-            ERROR("Unable to query real path for %s: %s", value, strerror(errno));
-        }
-        else
-        {
-            if (pconfig->db_path)
-                free(pconfig->db_path);
-            pconfig->db_path = tmp;
-            LOG("Database root is %s", pconfig->db_path);
-        }
     }
     else if (MATCH("SERVER", "tmpdir"))
     {
@@ -341,6 +324,13 @@ void load_config(const char *file)
             LOG("SSL Cipher suite: %s", g_server_config.ssl_cipher);*/
 #endif
     }
+    set_mimes_list(g_server_config.mimes);
+#ifdef USE_ZLIB
+    if(g_server_config.gzip_enable && g_server_config.gzip_types != NULL)
+    {
+        set_gzip_types(g_server_config.gzip_types);
+    }
+#endif
     LOG("%d mimes entries found", g_server_config.mimes->size);
     // Init plugins if necessary
     init_plugins();
@@ -361,9 +351,17 @@ void destroy_config()
     if (g_server_config.ssl_cipher)
         free(g_server_config.ssl_cipher);
     if (g_server_config.gzip_types)
+    {
         list_free(&g_server_config.gzip_types);
+#ifdef USE_ZLIB
+        set_gzip_types(g_server_config.gzip_types);
+#endif
+    }
     if (g_server_config.mimes)
+    {
         freedict(g_server_config.mimes);
+        set_mimes_list(NULL);
+    }
     if (g_server_config.stat_fifo_path)
         free(g_server_config.stat_fifo_path);
     if (g_server_config.plugins)
@@ -371,8 +369,17 @@ void destroy_config()
         for_each_assoc(it, g_server_config.plugins)
         {
             freedict((dictionary_t)it->value);
+            it->value = NULL;
         }
         freedict(g_server_config.plugins);
+    }
+    if(g_server_config.sslcert)
+    {
+        free(g_server_config.sslcert);
+    }
+    if(g_server_config.sslkey)
+    {
+        free(g_server_config.sslkey);
     }
     if (g_server_config.ports)
     {
@@ -396,4 +403,5 @@ void destroy_config()
         freedict(g_server_config.ports);
     }
     LOG("Unclosed connection: %d", g_server_config.connection);
+    LOG("Config destroyed");
 }

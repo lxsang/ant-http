@@ -533,7 +533,7 @@ void antd_scheduler_destroy(antd_scheduler_t *scheduler)
 */
 antd_task_t *antd_create_task(void *(*handle)(void *), void *data, void *(*callback)(void *), time_t atime)
 {
-    antd_task_t *task = (antd_task_t *)malloc(sizeof *task);
+    antd_task_t *task = (antd_task_t *)malloc(sizeof(antd_task_t));
     task->stamp = (unsigned long)time(NULL);
     task->data = data;
     task->handle = handle;

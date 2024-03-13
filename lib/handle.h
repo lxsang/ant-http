@@ -5,6 +5,7 @@
 
 #include "list.h"
 #include "dictionary.h"
+#include "plugin.h"
 
 #define SERVER_NAME "Antd"
 #define IS_POST(method) (strcmp(method, "POST") == 0)
@@ -28,9 +29,6 @@
 #define ANTD_CLIENT_RQ_DATA_DECODE 0x7
 #define ANTD_CLIENT_PROXY_MONITOR 0x8
 
-#define ANTD_PLUGIN_READY 0x0
-#define ANTD_PLUGIN_PANNIC 0x1
-#define ANTD_PLUGIN_INIT 0x2
 #define MAX_PATH_LEN 256
 
 typedef enum
@@ -63,6 +61,7 @@ typedef struct
 {
     antd_client_t *client;
     dictionary_t request;
+    antd_plugin_ctx_t * context;
 } antd_request_t;
 
 typedef struct
@@ -73,23 +72,12 @@ typedef struct
 
 } antd_response_header_t;
 
-typedef struct
-{
-    char name[MAX_PATH_LEN];
-    char dbpath[MAX_PATH_LEN];
-    char tmpdir[MAX_PATH_LEN];
-    char pdir[MAX_PATH_LEN];
-    dictionary_t config;
-    int raw_body;
-    int status;
-    void *instance_data;
-} plugin_header_t;
-
 void set_nonblock(int socket);
 //void set_block(int socket);
-
-int __attribute__((weak)) compressable(char *ctype);
-
+#ifdef USE_ZLIB
+int  compressable(char *ctype);
+void set_gzip_types(list_t list);
+#endif
 void antd_send_header(void *, antd_response_header_t *);
 const char *get_status_str(int stat);
 int __t(void *, const char *, ...);

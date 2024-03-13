@@ -22,7 +22,8 @@ libantd_la_SOURCES =  lib/ini.c \
 			lib/sha1.c \
 			lib/list.c \
 			lib/bst.c \
-			lib/scheduler.c
+			lib/scheduler.c \
+			lib/plugin.c
 
 pkginclude_HEADERS =  lib/ini.h \
 			lib/handle.h \

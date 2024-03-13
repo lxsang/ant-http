@@ -2,19 +2,12 @@
 #define PLUGIN_MANAGER_H
 
 #include "lib/dictionary.h"
+#include "lib/plugin.h"
+#include "lib/scheduler.h"
 
-#define PLUGIN_HANDLER "handle"
+typedef void*(*antd_plugin_handle_t)(void *);
 
-struct plugin_entry { 
-    struct plugin_entry *next; 
-    char *name; 
-    void *handle;
-    dictionary_t instances;
-};
-/* lookup: look for s in hashtable */
-struct plugin_entry *plugin_lookup(char *s);
-/* install: put (name, defn) in hashtable */
-struct plugin_entry *plugin_load(char *name, dictionary_t config);
-void unload_all_plugin();
-void unload_plugin(struct plugin_entry*);
+antd_plugin_ctx_t *antd_plugin_load(const char *name);
+void antd_unload_all_plugin();
+antd_plugin_handle_t antd_get_ctx_handle(antd_plugin_ctx_t *);
 #endif

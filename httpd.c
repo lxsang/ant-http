@@ -140,7 +140,6 @@ static void configure_context(SSL_CTX *ctx)
 
 static void stop_serve(int dummy)
 {
-    UNUSED(dummy);
     // close log server
     closelog();
     sigset_t mask;
@@ -151,7 +150,7 @@ static void stop_serve(int dummy)
     sigaddset(&mask, SIGABRT);
     sigprocmask(SIG_BLOCK, &mask, NULL);
     antd_scheduler_destroy(scheduler);
-    unload_all_plugin();
+    antd_unload_all_plugin();
 #ifdef USE_OPENSSL
     // DEPRECATED FIPS_mode_set(0);
     SSL_CTX_free(ctx);
@@ -165,6 +164,7 @@ static void stop_serve(int dummy)
 #endif
     destroy_config();
     sigprocmask(SIG_UNBLOCK, &mask, NULL);
+    exit(dummy);
 }
 
 static void antd_monitor(port_config_t *pcnf, int sock)
@@ -182,6 +182,7 @@ static void antd_monitor(port_config_t *pcnf, int sock)
             // just dump the scheduler when we have a connection
             antd_client_t *client = (antd_client_t *)malloc(sizeof(antd_client_t));
             antd_request_t *request = (antd_request_t *)malloc(sizeof(*request));
+            request->context = NULL;
             request->client = client;
             request->request = dict();
             client->zstream = NULL;
@@ -378,8 +379,7 @@ int main(int argc, char *argv[])
     if (scheduler == NULL)
     {
         ERROR("Unable to initialise scheduler. Exit");
-        stop_serve(0);
-        exit(1);
+        stop_serve(1);
     }
     FD_ZERO(&master_set);
     for_each_assoc(it, g_server_config.ports)
@@ -411,15 +411,13 @@ int main(int argc, char *argv[])
     if (nlisten == 0)
     {
         ERROR("No port is listened, quit!!");
-        stop_serve(0);
-        exit(1);
+        stop_serve(1);
     }
     // Start scheduler
     if (pthread_create(&sched_th, NULL, (void *(*)(void *))antd_scheduler_wait, (void *)scheduler) != 0)
     {
         ERROR("pthread_create: cannot start scheduler thread");
-        stop_serve(0);
-        exit(1);
+        stop_serve(1);
     }
     else
     {
@@ -460,5 +458,5 @@ int main(int argc, char *argv[])
         }
     }
     stop_serve(0);
-    return (0);
+    return 0;
 }

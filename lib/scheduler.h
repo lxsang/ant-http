@@ -1,8 +1,6 @@
 #ifndef ANT_SCHEDULER
 #define ANT_SCHEDULER
 
-#include <pthread.h>
-#include <semaphore.h>
 #include <stdint.h>
 
 

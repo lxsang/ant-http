@@ -5,15 +5,20 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 #include <stdio.h>
-#include "plugin_manager.h"
 #include "lib/utils.h"
 #include "lib/handle.h"
 #include "config.h"
+#include "lib/plugin_ctx.h"
+#include "plugin_manager.h"
+
+struct plugin_entry { 
+    struct plugin_entry *next; 
+    char *name; 
+    void *handle;
+    dictionary_t instances;
+};
 
 extern config_t g_server_config;
-
-static void unload_plugin_by_name(const char *);
-static void *plugin_from_file(char *name, char *path, dictionary_t conf);
 
 /**
  * Plugin table to store the loaded plugin
@@ -25,13 +30,147 @@ static struct plugin_entry *plugin_table[HASHSIZE];
  * @param  s plugin name
  * @return   a plugin entry in the plugin table
  */
-struct plugin_entry *plugin_lookup(char *s)
+static struct plugin_entry *plugin_lookup(const char *s)
 {
+    if(!s)
+    {
+        return NULL;
+    }
     struct plugin_entry *np;
     for (np = plugin_table[hash(s, HASHSIZE)]; np != NULL; np = np->next)
         if (strcmp(s, np->name) == 0)
             return np; /* found */
     return NULL;       /* not found */
+}
+
+static void antd_plugin_ctx_drop(struct plugin_entry* np, antd_plugin_ctx_t* ctx)
+{
+    if(!ctx)
+    {
+        return;
+    }
+    if(ctx->drop)
+    {
+        if(ctx->name)
+            LOG("Release user resource for context: %s", ctx->name);
+        ctx->drop((void*)ctx);
+    }
+    if(ctx->name)
+    {
+        LOG("Dropping plugin context: %s", ctx->name);
+        if(np->instances)
+        {
+            dput(np->instances, ctx->name, NULL);
+        }
+        free(ctx->name);
+    }
+    if(ctx->confdir)
+    {
+        free(ctx->confdir);
+    }
+    free(ctx);
+}
+
+
+static antd_plugin_ctx_t* antd_plugin_ctx_lookup(struct plugin_entry* np, const char* name)
+{
+    if(!np || !np->instances)
+    {
+        return NULL;
+    }
+    LOG("Looking for plugin context: %s", name);
+    antd_plugin_ctx_t* ctx = dvalue(np->instances, name);
+    if(ctx == NULL)
+    {
+        char *error;
+        LOG("Create new plugin context: %s", name);
+        ctx = (antd_plugin_ctx_t *)malloc(sizeof(antd_plugin_ctx_t));
+        if(!ctx)
+        {
+            ERROR("Unable to allocate memory for plugin context `%s`: %s", name, strerror(errno));
+            return NULL;
+        }
+        // init the context
+        ctx->basedir = g_server_config.plugins_dir;
+        ctx->tmpdir = g_server_config.tmpdir;
+        ctx->name = strdup(name);
+        ctx->confdir = NULL;
+        ctx->raw_body = 0;
+        ctx->status = ANTD_PLUGIN_INIT;
+        ctx->config=dvalue(g_server_config.plugins, name);
+        ctx->data = NULL;
+        ctx->handle = NULL;
+        ctx->create = NULL;
+        ctx->drop = NULL;
+        // look for handle function
+        ctx->handle = (void* (*)(void *))dlsym(np->handle, PLUGIN_HANDLE);
+        if ((error = dlerror()) != NULL)
+        {
+            ERROR("Problem when finding plugin handle function for %s : %s", name, error);
+            ctx->handle = NULL;
+            antd_plugin_ctx_drop(np, ctx);
+            return NULL;
+        }
+        // look for drop function
+        ctx->drop = (void (*)(antd_plugin_ctx_t *))dlsym(np->handle, PLUGIN_DROP);
+        if ((error = dlerror()) != NULL)
+        {
+            ERROR("Problem when finding plugin drop function for %s : %s", name, error);
+            ctx->drop = NULL;
+            antd_plugin_ctx_drop(np, ctx);
+            return NULL;
+        }
+        // look for init function
+        ctx->create = (void* (*)(antd_plugin_ctx_t *))dlsym(np->handle, PLUGIN_INIT);
+        if ((error = dlerror()) != NULL)
+        {
+            ERROR("Problem when finding plugin init function for %s : %s.", name, error);
+            ctx->create = NULL;
+            antd_plugin_ctx_drop(np, ctx);
+            return NULL;
+        }
+        else
+        {
+            // run the init function
+            ctx->data = ctx->create(ctx);
+            if(ctx->status == ANTD_PLUGIN_PANNIC)
+            {
+                ERROR("PANIC happens when init plugin context %s. drop it", name);
+                antd_plugin_ctx_drop(np, ctx);
+                return NULL;
+            }
+            ctx->status = ANTD_PLUGIN_READY;
+        }
+        dput(np->instances, name, (void*)ctx);
+    }
+    return ctx;
+}
+
+static void antd_plugin_entry_drop(struct plugin_entry* np)
+{
+    if(!np)
+    {
+        return;
+    }
+    if(np->name)
+    {
+        LOG("Unloaded %s", np->name);
+        free(np->name);
+    }
+    if(np->instances)
+    {
+        chain_t it;
+        for_each_assoc(it, np->instances)
+        {
+            antd_plugin_ctx_drop(np,(antd_plugin_ctx_t*)it->value);
+        }
+        freedict(np->instances);
+    }
+    if(np->handle)
+    {
+        dlclose(np->handle);
+    }
+    free(np);
 }
 
 /**
@@ -41,170 +180,76 @@ struct plugin_entry *plugin_lookup(char *s)
  * @param config: plugin configuration
  * @return      pointer to the loaded plugin
  */
-struct plugin_entry *plugin_load(char *name, dictionary_t pconf)
+antd_plugin_ctx_t* antd_plugin_load(const char *name)
 {
-    char *pname = NULL;
+    const char *plugin_file_name = NULL;
     char path[BUFFLEN];
     struct plugin_entry *np;
     unsigned hashval;
-    plugin_header_t *(*metafn)();
-    plugin_header_t *meta = NULL;
-    int fromfd, tofd;
-    char *error;
-    struct stat st;
-    int is_tmp = 0;
+    antd_plugin_ctx_t *ctx;
+    dictionary_t pconf = dvalue(g_server_config.plugins, name);
     if (pconf)
     {
-        pname = dvalue(pconf, "name");
+        plugin_file_name = dvalue(pconf, "name");
     }
-    if ((np = plugin_lookup(name)) == NULL)
+    if(plugin_file_name == NULL)
+    {
+        plugin_file_name = name;
+    }
+    if(plugin_file_name == NULL)
+    {
+        return NULL;
+    }
+    if ((np = plugin_lookup(plugin_file_name)) == NULL)
     { /* not found */
-        LOG("Loading plugin: %s...", name);
-        np = (struct plugin_entry *)malloc(sizeof(*np));
-        if (np == NULL || name == NULL)
+        LOG("Loading plugin: %s...", plugin_file_name);
+        np = (struct plugin_entry *)malloc(sizeof(struct plugin_entry));
+        np->instances = NULL;
+        if (np == NULL)
         {
-            if (np)
-                free(np);
             return NULL;
         }
 
-        (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.plugins_dir, name, g_server_config.plugins_ext);
-        if (pname && strcmp(name, pname) != 0)
+        (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.plugins_dir, plugin_file_name, g_server_config.plugins_ext);
+        np->name = strdup(plugin_file_name);
+        // now load it from file
+        np->handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL /*| RTLD_NODELETE*/);
+        if (!np->handle)
         {
-            // copy plugin file to tmpdir
-            (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.plugins_dir, pname, g_server_config.plugins_ext);
-            LOG("Original plugin file: %s", path);
-            if ((fromfd = open(path, O_RDONLY)) < 0)
-            {
-                ERROR("Unable to open file for reading %s: %s", path, strerror(errno));
-                return NULL;
-            }
-            if (stat(path, &st) != 0)
-            {
-                close(fromfd);
-                ERROR("Unable to get file stat %s: %s", path, strerror(errno));
-                return NULL;
-            }
-            (void)snprintf(path, sizeof(path), "%s/%s%s", g_server_config.tmpdir, name, g_server_config.plugins_ext);
-            LOG("TMP plugin file: %s", path);
-            if ((tofd = open(path, O_WRONLY | O_CREAT, 0600)) < 0)
-            {
-                close(fromfd);
-                ERROR("Unable open file for reading %s: %s", path, strerror(errno));
-                return NULL;
-            }
-            if (sendfile(tofd, fromfd, NULL, st.st_size) != st.st_size)
-            {
-                close(fromfd);
-                close(tofd);
-                ERROR("Unable to copy file: %s", strerror(errno));
-                return NULL;
-            }
-            is_tmp = 1;
-        }
-
-        np->name = strdup(name);
-        np->handle = plugin_from_file(name, path, pconf);
-        if (is_tmp)
-        {
-            //TODO change this
-            (void)remove(path);
-        }
-        if (np->handle == NULL)
-        {
-            if (np->name)
-                free(np->name);
-            if (np)
-                free(np);
+            ERROR("Cannot load plugin '%s' : '%s'", plugin_file_name, dlerror());
+            antd_plugin_entry_drop(np);
             return NULL;
         }
+        np->instances = dict();
         hashval = hash(name, HASHSIZE);
         np->next = plugin_table[hashval];
         plugin_table[hashval] = np;
     }
     else /* already there */
     {
-        LOG("The plugin %s id already loaded", name);
+        LOG("The plugin %s id already loaded", plugin_file_name);
     }
-
+    // now look for the plugin context
+    ctx = antd_plugin_ctx_lookup(np, name);
     // check if plugin is ready
-    metafn = (plugin_header_t * (*)()) dlsym(np->handle, "meta");
-    if ((error = dlerror()) != NULL)
+    if (ctx == NULL)
     {
-        ERROR("Unable to fetch plugin meta-data: [%s] %s", name, error);
-        unload_plugin_by_name(name);
-        free(np);
+        ERROR("Unable to fetch plugin context for: [%s] %s", plugin_file_name, name);
         return NULL;
     }
-    meta = metafn();
-    LOG("PLugin status: [%s] %d", name, meta->status);
-    if (!meta || meta->status != ANTD_PLUGIN_READY)
+    LOG("PLugin instance status: [%s] %d", name, ctx->status);
+    if (ctx->status != ANTD_PLUGIN_READY)
     {
-        ERROR("Plugin is not ready or error: [%s].", name);
-        unload_plugin_by_name(name);
-        free(np);
+        ERROR("Plugin instance is not ready or error: [%s].", name);
+        antd_plugin_ctx_drop(np, ctx);
         return NULL;
     }
-    return np;
-}
-/**
- * Find a plugin in a file, and load it in to the plugin table
- * @param  name Name of the plugin
- * @return
- */
-static void *plugin_from_file(char *name, char *path, dictionary_t conf)
-{
-    void *lib_handle;
-    char *error;
-    void (*fn)(plugin_header_t *, dictionary_t);
-    lib_handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL /*| RTLD_NODELETE*/);
-    if (!lib_handle)
-    {
-        ERROR("Cannot load plugin '%s' : '%s'", name, dlerror());
-        return NULL;
-    }
-    fn = (void (*)(plugin_header_t *, dictionary_t))dlsym(lib_handle, "__init_plugin__");
-    if ((error = dlerror()) != NULL)
-        ERROR("Problem when finding plugin init function for %s : %s", name, error);
-    else
-    {
-        plugin_header_t header;
-        strncpy(header.name, name, MAX_PATH_LEN - 1);
-        strncpy(header.dbpath, g_server_config.db_path, MAX_PATH_LEN - 1);
-        strncpy(header.tmpdir, g_server_config.tmpdir, MAX_PATH_LEN - 1);
-        strncpy(header.pdir, g_server_config.plugins_dir, MAX_PATH_LEN - 1);
-        header.config = conf;
-        header.raw_body = 0;
-        header.status = ANTD_PLUGIN_INIT;
-        (*fn)(&header, conf);
-    }
-    // trick libc that we close this lib, but it is not realy deleted
-    return lib_handle;
+    return ctx;
 }
 
-void unload_plugin(struct plugin_entry *np)
-{
-    char *error;
-    void (*fn)() = NULL;
-    // find and execute the exit function
-    fn = (void (*)())dlsym(np->handle, "__release__");
-    if ((error = dlerror()) != NULL)
-    {
-        ERROR("Cant not release plugin %s : %s", np->name, error);
-    }
-    if (fn)
-    {
-        (*fn)();
-    }
-    dlclose(np->handle);
-    LOG("Unloaded %s", np->name);
-    // free((void *) np->handle);
-    if (np->name)
-        free((void *)np->name);
-}
 /*
     Unload a plugin by its name
-*/
+
 void unload_plugin_by_name(const char *name)
 {
     struct plugin_entry *np;
@@ -212,7 +257,7 @@ void unload_plugin_by_name(const char *name)
     np = plugin_table[hasval];
     if (strcmp(np->name, name) == 0)
     {
-        unload_plugin(np);
+        antd_plugin_entry_drop(np);
         plugin_table[hasval] = np->next;
     }
     else
@@ -226,14 +271,16 @@ void unload_plugin_by_name(const char *name)
         }
         if (np == NULL)
             return; // the plugin is is not loaded
-        unload_plugin(np->next);
+        antd_plugin_entry_drop(np->next);
         np->next = np->next->next;
     }
 }
+*/
+
 /**
  * Unload all the plugin loaded on the plugin table
  */
-void unload_all_plugin()
+void antd_unload_all_plugin()
 {
     LOG("Unload all plugins");
     for (int i = 0; i < HASHSIZE; i++)
@@ -244,10 +291,14 @@ void unload_all_plugin()
         while ((curr = *np) != NULL)
         {
             (*np) = (*np)->next;
-            unload_plugin(curr);
-            free(curr);
+            antd_plugin_entry_drop(curr);
+            //free(curr);
         }
         plugin_table[i] = NULL;
     }
-    exit(0);
+}
+
+antd_plugin_handle_t antd_get_ctx_handle(antd_plugin_ctx_t *ctx)
+{
+    return ctx->handle;
 }

@@ -352,6 +352,7 @@ int main(int argc, char *argv[])
     signal(SIGPIPE, SIG_IGN);
     signal(SIGABRT, SIG_IGN);
     signal(SIGINT, stop_serve);
+    signal(SIGTERM,stop_serve);
     // start syslog
     if (g_server_config.debug_enable == 1)
     {

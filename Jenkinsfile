@@ -3,22 +3,39 @@ def build_antd()
   sh '''
   set -e
   cd $WORKSPACE
-  mkdir -p build/$arch/etc/systemd/system/
-  mkdir -p build/$arch/opt/www
+  mkdir -p build/$arch/
   [ -f Makefile ] && make clean
+  case $arch in
+    amd64|x86_64)
+        HOST=
+        ;;
+    aarch64|arm64)
+        HOST=--host=aarch64-linux-gnu
+        ;;
+    armv7l|arm)
+        HOST=--host=arm-linux-gnueabihf
+        ;;
+    *)
+        echo "Unkown architecture"
+        exit 1
+        ;;
+  esac
   libtoolize
   aclocal
   autoconf
   automake --add-missing
-  ./configure --prefix=/usr
-  make
+  ./configure $HOST --prefix=/usr
   DESTDIR=$WORKSPACE/build/$arch make install
-  cp  build/$arch/usr/etc/antd-config.ini build/$arch/opt/www/config.ini.example
   '''
 }
 
 pipeline{
-  agent { node{ label'master' }}
+  agent {
+    docker {
+      image 'xsangle/ci-tools:latest'
+      reuseNode true
+    }
+  }
   options {
     // Limit build history with buildDiscarder option:
     // daysToKeepStr: history is only kept up to this many days.
@@ -37,17 +54,16 @@ pipeline{
   }
   stages
   {
-    stage('Build AMD64') {
-      agent {
-          docker {
-              image 'xsangle/ci-tools:bionic-amd64'
-              // Run the container on the node specified at the
-              // top-level of the Pipeline, in the same workspace,
-              // rather than on a new node entirely:
-              reuseNode true
-              registryUrl 'http://workstation:5000/'
-          }
+    stage('Prepare') {
+      steps {
+          sh'''
+          make clean || true
+          rm -rf build/* || true
+          mkdir build || true
+          '''
       }
+    }
+    stage('Build AMD64') {
       steps {
         script{
           env.arch = "amd64"
@@ -56,16 +72,6 @@ pipeline{
       }
     }
     stage('Build ARM64') {
-      agent {
-          docker {
-              image 'xsangle/ci-tools:bionic-arm64'
-              // Run the container on the node specified at the
-              // top-level of the Pipeline, in the same workspace,
-              // rather than on a new node entirely:
-              reuseNode true
-              registryUrl 'http://workstation:5000/'
-          }
-      }
       steps {
         script{
           env.arch = "arm64"
@@ -74,16 +80,6 @@ pipeline{
       }
     }
     stage('Build ARM') {
-      agent {
-          docker {
-              image 'xsangle/ci-tools:bionic-arm'
-              // Run the container on the node specified at the
-              // top-level of the Pipeline, in the same workspace,
-              // rather than on a new node entirely:
-              reuseNode true
-              registryUrl 'http://workstation:5000/'
-          }
-      }
       steps {
         script{
           env.arch = "arm"

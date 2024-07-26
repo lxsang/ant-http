@@ -35,10 +35,6 @@ With all dependencies installed:
 ```bash
 mkdir antd
 cd antd
-# Replace x.x.x by the version number
-# build without plugin
-wget -O- https://get.iohub.dev/antd | bash -s "x.x.x"
-
 # or from the distribution tarball
 tar xvzf antd-x.x.x.tar.gz
 cd antd-x.x.x
